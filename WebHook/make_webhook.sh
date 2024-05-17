@@ -1,0 +1,1 @@
+docker build -t 775495797/easyaccounts-webhook:latest .
