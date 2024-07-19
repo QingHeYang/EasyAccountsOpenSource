@@ -1,6 +1,6 @@
 <template>
   <div>
-    <van-nav-bar title="流水" right-text="记一笔" @click-right="toAddFlow"/>
+    <van-nav-bar title="流水" left-text="搜索流水"  right-text="记一笔" @click-right="toAddFlow"/>
     <van-dropdown-menu active-color="#1989fa">
       <van-dropdown-item
           v-model="handle"
@@ -28,15 +28,21 @@
         <div v-show="this.handle===3">当月结余： ￥{{ this.totalEarn }}</div>
         <div v-show="this.handle===2">内部转账笔数： {{ this.flows.length }}</div>
       </div>
-      <van-button type="default" round size="small" style=" float: right;margin-right: 20px" icon="clock-o"
-                  @click="()=>{showPicker = true}">
-        {{ this.chooseMonth }}
-      </van-button>
-      <van-button type="default" round size="small" style=" float: right;margin-right: 20px" icon="flag-o"
-                  @click="toLastMonth">
-        去{{this.lastMonthBtnText}}月
-      </van-button>
+      <div style="display: flex; flex-direction: column; float: right;  margin-top: 5px; margin-right: 20px">
+        <div style="display: flex; justify-content: space-around; align-items: center; width: 100%;">
+          <van-button size="mini" plain type="info" icon="minus" @click="toLastMonth"></van-button>
+          <van-button type="info" round size="small" plain style="margin-left: 5px; margin-right: 5px" icon="clock-o"
+                      @click="()=>{showPicker = true}">
+            {{ this.chooseMonth }}
+          </van-button>
+          <van-button size="mini" v-show="showNextMonthButton" plain type="info" icon="plus" @click="toNextMonth"></van-button>
+        </div>
+        <van-button  type="default" v-show="flows.length!=0" round size="small" style="margin-top: 10px;" @click="generateReport">生成报表</van-button>
+      </div>
+
     </div>
+
+
     <van-divider
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
     > 账本概览
@@ -117,7 +123,7 @@
 
 <script>
 import request from "../../utils/request";
-import {Dialog} from 'vant';
+import {Dialog, Toast} from 'vant';
 
 export default {
   name: "Flow.vue",
@@ -125,6 +131,7 @@ export default {
   data() {
     return {
       showPicker: false,
+      hasFlow: true,
       flowId: "",
       currentFlow: {},
       handle: 3,
@@ -147,28 +154,22 @@ export default {
       totalOut: "",
       totalEarn: "",
       detail: "",
+      showNextMonthButton: true,
       chooseMonth: "",
+      curDate: new Date(),
       editShow: false,
       actions: [{name: "编辑", color: "#39bdfa"}, {name: "删除", color: "#f54949"}],
       columns: [
         // 第一列
       ],
-      lastMonthBtnText:""
     };
   },
 
   mounted() {
-    var curDate = new Date();
     this.prepareDateDouble();
-    this.chooseMonth = curDate.getFullYear() + "-" + (curDate.getMonth() + 1).toString().padStart(2, "0");
+    this.chooseMonth = this.curDate.getFullYear() + "-" + (this.curDate.getMonth() + 1).toString().padStart(2, "0");
     this.getMonthFlow();
-    if (curDate.getMonth()==0){
-      this.lastMonthBtnText = "12";
-    }else {
-      this.lastMonthBtnText =(curDate.getMonth()).toString().padStart(2, "0");
-    }
     this.renderVChart();
-
   },
   methods: {
 
@@ -305,16 +306,65 @@ export default {
       this.showPicker = false;
     },
 
-    toLastMonth(){
-      var date = new Date()
-      if (date.getMonth()==0){
-        this.chooseMonth = (date.getFullYear()-1) + "-12";
-      }else {
-        this.chooseMonth = date.getFullYear() + "-" + (date.getMonth()).toString().padStart(2, "0");
+    toLastMonth() {
+      let parts = this.chooseMonth.split("-");
+      let year = parseInt(parts[0]);
+      let month = parseInt(parts[1]);
+
+      if (month === 1) {
+        this.chooseMonth = (year - 1) + "-12";
+      } else {
+        this.chooseMonth = year + "-" + (month - 1).toString().padStart(2, "0");
       }
-      this.getMonthFlow()
+
+      this.getMonthFlow(); // 假设这个方法用来获取指定月份的数据
+    },
+
+
+    toNextMonth() {
+      let parts = this.chooseMonth.split("-");
+      let year = parseInt(parts[0]);
+      let month = parseInt(parts[1]);
+      let currentYear = this.curDate.getFullYear();
+      let currentMonth = this.curDate.getMonth() + 1; // JavaScript的getMonth()从0开始计数
+
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        if (month === 12) {
+          this.chooseMonth = (year + 1) + "-01";
+        } else {
+          this.chooseMonth = year + "-" + (month + 1).toString().padStart(2, "0");
+        }
+        this.getMonthFlow(); // 更新数据
+      }else {
+        Toast.fail("已经到最后了")
+      }
+    },
+
+    generateReport() {
+      //this.$router.push({path: "/flow/report", query: {month: this.chooseMonth}});
+      Dialog.confirm({
+        title: '确定生成报表吗？',
+        message:
+            '确定生成 ' +this.chooseMonth + " 月度报表吗？",
+      })
+          .then(() => {
+            this.makeExcel()
+          })
+          .catch(() => {
+            // on cancel
+          });
+    },
+    makeExcel(){
+      request({
+        url: "/flow/makeExcel/" + this.chooseMonth,
+        method: "get"
+      }).then(() => {
+        this.getMonthFlow();
+      });
     }
-  }
+
+  },
+
 };
 </script>
 

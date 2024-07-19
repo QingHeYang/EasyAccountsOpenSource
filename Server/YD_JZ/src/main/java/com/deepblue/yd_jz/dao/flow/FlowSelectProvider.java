@@ -114,4 +114,23 @@ public class FlowSelectProvider {
         log.info("method: getYearlySummary\n"+sql);
         return sql;
     }
+
+    public String getFlowsTypeByStartMonthAndEndMonth(String startMonth, String endMonth) {
+        String sql = "SELECT t.id, t.t_name, t.parent, SUM(CAST(f.money AS DECIMAL(10, 2))) AS money, tp.t_name as parentName \n" +
+                "FROM flow f \n" +
+                "JOIN type t ON f.type_id = t.id \n" +
+                "LEFT JOIN type tp ON t.parent = tp.id \n";
+
+        if (endMonth == null || endMonth.isEmpty()) {
+            sql += "WHERE f.f_date LIKE '" + startMonth + "%' AND f.account_to_id = 0 \n";
+        } else {
+            sql += "WHERE f.f_date BETWEEN '" + startMonth + "' AND '" + endMonth + "' AND f.account_to_id = 0 \n";
+        }
+
+        sql += "GROUP BY t.id, t.t_name, t.parent, tp.t_name\n";
+        log.info("method: getFlowsTypeByStartMonthAndEndMonth\n" + sql);
+        return sql;
+    }
+
+
 }

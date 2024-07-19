@@ -15,6 +15,8 @@ import com.deepblue.yd_jz.dao.action.ActionDao;
 import com.deepblue.yd_jz.dao.flow.FlowDao;
 import com.deepblue.yd_jz.dao.flow.FlowType;
 import com.deepblue.yd_jz.utils.*;
+import com.google.gson.Gson;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -33,6 +35,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Slf4j
 @Service
 public class ExcelService {
     @Autowired
@@ -59,6 +62,7 @@ public class ExcelService {
         try {
             Date date = sdf.parse(dateStr); // 尝试解析传入的日期字符串
             ExcelBean excelBean = getExcelForMonth(date); // 获取该日期的Excel报表数据
+            log.info(new Gson().toJson(excelBean));
             writeMonthExcel(dateStr,excelBean);
             return excelBean;
         } catch (ParseException e) {
@@ -82,7 +86,6 @@ public class ExcelService {
         BigDecimal moneyOut = new BigDecimal("0");
 
         ExcelBean excelBean = new ExcelBean();
-        excelBean = makeAnaylizeExcel(excelBean, date);
 
         for (Map<String, Object> map : flows) {
             ExcelBean.Flow flow = new ExcelBean.Flow();
@@ -131,115 +134,7 @@ public class ExcelService {
 
     }
 
-    private ExcelBean makeAnaylizeExcel(ExcelBean excelBean, Date date) {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM");
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(date); // 设置为当前时间
-        String curDate = sdf.format(date) + "%";
-        List<FlowType> currFlowTypes = flowDao.getFlowsByMonthAndType(curDate);
-        currFlowTypes = addRootToList(currFlowTypes);
-        calendar.set(Calendar.YEAR, calendar.get(Calendar.YEAR) - 1);
-        List<FlowType> lastYearFlowTypes = flowDao.getFlowsByMonthAndType(sdf.format(calendar.getTime()) + "%");
-        lastYearFlowTypes = addRootToList(lastYearFlowTypes);
-        calendar.set(Calendar.YEAR, calendar.get(Calendar.YEAR) + 1);
-        calendar.set(Calendar.MONTH, calendar.get(Calendar.MONTH) - 1);
-        List<FlowType> lastMonthFlowTypes = flowDao.getFlowsByMonthAndType(sdf.format(calendar.getTime()) + "%");
-        lastMonthFlowTypes = addRootToList(lastMonthFlowTypes);
-        Map<Integer, ExcelBean.Analyze> analyzeMap = new HashMap<>();
 
-        // Create or update analyzes for all flow types
-        Stream.of(currFlowTypes, lastYearFlowTypes, lastMonthFlowTypes).flatMap(Collection::stream)
-                .forEach(flow -> {
-                    ExcelBean.Analyze analyze = analyzeMap.computeIfAbsent(flow.getId(), k -> new ExcelBean.Analyze());
-                    if (analyze.getName() == null && flow.getTName() != null) {
-                        analyze.setId(flow.getId());
-                        analyze.setParent(flow.getParent());
-                        analyze.setRoot(flow.getParent() == -1);
-                        if (!analyze.isRoot()){
-                            analyze.setName("　● "+flow.getTName());
-                        }else {
-                            analyze.setName(flow.getTName());
-                        }
-                    }
-                });
-
-        // Set current month money
-        for (FlowType flow : currFlowTypes) {
-            analyzeMap.get(flow.getId()).setMoney(flow.getMoney());
-        }
-
-        // Set last year money
-        for (FlowType flow : lastYearFlowTypes) {
-            analyzeMap.get(flow.getId()).setLastYearMoney(flow.getMoney());
-        }
-
-        // Set last month money
-        for (FlowType flow : lastMonthFlowTypes) {
-            analyzeMap.get(flow.getId()).setLastMonthMoney(flow.getMoney());
-        }
-
-        // Add all analyzes to ExcelBean
-        List<ExcelBean.Analyze> analyzeList = new ArrayList<>(analyzeMap.values());
-        excelBean.setAnalyzeList(orderList(analyzeList));
-        return excelBean;
-    }
-
-    private List<ExcelBean.Analyze> orderList(List<ExcelBean.Analyze> analyzeList) {
-        Map<Integer, ExcelBean.Analyze> analyzeMap = analyzeList.stream()
-                .collect(Collectors.toMap(ExcelBean.Analyze::getId, a -> a));
-
-        List<ExcelBean.Analyze> orderedList = new ArrayList<>();
-
-        // 筛选出根节点并按原始列表中的顺序排序
-        List<ExcelBean.Analyze> roots = analyzeList.stream()
-                .filter(ExcelBean.Analyze::isRoot)
-                .collect(Collectors.toList());
-
-        // 为每个根节点添加它及其所有子节点
-        for (ExcelBean.Analyze root : roots) {
-            orderedList.add(root);
-            addChildren(root, orderedList, analyzeMap);
-        }
-
-        for (ExcelBean.Analyze analyze : orderedList) {
-            analyze.calculateMetrics();
-        }
-
-        return orderedList;
-    }
-
-    // 递归添加子节点的函数
-    private void addChildren(ExcelBean.Analyze parent, List<ExcelBean.Analyze> orderedList, Map<Integer, ExcelBean.Analyze> analyzeMap) {
-        for (ExcelBean.Analyze analyze : analyzeMap.values()) {
-            if (analyze.getParent() == parent.getId()) {
-                orderedList.add(analyze);
-                addChildren(analyze, orderedList, analyzeMap); // 递归添加子子节点
-            }
-        }
-    }
-
-
-    private List<FlowType> addRootToList(List<FlowType> flowList) {
-        Map<Integer, FlowType> rootFlowMap = new HashMap<>();
-        for (FlowType flow : flowList) {
-            if (flow.getParent() != -1 ) {
-                if (!rootFlowMap.containsKey(flow.getParent())) {
-                    FlowType rootFlow = new FlowType();
-                    rootFlow.setId(flow.getParent());
-                    rootFlow.setParent(-1);
-                    rootFlow.setTName(flow.getParentName());
-                    rootFlow.setMoney(flow.getMoney());
-                    rootFlowMap.put(flow.getParent(), rootFlow);
-                }else {
-                    FlowType rootFlow = rootFlowMap.get(flow.getParent());
-                    BigDecimal bigDecimal = rootFlow.getMoney();
-                    rootFlow.setMoney(flow.getMoney().add(bigDecimal));
-                }
-            }
-        }
-        flowList.addAll(rootFlowMap.values());
-        return flowList;
-    }
 
     private void writeMonthExcel(String excelDate, ExcelBean excelBean) {
         Date date = new Date();
@@ -253,7 +148,7 @@ public class ExcelService {
         excelWriter.fill(excelBean, writeSheet);
         excelWriter.fill(new FillWrapper("flow", excelBean.getFlow()), writeSheet);
         excelWriter.fill(new FillWrapper("account", excelBean.getExcelAccounts()), writeSheet);
-        excelWriter.fill(new FillWrapper("analyze",excelBean.getAnalyzeList()), writeSheet);
+        //excelWriter.fill(new FillWrapper("analyze",excelBean.getAnalyzeList()), writeSheet);
         //  excelWriter.write(flowList,writeSheet);
         excelWriter.finish();
         uploadExcel(excelPath, excelFileName, excelDate);
@@ -262,26 +157,11 @@ public class ExcelService {
     private void uploadExcel(String excelPath, String excelFileName, String title) {
         if (FileUtils.isExist(excelPath)) {
             fileMakeWebHook.sendFile(new File(excelPath), "month_excel", excelFileName);
-            /*ossUtils.doUpload(new File(excelPath), "YD_JZ/excel/auto/", excelFileName, new OssUtils.OssUploadCallBack() {
-                @Override
-                public void onUploadSuccess(String ossUrl) {
-                    LogUtils.log_print("上传完成，地址为： " + ossUrl);
-                    sendEmail(ossUrl, title);
-                }
-
-                @Override
-                public void onUploadFailed(String msg) {
-                    LogUtils.log_print("上传失败: " + msg);
-
-                }
-            });*/
         }
     }
 
     private void sendEmail(String fileUrl, String title) {
-//        emailUtils.setTitle(title + "月度账单生成报告");
-//        emailUtils.setContent(title + "已生成");
-//        emailUtils.sendEmail(fileUrl);
+
     }
 
     public static class ExcelWriteHandler implements CellWriteHandler {

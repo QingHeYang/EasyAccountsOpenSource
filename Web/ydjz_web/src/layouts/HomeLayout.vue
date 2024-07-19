@@ -1,17 +1,20 @@
 <template>
   <div>
-    <keep-alive  :include="cachedViews">
+    <keep-alive >
 
-    <router-view  :key="key"  :include="cachedViews" style="margin-bottom: 60px">
+      <router-view :key="key"  style="margin-bottom: 60px">
 
-    </router-view>
+      </router-view>
     </keep-alive>
 
-    <van-tabbar route>
+    <van-tabbar route style="padding-bottom: 20px">
       <van-tabbar-item icon="balance-pay" to="/board">总览</van-tabbar-item>
       <van-tabbar-item icon="records" to="/flow">流水</van-tabbar-item>
+      <van-tabbar-item icon="cart-circle-o" to="/analysis">分析</van-tabbar-item>
       <van-tabbar-item icon="setting-o" to="/setting">设置</van-tabbar-item>
     </van-tabbar>
+
+
   </div>
 </template>
 
@@ -28,8 +31,7 @@ export default {
   // },
 
   data() {
-    return {
-    };
+    return {};
   },
 };
 </script>

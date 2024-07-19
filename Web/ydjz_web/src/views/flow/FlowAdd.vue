@@ -9,6 +9,7 @@
           type="number"
           label="账单金额"
           placeholder="请输入账单金额"
+          @touchstart.native.stop="keyboardShow = true"
       />
       <van-cell title="选择收支" is-link @click="onActionClick">
         <template #default>
@@ -119,6 +120,17 @@
       >{{ this.$route.query.flowId != null ? "修改" : "提交" }}
       </van-button>
     </div>
+
+    <van-number-keyboard
+        :show="keyboardShow"
+        v-model="money"
+        theme="custom"
+        extra-key="."
+        close-button-text="完成"
+        @input="onInput"
+        @delete="onDelete"
+        @blur="keyboardShow = false"
+    />
   </div>
 </template>
 
@@ -130,6 +142,8 @@ export default {
   name: "FlowAdd",
   data() {
     return {
+      keyboardShow: false,
+      keyboardValue: "",
       childMoneyItem: [],
       money: "",
       actionShow: false,

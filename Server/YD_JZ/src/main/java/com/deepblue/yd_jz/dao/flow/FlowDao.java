@@ -69,5 +69,7 @@ public interface FlowDao {
             "GROUP BY t.id, t.t_name, t.parent, tp.t_name")
     List<FlowType> getFlowsByMonthAndType(@Param("datePattern") String datePattern);
 
+    @SelectProvider(type = FlowSelectProvider.class, method = "getFlowsTypeByStartMonthAndEndMonth")
+    List<FlowType> getFlowsTypeByStartMonthAndEndMonth(@Param("startMonth") String startMonth, @Param("endMonth") String endMonth);
 
 }

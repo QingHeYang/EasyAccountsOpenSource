@@ -30,6 +30,11 @@ const routes = [
           import(/* webpackChunkName: "home" */ "../views/flow/Flow.vue"),
       },
       {
+        path: "/analysis",
+        component: () =>
+            import(/* webpackChunkName: "flow" */ "../views/analysis/Analysis.vue"),
+      },
+      {
         path: "/board",
        component: Dashbord,
       },
@@ -66,6 +71,12 @@ const routes = [
     name: "Flow",
     component: () =>
       import(/* webpackChunkName: "flow" */ "../views/flow/Flow.vue"),
+  },
+  {
+    path: "/analysis",
+    name: "Analysis",
+    component: () =>
+        import(/* webpackChunkName: "flow" */ "../views/analysis/Analysis.vue"),
   },
   {
     path: "/screen",

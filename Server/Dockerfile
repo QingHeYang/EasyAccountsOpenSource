@@ -22,7 +22,7 @@ ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 ENV PATH=$PATH:$JAVA_HOME/bin
 
 # 创建必要的目录并设置权限
-RUN mkdir -p /Ledger/config/ /Ledger/excel/month/ /Ledger/excel/screen/ /Ledger/excel_template/ /Ledger/backup/ /Ledger/app/ /Ledger/logs/ \
+RUN mkdir -p /Ledger/config/ /Ledger/excel/month/ /Ledger/excel/screen/ /Ledger/excel/analysis/ /Ledger/excel_template/ /Ledger/backup/ /Ledger/app/ /Ledger/logs/ \
     && chmod -R 777 /Ledger
 
 # 复制 excel_template 目录下的 xls 文件到容器内的 /Ledger/excel_template/ 目录
