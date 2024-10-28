@@ -11,7 +11,8 @@ Vue.use(Vant)
 
 axios.defaults.timeout = 5000 // 请求超时
 //axios.defaults.baseURL = 'http://easy_accounts_net:10670/'
-axios.defaults.baseURL = window.config.apiBaseUrl 
+axios.defaults.baseURL = window.config.apiBaseUrl
+//axios.defaults.baseURL = 'http://192.168.50.226:10670'
 
 //new VConsole()
 new Vue({

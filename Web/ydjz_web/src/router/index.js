@@ -29,10 +29,15 @@ const routes = [
         component: () =>
           import(/* webpackChunkName: "home" */ "../views/flow/Flow.vue"),
       },
-      {
+      /*{
         path: "/analysis",
         component: () =>
-            import(/* webpackChunkName: "flow" */ "../views/analysis/Analysis.vue"),
+            import(/!* webpackChunkName: "flow" *!/ "../views/analysis/Analysis.vue"),
+      },*/
+      {
+        path: "/screen",
+        component: () =>
+            import(/* webpackChunkName: "flow" */ "../views/screen/Screen.vue"),
       },
       {
         path: "/board",
@@ -53,6 +58,12 @@ const routes = [
     name: "TypeAdd",
     component: () =>
       import(/* webpackChunkName: "type" */ "../views/setting/TypeAdd.vue"),
+  },
+  {
+    path: "/type/archive",
+    name: "TypeArchive",
+    component: () =>
+        import(/* webpackChunkName: "type" */ "../views/setting/TypeArchive.vue"),
   },
   {
     path: "/action/add",
@@ -91,6 +102,22 @@ const routes = [
       import(/* webpackChunkName: "flow" */ "../views/flow/FlowAdd.vue"),
   },
   {
+    path: "/template/add",
+    name: "TemplateAdd",
+    component: () =>
+      import(
+        /* webpackChunkName: "template" */ "../views/setting/template/TemplateAdd.vue"
+      ),
+  },
+  {
+    path: "/template/tag",
+    name: "TemplateTag",
+    component: () =>
+      import(
+        /* webpackChunkName: "template" */ "../views/setting/template/TemplateTag.vue"
+      ),
+  },
+  {
     path: "/setting",
     component: SettingLayout,
     children: [
@@ -116,6 +143,14 @@ const routes = [
             /* webpackChunkName: "setting" */ "../views/setting/Action.vue"
           ),
       },
+      {
+        path: "/setting/template",
+        name: "Template",
+        component: () =>
+          import(
+            /* webpackChunkName: "setting" */ "../views/setting/template/Template.vue"
+          ),
+      }
     ],
   },
 ];

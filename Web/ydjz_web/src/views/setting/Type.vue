@@ -1,40 +1,42 @@
 <template>
-  <div>
+  <div style="width:100vw; height:100vh; background: #F7F8FA">
     <van-nav-bar
-      title="分类"
-      left-arrow
-      right-text="添加"
-      @click-left="onClickLeft"
-      @click-right="onClickRight"
+        title="分类"
+        left-arrow
+        fixed placeholder
+        right-text="添加"
+        @click-left="onClickLeft"
+        @click-right="onClickRight"
     >
     </van-nav-bar>
-    <van-collapse v-model="activeNames">
-      <van-collapse-item
-        :name="item.id"
-        v-for="item in list"
-        :key="item.id"
-        :title="item.tName"
-      >
+    <van-cell  title="管理归档" is-link  @click="onClickArchive" />
+    <van-cell-group  inset :border="false" :style="{marginTop:'10px',background:'#F7F8FA'}" v-for="item in list" :key="item.id">
+    <van-collapse :border="false" v-model="activeNames" >
+      <van-collapse-item  :name="item.id" :title="item.tname">
+        <template v-if="item.action!=null" #value>
+          <van-tag :type="item.action.style">{{ item.action.hname }}</van-tag>
+        </template>
         <div
-          style="right: 10px; color: cornflowerblue; font-size: 10px"
-          @click="onEditClick(item.id)"
+            style="right: 10px; color: cornflowerblue; font-size: 12px"
+            @click="onEditClick(item.id)"
         >
           编辑一级分类
         </div>
         <van-cell
-          v-for="child in item.childrenTypes"
-          :key="child.id"
-          :title="child.tName"
-        >
-          <div
-            style="color: cornflowerblue; font-size: 10px"
+            v-for="child in item.childrenTypes"
+            :key="child.id"
             @click="onEditClick(child.id)"
-          >
-            编辑
-          </div>
+            :title="child.tname"
+            title-style="font-size: 12px; "
+        >
+          <template  v-if="child.action!=null"  #default>
+            <van-tag :type="child.action.style">{{ child.action.hname }}</van-tag>
+          </template>
+
         </van-cell>
       </van-collapse-item>
     </van-collapse>
+    </van-cell-group>
   </div>
 </template>
 
@@ -60,10 +62,15 @@ export default {
     onClickRight() {
       this.$router.push("/type/add");
     },
+
+    onClickArchive() {
+      this.$router.push("/type/archive");
+    },
+
     onEditClick(id) {
       this.$router.push({
         path: "/type/add",
-        query: { typeId: id, editId: true },
+        query: {typeId: id, editId: true},
       });
     },
     onLoad() {
@@ -71,15 +78,29 @@ export default {
         url: "/type/getType",
         method: "get",
       })
-        .then((response) => {
-          this.loading = false;
-          this.list = response.data.data;
-        })
-        .catch(() => {
-          this.loading = false;
-          this.finished = true;
-          this.error = true;
-        });
+          .then((response) => {
+            this.loading = false;
+            var origin_list = response.data.data;
+            console.log(this.list)
+            origin_list.forEach((item) => {
+              if (item.action!=null) {
+                item.action.style = item.action.handle === 0 ? "success" : item.action.handle === 1 ? "danger" : "primary";
+              }
+              if (item.childrenTypes != null) {
+                item.childrenTypes.forEach((child) => {
+                  if (child.action!=null) {
+                    child.action.style = child.action.handle === 0 ? "success" : child.action.handle === 1 ? "danger" : "primary";
+                  }
+                });
+              }
+            });
+            this.list = origin_list;
+          })
+          .catch(() => {
+            this.loading = false;
+            this.finished = true;
+            this.error = true;
+          });
     },
   },
 };

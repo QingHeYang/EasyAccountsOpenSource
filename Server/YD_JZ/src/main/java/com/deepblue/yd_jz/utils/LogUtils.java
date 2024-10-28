@@ -3,7 +3,6 @@ package com.deepblue.yd_jz.utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.util.TextUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
@@ -53,7 +52,7 @@ public class LogUtils {
             return "";
         }
         String fileName = ste.getFileName();
-        if (TextUtils.isEmpty(fileName)) {
+        if (fileName.isEmpty()) {
             return "";
         }
         return "\n"+fileName+"  at " + ste.toString() ;

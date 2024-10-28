@@ -1,7 +1,7 @@
 package com.deepblue.yd_jz.service;
 
-import com.deepblue.yd_jz.dao.action.Action;
-import com.deepblue.yd_jz.dao.action.ActionDao;
+import com.deepblue.yd_jz.entity.Action;
+import com.deepblue.yd_jz.dao.jpa.ActionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,31 +12,28 @@ import java.util.List;
 public class ActionService {
 
     @Autowired
-    ActionDao actionDao;
+    private ActionRepository actionRepository; // Updated to use JPA repository
+
 
     @Transactional(rollbackFor = Exception.class)
     public void addAction(Action action) {
-        actionDao.insertAction(action);
+        actionRepository.save(action); // JPA repository method for creating or updating
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void updateAction(int id, Action action) {
         action.setId(id);
-        actionDao.updateAction(action);
+        actionRepository.save(action); // JPA repository method for creating or updating
     }
 
     @Transactional(rollbackFor = Exception.class)
     public List<Action> getActions() {
-        return actionDao.getAction();
+        return actionRepository.findAll(); // JPA repository method for retrieving all records
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Action getAction(int id) {
-        List<Action> actions = actionDao.getActionSingle(id);
-        if (actions!=null&&actions.size()>0){
-            return actions.get(0);
-        }else {
-            return null;
-        }
+        return actionRepository.findById(id).orElse(null); // JPA repository method for finding by id
     }
+
 }

@@ -1,6 +1,6 @@
 <template>
   <div class="analysis">
-    <van-nav-bar title="财务分析"/>
+    <van-nav-bar title="财务分析"  left-arrow   @click-left="onClickLeft"/>
     <van-divider
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
     > 条件选择
@@ -266,7 +266,9 @@ export default {
   },
 
   methods: {
-
+    onClickLeft() {
+      this.$router.go(-1);
+    },
     formatter(type, val) {
       if (type === 'year') {
         return `${val}年`;

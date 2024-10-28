@@ -1,9 +1,9 @@
 package com.deepblue.yd_jz.task;
 
+import com.deepblue.yd_jz.entity.Action;
 import com.deepblue.yd_jz.utils.FileMakeWebHook;
 import com.deepblue.yd_jz.utils.FileUtils;
 import com.deepblue.yd_jz.utils.LogUtils;
-import com.deepblue.yd_jz.utils.OssUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.TimeZone;
 
 @Slf4j
 @Configuration      //1.主要用于标记配置类，兼备Component的效果。
@@ -24,6 +23,7 @@ public class SQLBackUpTask {
 
     @Value("${sqlBackUpFolder}")
     String sqlBackupFolder;
+    Action action;
 
     @Value("${sqldumpCmd}")
     String sqldumpCmd;

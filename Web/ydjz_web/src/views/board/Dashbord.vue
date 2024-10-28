@@ -1,7 +1,7 @@
 <template>
   <div>
-    <van-nav-bar title="总览" right-text="筛选" @click-right=toScreen(null) />
-    <div style="height: 40px;margin-left: 20px;margin-top5px;font-size: 20px">总资产： ￥{{this.homeInfo.totalAsset}}</div>
+    <van-nav-bar fixed placeholder title="总览" right-text="财务分析" @click-right=toAnalysis() />
+    <div style="height: 40px;margin-left: 20px;margin-top:15px;font-size: 20px">总资产： ￥{{this.homeInfo.totalAsset}}</div>
     <div style="height: 30px;margin-left: 20px;font-size: 16px;color: #4e4e4e">净资产： ￥{{this.homeInfo.netAsset}}</div>
     <van-divider
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
@@ -23,7 +23,8 @@
     >  账户资产
     </van-divider>
     <van-cell-group>
-      <van-cell v-for="account in homeInfo.accounts" :key="account.id" :title="account.accountName"  size="large" :label="account.note"  @click=toScreen(account.id)>
+      <van-cell v-for="account in homeInfo.accounts" :key="account.id" :title="account.accountName"  size="large" :label="account.note"
+                @click=toScreen(account.id)>
         <template #default>
           <div style="color: #000; font-size: 16px">￥{{account.accountAsset }}</div>
           <div style="color: #ccc; font-size: 14px">{{account.realAsset }}</div>
@@ -54,6 +55,9 @@ export default {
     this.getHomeInfo();
   },
   methods: {
+    toAnalysis() {
+      this.$router.push({ path: "/analysis" });
+    },
     toScreen(acid) {
       this.$router.push({ path: "/screen", query: { acid: acid } });
     },

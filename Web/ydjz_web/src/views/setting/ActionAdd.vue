@@ -65,7 +65,7 @@ export default {
         url: "/action/getAction/" + this.$route.query.action,
       }).then((res) => {
         const action = res.data.data;
-        this.actionName = action.hName;
+        this.actionName = action.hname;
         this.radio = action.handle + "";
         this.switchChecked = action.exempt;
         console.log(action);
@@ -90,7 +90,7 @@ export default {
         url: api,
         method: method,
         data: {
-          hName: this.actionName,
+          hname: this.actionName,
           handle: parseInt(this.radio),
           exempt: this.switchChecked,
         },

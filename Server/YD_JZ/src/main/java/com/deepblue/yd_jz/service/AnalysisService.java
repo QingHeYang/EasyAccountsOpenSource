@@ -4,17 +4,17 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
-import com.deepblue.yd_jz.controller.analysis.AnalysisBean;
-import com.deepblue.yd_jz.controller.analysis.AnalysisExcelBean;
-import com.deepblue.yd_jz.dao.flow.FlowDao;
-import com.deepblue.yd_jz.dao.flow.FlowType;
-import com.deepblue.yd_jz.utils.ExcelBean;
+import com.deepblue.yd_jz.dto.AnalysisResponseDto;
+import com.deepblue.yd_jz.data.AnalysisExcelData;
+import com.deepblue.yd_jz.dao.mybatis.FlowDao;
+import com.deepblue.yd_jz.entity.FlowType;
 import com.deepblue.yd_jz.utils.FileMakeWebHook;
 import com.deepblue.yd_jz.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -39,7 +39,8 @@ public class AnalysisService {
     @Autowired
     FileMakeWebHook fileMakeWebHook;
 
-    public AnalysisBean doAnalysis(String startMonth, String endMonth) {
+    @Transactional(rollbackFor = Exception.class)
+    public AnalysisResponseDto doAnalysis(String startMonth, String endMonth) {
         log.info("开始分析数据");
         String yoyStartMonth = "";
         String yoyEndMonth = "";
@@ -95,15 +96,15 @@ public class AnalysisService {
             momFlowTypes = flowDao.getFlowsTypeByStartMonthAndEndMonth(momStartMonth, "");
         }
         // 输出结果
-        AnalysisBean analysisBean = new AnalysisBean();
-        AnalysisExcelBean analysisExcelBean = new AnalysisExcelBean();
+        AnalysisResponseDto analysisResponseDto = new AnalysisResponseDto();
+        AnalysisExcelData analysisExcelData = new AnalysisExcelData();
         String currentCircle = "";
         if (endMonth == null || endMonth.isEmpty()) {
             currentCircle = startMonth;
         } else {
             currentCircle = startMonth + " - " + endMonth;
         }
-        analysisBean.setCurrentCircle(currentCircle);
+        analysisResponseDto.setCurrentCircle(currentCircle);
         String yoyCircle = "";
         if (yoyEndMonth == null || yoyEndMonth.isEmpty()) {
             yoyCircle = yoyStartMonth;
@@ -111,36 +112,36 @@ public class AnalysisService {
             yoyCircle = yoyStartMonth + " - " + yoyEndMonth;
         }
 
-        analysisBean.setYoyCircle(yoyCircle);
+        analysisResponseDto.setYoyCircle(yoyCircle);
         if (!momStartMonth.isEmpty()) {
-            analysisBean.setMomCircle(momStartMonth);
+            analysisResponseDto.setMomCircle(momStartMonth);
         }
 
         currFlowTypes = addRootToList(currFlowTypes);
         if (yoyFlowTypes == null || yoyFlowTypes.isEmpty()) {
             log.info("同比数据为空");
-            analysisBean.setYoyList(new ArrayList<>(0));
+            analysisResponseDto.setYoyList(new ArrayList<>(0));
         } else {
             log.info("同比数据不为空，合计: " + yoyFlowTypes.size() + " 条");
             yoyFlowTypes = addRootToList(yoyFlowTypes);
-            List<AnalysisBean.SingleTypeBean> yoyAList = makeCombine(currFlowTypes, yoyFlowTypes);
-            analysisBean.setYoyList(yoyAList);
+            List<AnalysisResponseDto.SingleTypeBean> yoyAList = makeCombine(currFlowTypes, yoyFlowTypes);
+            analysisResponseDto.setYoyList(yoyAList);
         }
         if (momFlowTypes == null || momFlowTypes.isEmpty()) {
             log.info("环比数据为空");
-            analysisBean.setMomList(new ArrayList<>(0));
+            analysisResponseDto.setMomList(new ArrayList<>(0));
         } else {
             log.info("环比数据不为空，合计: " + momFlowTypes.size() + " 条");
             momFlowTypes = addRootToList(momFlowTypes);
-            List<AnalysisBean.SingleTypeBean> momAList = makeCombine(currFlowTypes, momFlowTypes);
-            analysisBean.setMomList(momAList);
+            List<AnalysisResponseDto.SingleTypeBean> momAList = makeCombine(currFlowTypes, momFlowTypes);
+            analysisResponseDto.setMomList(momAList);
         }
         log.info("分析数据完成");
 
-        return analysisBean;
+        return analysisResponseDto;
     }
 
-    public AnalysisExcelBean doMakeAnalysisExcel(String startMonth, String endMonth) {
+    public AnalysisExcelData doMakeAnalysisExcel(String startMonth, String endMonth) {
         log.info("开始分析数据");
         String yoyStartMonth = "";
         String yoyEndMonth = "";
@@ -196,7 +197,7 @@ public class AnalysisService {
             momFlowTypes = flowDao.getFlowsTypeByStartMonthAndEndMonth(momStartMonth, "");
         }
         // 输出结果
-        AnalysisExcelBean excelBean = new AnalysisExcelBean();
+        AnalysisExcelData excelBean = new AnalysisExcelData();
         String currentCircle = "";
         if (endMonth == null || endMonth.isEmpty()) {
             currentCircle = startMonth;
@@ -219,7 +220,7 @@ public class AnalysisService {
         currFlowTypes = addRootToList(currFlowTypes);
         yoyFlowTypes = addRootToList(yoyFlowTypes);
         momFlowTypes = addRootToList(momFlowTypes);
-        List<AnalysisExcelBean.Analyze> analyzeList = makeCombineExcel(currFlowTypes, yoyFlowTypes, momFlowTypes);
+        List<AnalysisExcelData.Analyze> analyzeList = makeCombineExcel(currFlowTypes, yoyFlowTypes, momFlowTypes);
         excelBean.setAnalyzeList(analyzeList);
 
         log.info("分析数据完成");
@@ -227,13 +228,13 @@ public class AnalysisService {
         return excelBean;
     }
 
-    private List<AnalysisBean.SingleTypeBean> makeCombine(List<FlowType> cur, List<FlowType> circle) {
-        Map<Integer, AnalysisBean.SingleTypeBean> analyzeMap = new HashMap<>();
+    private List<AnalysisResponseDto.SingleTypeBean> makeCombine(List<FlowType> cur, List<FlowType> circle) {
+        Map<Integer, AnalysisResponseDto.SingleTypeBean> analyzeMap = new HashMap<>();
 
         // Create or update analyzes for all flow types
         Stream.of(cur, circle).flatMap(Collection::stream)
                 .forEach(flow -> {
-                    AnalysisBean.SingleTypeBean analyze = analyzeMap.computeIfAbsent(flow.getId(), k -> new AnalysisBean.SingleTypeBean());
+                    AnalysisResponseDto.SingleTypeBean analyze = analyzeMap.computeIfAbsent(flow.getId(), k -> new AnalysisResponseDto.SingleTypeBean());
                     if (analyze.getName() == null && flow.getTName() != null) {
                         analyze.setId(flow.getId());
                         analyze.setParent(flow.getParent());
@@ -254,38 +255,38 @@ public class AnalysisService {
         for (FlowType flow : circle) {
             analyzeMap.get(flow.getId()).setCompareMoney(flow.getMoney());
         }
-        List<AnalysisBean.SingleTypeBean> analyzeList = new ArrayList<>(analyzeMap.values());
+        List<AnalysisResponseDto.SingleTypeBean> analyzeList = new ArrayList<>(analyzeMap.values());
 
 
-        Map<Integer, AnalysisBean.SingleTypeBean> analyzeRebaseMap = analyzeList.stream()
-                .collect(Collectors.toMap(AnalysisBean.SingleTypeBean::getId, a -> a));
+        Map<Integer, AnalysisResponseDto.SingleTypeBean> analyzeRebaseMap = analyzeList.stream()
+                .collect(Collectors.toMap(AnalysisResponseDto.SingleTypeBean::getId, a -> a));
 
-        List<AnalysisBean.SingleTypeBean> orderedList = new ArrayList<>();
+        List<AnalysisResponseDto.SingleTypeBean> orderedList = new ArrayList<>();
 
         // 筛选出根节点并按原始列表中的顺序排序
-        List<AnalysisBean.SingleTypeBean> roots = analyzeList.stream()
-                .filter(AnalysisBean.SingleTypeBean::isRoot)
+        List<AnalysisResponseDto.SingleTypeBean> roots = analyzeList.stream()
+                .filter(AnalysisResponseDto.SingleTypeBean::isRoot)
                 .collect(Collectors.toList());
 
         // 为每个根节点添加它及其所有子节点
-        for (AnalysisBean.SingleTypeBean root : roots) {
+        for (AnalysisResponseDto.SingleTypeBean root : roots) {
             orderedList.add(root);
             addChildren(root, orderedList, analyzeRebaseMap);
         }
 
-        for (AnalysisBean.SingleTypeBean analyze : orderedList) {
+        for (AnalysisResponseDto.SingleTypeBean analyze : orderedList) {
             analyze.calculateComparison();
         }
         return orderedList;
     }
 
-    private List<AnalysisExcelBean.Analyze> makeCombineExcel(List<FlowType> cur, List<FlowType> yoy, List<FlowType> mom) {
-        Map<Integer, AnalysisExcelBean.Analyze> analyzeMap = new HashMap<>();
+    private List<AnalysisExcelData.Analyze> makeCombineExcel(List<FlowType> cur, List<FlowType> yoy, List<FlowType> mom) {
+        Map<Integer, AnalysisExcelData.Analyze> analyzeMap = new HashMap<>();
 
         // Create or update analyzes for all flow types
         Stream.of(cur, yoy, mom).flatMap(Collection::stream)
                 .forEach(flow -> {
-                    AnalysisExcelBean.Analyze analyze = analyzeMap.computeIfAbsent(flow.getId(), k -> new AnalysisExcelBean.Analyze());
+                    AnalysisExcelData.Analyze analyze = analyzeMap.computeIfAbsent(flow.getId(), k -> new AnalysisExcelData.Analyze());
                     if (analyze.getName() == null && flow.getTName() != null) {
                         analyze.setId(flow.getId());
                         analyze.setParent(flow.getParent());
@@ -311,26 +312,26 @@ public class AnalysisService {
             analyzeMap.get(flow.getId()).setLastMonthMoney(flow.getMoney());
         }
 
-        List<AnalysisExcelBean.Analyze> analyzeList = new ArrayList<>(analyzeMap.values());
+        List<AnalysisExcelData.Analyze> analyzeList = new ArrayList<>(analyzeMap.values());
 
 
-        Map<Integer, AnalysisExcelBean.Analyze> analyzeRebaseMap = analyzeList.stream()
-                .collect(Collectors.toMap(AnalysisExcelBean.Analyze::getId, a -> a));
+        Map<Integer, AnalysisExcelData.Analyze> analyzeRebaseMap = analyzeList.stream()
+                .collect(Collectors.toMap(AnalysisExcelData.Analyze::getId, a -> a));
 
-        List<AnalysisExcelBean.Analyze> orderedList = new ArrayList<>();
+        List<AnalysisExcelData.Analyze> orderedList = new ArrayList<>();
 
         // 筛选出根节点并按原始列表中的顺序排序
-        List<AnalysisExcelBean.Analyze> roots = analyzeList.stream()
-                .filter(AnalysisExcelBean.Analyze::isRoot)
+        List<AnalysisExcelData.Analyze> roots = analyzeList.stream()
+                .filter(AnalysisExcelData.Analyze::isRoot)
                 .collect(Collectors.toList());
 
         // 为每个根节点添加它及其所有子节点
-        for (AnalysisExcelBean.Analyze root : roots) {
+        for (AnalysisExcelData.Analyze root : roots) {
             orderedList.add(root);
             addChildrenExcel(root, orderedList, analyzeRebaseMap);
         }
 
-        for (AnalysisExcelBean.Analyze analyze : orderedList) {
+        for (AnalysisExcelData.Analyze analyze : orderedList) {
             analyze.caculateComparison();
         }
         return orderedList;
@@ -338,8 +339,8 @@ public class AnalysisService {
 
 
     // 递归添加子节点的函数
-    private void addChildren(AnalysisBean.SingleTypeBean parent, List<AnalysisBean.SingleTypeBean> orderedList, Map<Integer, AnalysisBean.SingleTypeBean> analyzeMap) {
-        for (AnalysisBean.SingleTypeBean analyze : analyzeMap.values()) {
+    private void addChildren(AnalysisResponseDto.SingleTypeBean parent, List<AnalysisResponseDto.SingleTypeBean> orderedList, Map<Integer, AnalysisResponseDto.SingleTypeBean> analyzeMap) {
+        for (AnalysisResponseDto.SingleTypeBean analyze : analyzeMap.values()) {
             if (analyze.getParent() == parent.getId()) {
                 orderedList.add(analyze);
                 addChildren(analyze, orderedList, analyzeMap); // 递归添加子子节点
@@ -348,8 +349,8 @@ public class AnalysisService {
     }
 
 
-    private void addChildrenExcel(AnalysisExcelBean.Analyze parent, List<AnalysisExcelBean.Analyze> orderedList, Map<Integer, AnalysisExcelBean.Analyze> analyzeMap) {
-        for (AnalysisExcelBean.Analyze analyze : analyzeMap.values()) {
+    private void addChildrenExcel(AnalysisExcelData.Analyze parent, List<AnalysisExcelData.Analyze> orderedList, Map<Integer, AnalysisExcelData.Analyze> analyzeMap) {
+        for (AnalysisExcelData.Analyze analyze : analyzeMap.values()) {
             if (analyze.getParent() == parent.getId()) {
                 orderedList.add(analyze);
                 addChildrenExcel(analyze, orderedList, analyzeMap); // 递归添加子子节点
@@ -400,12 +401,12 @@ public class AnalysisService {
         }
     }
 
-    public void writeExcel(AnalysisExcelBean excelBean){
+    public void writeExcel(AnalysisExcelData excelBean){
         String headerName =excelBean.getCurrentCircle().substring(6);
         writeMonthExcel(headerName+"财务分析报表",excelBean);
     }
 
-    private void writeMonthExcel(String excelDate, AnalysisExcelBean excelBean) {
+    private void writeMonthExcel(String excelDate, AnalysisExcelData excelBean) {
         Date date = new Date();
         String excelFileName = excelDate + "_" + date.getTime() + ".xls";
         String excelPath = excelFolder + excelFileName;

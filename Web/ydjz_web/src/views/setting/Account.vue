@@ -2,6 +2,7 @@
   <div>
     <van-nav-bar
       title="账号"
+      fixed placeholder
       left-arrow
       right-text="添加账号"
       @click-left="onClickLeft"
@@ -43,7 +44,7 @@
       </van-cell-group>
       <div style="height: 10px; background: #f8f9fc" />
       <div id="edit" @click="onEdit(chooseItem.id)">编辑账号</div>
-      <div id="delete" @click="onDelete(chooseItem.id)">删除账号</div>
+      <div id="delete" @click="onDelete(chooseItem.id)">停用账号</div>
     </van-action-sheet>
   </div>
 </template>
@@ -64,7 +65,9 @@ export default {
     };
   },
 
-  mounted() {},
+  mounted() {
+    this.onLoad();
+  },
 
   methods: {
     onEdit(id) {
@@ -72,33 +75,22 @@ export default {
     },
     onDelete(id) {
       this.showPopup = false;
-
       Dialog.confirm({
-        title: "删除账户",
-        message: "确定删除账户吗？删除后将无法在此账户下记账",
-        beforeClose,
-      });
-
-      function beforeClose(action, done) {
-        if (action === "confirm") {
-          request({
-            url: "/account/deleteAccount/" + id,
-            method: "delete",
+        title: "停用账户",
+        message: "确定停用账户吗？\n停用后将无法在此账户下记账!\n关于此账户的数据不会删除",
+      }).then(() => {
+        request({
+          url: "/account/deleteAccount/" + id,
+          method: "delete",
+        })
+          .then((response) => {
+            console.log(response.data);
+            this.onLoad();
           })
-            .then((response) => {
-              console.log(response.data)
-              this.mounted();
-            /*  if (response.data.code == 0) {
-              }*/
-              done();
-            })
-            .catch(() => {
-              done();
-            });
-        } else {
-          done();
-        }
-      }
+          .catch(() => {
+            console.log("error");
+          });
+      });
     },
 
     onItemClick(item) {

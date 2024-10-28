@@ -1,6 +1,7 @@
-<template >
-  <div style="height:100%;background: #eeeeee">
-    <van-nav-bar v-if="this.$route.query.flowId==null" title="新增账单" left-arrow @click-left="onClickLeft"/>
+<template>
+  <div style="width:100vw; height:100vh; background: #F7F8FA">
+    <van-nav-bar v-if="this.$route.query.flowId==null" title="新增账单" left-arrow @click-left="onClickLeft"
+                 right-text="快记模板" @click-right="fastPopupShow = true"/>
     <van-nav-bar v-else title="修改账单" left-arrow @click-left="onClickLeft"/>
     <van-cell-group>
       <van-field
@@ -13,7 +14,7 @@
       />
       <van-cell title="选择收支" is-link @click="onActionClick">
         <template #default>
-          <van-tag :type="chooseAction.style">{{ chooseAction.hName }}</van-tag>
+          <van-tag :type="chooseAction.style">{{ chooseAction.hname }}</van-tag>
           <van-tag
               v-show="chooseAction.exempt"
               style="margin-left: 10px"
@@ -30,7 +31,7 @@
       <van-cell v-show="chooseAction.handle==2" title="选择目标账户" is-link @click="onAccountClick(2)"
                 :value="chooseToAccount.name"/>
 
-      <van-cell title="账单分类" :value="chooseType.tName" is-link @click="onTypeClick"/>
+      <van-cell title="账单分类" :value="chooseType.tname" is-link @click="onTypeClick"/>
 
       <van-cell title="账单日期" :value="chooseDate" is-link @click="onCalanderClick"/>
 
@@ -59,7 +60,7 @@
             :key="action.id"
             @click="onChooseAction(action)">
           <template #title>
-            <span class="custom-title">{{ action.hName }}</span>
+            <span class="custom-title">{{ action.hname }}</span>
           </template>
           <template #label>
             <van-tag :type="action.style">{{ action.handleText }}</van-tag>
@@ -81,21 +82,23 @@
                   :label="account.note" @click="onChooseAccount(account,popupStyle)"/>
       </van-cell-group>
     </van-action-sheet>
-    <van-popup v-model="cascaderShow" round position="bottom">
+    <van-popup v-model="typeCascaderShow" round position="bottom">
       <van-cascader
           v-model="cascaderValue"
           title="选择账单分类"
           :options="allTypes"
           active-color="#1989fa"
-          @close="cascaderShow = false"
+          @close="typeCascaderShow = false"
           :field-names="cascaderNames"
           @finish="onChooseCascader"
       />
     </van-popup>
     <van-calendar v-model="calanderShow" :show-confirm="false" color="#1989fa" :min-date="minDate"
-                  :max-date="maxDate " @confirm="onChooseCalander"/>
+                  :max-date="maxDate " @confirm="onChooseCalendar"/>
 
-    <van-cell-group v-for="child in childMoneyItem" :key="child.index" inset style="margin-top: 10px;margin-bottom: 10px">
+    <!--  追加账单 1.6版本  -->
+    <van-cell-group v-for="child in childMoneyItem" :key="child.index" inset
+                    style="margin-top: 10px;margin-bottom: 10px">
       <van-swipe-cell>
         <van-field
             input-align="left"
@@ -110,45 +113,139 @@
         </template>
       </van-swipe-cell>
     </van-cell-group>
-
+    <!--  追加账单 1.6版本  -->
     <div style="margin: 16px">
       <van-button @click="doAddNewItemMoney" style="margin-bottom: 5px" round block type="warning" native-type="submit">
         追加分账单
       </van-button>
 
-      <van-button @click="onSubmit" round block type="info" native-type="submit"
+      <van-button @click="onSubmitBtnClick" round block type="info" native-type="submit"
       >{{ this.$route.query.flowId != null ? "修改" : "提交" }}
       </van-button>
     </div>
 
-    <van-number-keyboard
-        :show="keyboardShow"
-        v-model="money"
-        theme="custom"
-        extra-key="."
-        close-button-text="完成"
-        @input="onInput"
-        @delete="onDelete"
-        @blur="keyboardShow = false"
-    />
+    <!--  快记模板 2.1版本  -->
+    <van-popup
+        v-model="fastPopupShow"
+        position="top"
+        :style="{ width: '100%',height: '100%' ,background:'#F7F8FA' }"
+    >
+      <van-nav-bar title="选择模板" left-arrow fixed placeholder right-text="模板管理" @click-right="fastNavToTemplateManage">
+        <template #left>
+          <van-icon name="cross" size="18" @click="fastPopupShow=false"/>
+        </template>
+      </van-nav-bar>
+      <van-cell-group inset :border="false" style="margin-top: 10px;margin-bottom: 10px">
+        <van-collapse :border="false" v-model="activeNames">
+          <van-collapse-item title="标签筛选" :toggle="tagChooseShow" name="1">
+            <template #value>
+              <van-tag v-if="chooseTag.id!=null" :color="chooseTag.color" closeable
+                       @close="chooseTag = {};getAllTemplate()">{{ chooseTag.name }}
+              </van-tag>
+            </template>
+            <div v-if="allTags.length !== 0" class="tags-container">
+              <div class="tag-item" v-for="tag in allTags" :key="tag.id"
+                   @click="chooseTag = tag;getAllTemplate();tagChooseShow = false">
+                <van-tag size="small" :color="tag.color">{{ tag.name }}</van-tag>
+              </div>
+            </div>
+            <van-empty v-else description="暂无标签" style="margin-top: 10px"/>
+
+          </van-collapse-item>
+
+        </van-collapse>
+      </van-cell-group>
+
+      <van-cell-group :border="false" inset style="margin-top: 10px;">
+        <van-cell title="模板列表" :border="false"/>
+        <van-grid :border="true" :column-num="2" :gutter="10" style="margin-bottom: 10px" :center="false"
+                  v-if="allTemplates.length!=0">
+          <van-grid-item v-for="template in allTemplates" :key="template.id">
+            <template #default>
+              <div class="template-container" @click="fastChooseClick(template)">
+                <div class="template-info">
+                  <div class="template-name">{{ template.name }}</div>
+                  <van-tag v-if="template.tag" :color="template.tag.color">{{ template.tag.name }}</van-tag>
+                </div>
+                <div class="template-action">
+                  <van-button plain hairline size="small" type="info" style="margin-left: 10px"
+                              @click.stop="fastDialogClick(template)">详情
+                  </van-button>
+                </div>
+              </div>
+            </template>
+          </van-grid-item>
+        </van-grid>
+        <van-empty v-else description="暂无模板" style="margin-top: 10px"/>
+      </van-cell-group>
+    </van-popup>
+
+    <van-dialog v-model="fastDialogShow" closeOnClickOverlay cancel-button-text="编辑" confirm-button-text="选择"
+                cancel-button-color="#3D8AF2" @cancel="fastDialogToEdit(chooseTemplate.id)" :title="chooseTemplate.name"
+                @confirm="fastChooseClick(chooseTemplate)"
+                show-cancel-button>
+      <van-cell-group :border="false" v-model="chooseTemplate.show">
+
+        <van-cell v-if="chooseTemplate.money" title="金额" :value="chooseTemplate.money"/>
+        <van-cell v-if="chooseTemplate.actionId" title="收支">
+          <template #default>
+            <van-tag plain :type="chooseTemplate.action.style">{{ chooseTemplate.action.hname }}</van-tag>
+          </template>
+        </van-cell>
+        <van-cell v-if="chooseTemplate.accountId" title="账户" :value="chooseTemplate.account.name"/>
+        <van-cell v-if="chooseTemplate.accountToId" title="目标账户" :value="chooseTemplate.accountTo.name"/>
+        <van-cell v-if="chooseTemplate.typeId" title="分类选择" :value="chooseTemplate.type.tname"/>
+        <van-cell v-if="chooseTemplate.dateTypeStr" title="日期类型"
+                  :value="chooseTemplate.dateTypeStr==='1'?'补上月':'记本月'"/>
+        <van-cell title="标签" name="1">
+          <template #default>
+            <div style="display: flex; justify-content: flex-end;">
+              <div v-if="chooseTemplate.tag">
+                <van-tag :color="chooseTemplate.tag.color" style="margin-right: 15px">{{ chooseTemplate.tag.name }}
+                </van-tag>
+              </div>
+            </div>
+          </template>
+        </van-cell>
+      </van-cell-group>
+    </van-dialog>
   </div>
 </template>
 
 <script>
 import request from "../../utils/request";
 import {Dialog, Toast} from "vant";
+import template from "@/views/setting/template/Template.vue";
 
 export default {
   name: "FlowAdd",
+  computed: {
+    template() {
+      return template
+    },
+    Toast() {
+      return Toast
+    }
+  },
   data() {
     return {
+      // 2.1版本
+      tagChooseShow: false,
+      activeNames: [],
+      allTemplates: [],
+      chooseTemplate: {},
+      allTags: [],
+      chooseTag: {},
+      fastPopupShow: false,
+      fastDialogShow: false,
+
       keyboardShow: false,
       keyboardValue: "",
       childMoneyItem: [],
       money: "",
-      actionShow: false,
       calanderShow: false,
-      cascaderShow: false,
+      typeCascaderShow: false,
+      actionShow: false,
       popupStyle: 0,
       popupTitle: "",
 
@@ -160,7 +257,7 @@ export default {
       allAccounts: [],
 
       cascaderValue: '',//已选则分类的id
-      chooseType: {tName: "", id: 0},
+      chooseType: {},
       allTypes: [],
 
       chooseDate: "",
@@ -168,11 +265,11 @@ export default {
       isCollect: false,
 
       note: "",
-      submitMoney:"",
-      submitNote:"",
+      submitMoney: "",
+      submitNote: "",
       //以下是分类级联
       cascaderNames: {
-        text: 'tName',
+        text: 'tname',
         value: 'id',
         children: 'childrenTypes',
       },
@@ -184,15 +281,96 @@ export default {
   mounted() {
     if (this.$route.query.flowId != null) {
       this.doGetCurrentFlow()
+
+    } else {
+      this.getAllTags()
     }
-    this.doGetTypes()
     this.doGetActions()
     this.doGetAccounts()
   },
   methods: {
-    doRemoveMoneyItem(item){
+    fastChooseClick(template) {
+      this.fastPopupShow = false;
+      this.fastDialogShow = false;
+      this.$toast.success(template.name);
+      this.money = template.money;
+      this.chooseAccount = template.account;
+      if (template.action != null) {
+        this.chooseAction = this.setActionStyle(template.action);
+        if (this.chooseAction.id != null) {
+          this.doGetTypes()
+        }
+
+        if (template.action.handle.toString() == "2") {
+          this.chooseToAccount = template.accountTo
+          this.chooseToAccount.name = template.accountTo.name
+        }
+      }
+
+      this.chooseType = template.type;
+      if (template.dateType != null) {
+        if (template.dateType.toString() === "0") {
+          this.chooseDate = this.formatDate(new Date())
+        } else {
+          //选择的是上月最后一天
+          var date = new Date();
+          date.setDate(0);
+          this.chooseDate = this.formatDate(date)
+        }
+      }
+
+    },
+    fastDialogClick(template) {
+      this.chooseTemplate = template;
+      this.fastDialogShow = true;
+      // 阻止冒泡可以放在这里或直接在模板中使用 .stop 修饰符
+    },
+    fastDialogToEdit(id) {
+      this.fastDialogShow = false;
+      this.$router.push({path: "/template/add", query: {templateId: id}});
+    },
+    fastNavToTemplateManage() {
+      this.$router.push({path: "/setting/template"});
+    },
+
+    getAllTags() {
+      request({
+        url: "/tag/getTags",
+        method: "get",
+      }).then((response) => {
+        this.allTags = response.data.data;
+        this.getAllTemplate()
+        console.log(this.allTags);
+      }).catch((error) => {
+        console.log(error);
+      });
+    },
+
+    getAllTemplate() {
+      request({
+        url: this.chooseTag.id != null ? "/template/getAllTemplatesByTag/" + this.chooseTag.id : "/template/getAllTemplates",
+        method: "get",
+      }).then((response) => {
+        this.allTemplates = response.data.data;
+        this.allTemplates.forEach((template) => {
+          if (template.action) {
+            template.action = this.setActionStyle(template.action);
+          }
+          if (template.date != null) {
+            template.dateTypeStr = template.dateType.toString();
+          } else {
+            template.dateTypeStr = "";
+          }
+        });
+        console.log(this.allTemplates);
+      }).catch((error) => {
+        console.log(error);
+      });
+    },
+
+    doRemoveMoneyItem(item) {
       console.log(item)
-      this.childMoneyItem.splice(this.childMoneyItem.indexOf(item),1)
+      this.childMoneyItem.splice(this.childMoneyItem.indexOf(item), 1)
     },
     doAddNewItemMoney() {
       var childItem = {
@@ -200,7 +378,7 @@ export default {
         note: ""
       }
       this.childMoneyItem.push(childItem)
-      console.log( this.childMoneyItem)
+      console.log(this.childMoneyItem)
     },
 
     doGetCurrentFlow() {
@@ -212,16 +390,18 @@ export default {
         console.log(flow)
         this.money = flow.money
         this.chooseAccount = flow.account
-        this.chooseAccount.name = flow.account.aName
+        this.chooseAccount.name = flow.account.aname
         this.chooseAction = this.setActionStyle(flow.action)
         this.chooseType = flow.type
+        console.log(this.chooseType)
         this.isCollect = flow.collect
         this.note = flow.note
         if (flow.action.handle == "2") {
           this.chooseToAccount = flow.accountTo
-          this.chooseToAccount.name = flow.accountTo.aName
+          this.chooseToAccount.name = flow.accountTo.aname
         }
-        this.chooseDate = flow.fDate
+        this.chooseDate = flow.fdate
+        this.doGetTypes()
       })
     },
 
@@ -241,43 +421,62 @@ export default {
                   : "primary";
       return action
     },
-    onSubmit() {
-      if (!this.doVertify()) {
-        return
-      }
+
+    onSubmitHandle() {
       var moneyInt = parseFloat(this.money)
       this.submitNote = this.note
 
-      if (this.childMoneyItem.length>0&&!this.submitNote.includes("(￥")){
-        this.submitNote = this.submitNote+"(￥"+this.money+")"
+      if (this.childMoneyItem.length > 0 && !this.submitNote.includes("(￥")) {
+        this.submitNote = this.submitNote + "(￥" + this.money + ")"
       }
-      this.childMoneyItem.forEach(chileMoney=>{
-        if (chileMoney.money!=null){
-          moneyInt = moneyInt+parseFloat(chileMoney.money)
-          this.submitNote = this.submitNote+"\n"+chileMoney.note+"(￥"+chileMoney.money+")"
+      this.childMoneyItem.forEach(chileMoney => {
+        if (chileMoney.money != null) {
+          moneyInt = moneyInt + parseFloat(chileMoney.money)
+          this.submitNote = this.submitNote + "\n" + chileMoney.note + "(￥" + chileMoney.money + ")"
         }
       })
-      if (this.childMoneyItem.length>0){
-        this.submitMoney = moneyInt+""
+      if (this.childMoneyItem.length > 0) {
+        this.submitMoney = moneyInt + ""
       } else {
         this.submitMoney = this.money
       }
       Dialog.confirm({
         title: '请确认账单',
         message:
-            '总金额: ￥' + this.submitMoney +'\n'+
-        "备注："+this.submitNote,
-        confirmButtonText:"确认无误"
+            '总金额: ￥' + this.submitMoney + '\n' +
+            "备注：" + this.submitNote,
+        confirmButtonText: "确认无误"
       })
           .then(() => {
-          this.doSubmitRequest()
+            this.doSubmitRequest()
           })
           .catch(() => {
             // on cancel
           });
     },
 
-    doSubmitRequest(){
+    onSubmitBtnClick() {
+      if (!this.doVertify()) {
+        return
+      }
+      if (this.chooseType.action != null && this.chooseType.action.id != this.chooseAction.id) {
+        return Dialog.confirm({
+          title: '提示',
+          message:
+              '当前分类存在修改收支类型的情况\n是否继续提交？',
+          confirmButtonText: "继续提交"
+        })
+            .then(() => {
+              this.onSubmitHandle()
+            })
+            .catch(() => {
+            });
+      } else {
+        this.onSubmitHandle()
+      }
+    },
+
+    doSubmitRequest() {
       const api = this.$route.query.flowId == null ? "/flow/addFlow" : "/flow/updateFlow/" + this.$route.query.flowId
       const method = this.$route.query.flowId == null ? "post" : "put"
       request({
@@ -337,7 +536,11 @@ export default {
     },
 
     onTypeClick() {
-      this.cascaderShow = true;
+      if (this.chooseAction.id == null) {
+        Toast.fail("请先选择收支")
+        return;
+      }
+      this.typeCascaderShow = true;
     },
 
     onAccountClick(popupStyle) {
@@ -348,7 +551,7 @@ export default {
 
     onActionClick() {
       this.actionShow = true;
-      this.popupTitle = "选择账单分类";
+      this.popupTitle = "选择账单收支";
       this.popupStyle = 0;
     },
 
@@ -386,7 +589,7 @@ export default {
 
     doGetTypes() {
       request({
-        url: "/type/getType",
+        url: "/type/getTypeByActionId/" + this.chooseAction.id,
         method: "get",
       })
           .then((response) => {
@@ -397,8 +600,13 @@ export default {
 
     onChooseAction(action) {
       this.actionShow = false;
+      if (action === this.chooseAction) {
+        return
+      }
       this.chooseAction = action;
       this.chooseToAccount = {};
+      this.chooseType = {}
+      this.doGetTypes()
     },
 
     onChooseAccount(account, popupStyle) {
@@ -411,9 +619,10 @@ export default {
     },
 
     onChooseCascader({selectedOptions}) {
-      this.cascaderShow = false;
+      this.typeCascaderShow = false;
       this.chooseType.id = this.cascaderValue
-      this.chooseType.tName = selectedOptions.map((option) => option.tName).join('——');
+      this.chooseType.tname = selectedOptions.map((option) => option.tname).join('/');
+
       console.log(this.chooseType)
     },
 
@@ -421,9 +630,10 @@ export default {
       return `${date.getFullYear()}-${((date.getMonth() + 1) + "").padStart(2, '0')}-${(date.getDate() + "").padStart(2, '0')}`;
     },
 
-    onChooseCalander(date) {
+    onChooseCalendar(date) {
       this.calanderShow = false;
       this.chooseDate = this.formatDate(date);
+      console.log(this.chooseDate)
     },
 
 
@@ -431,4 +641,43 @@ export default {
 };
 </script>
 
-<style scoped></style>
+<style scoped>
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* 设置标签之间的间隔 */
+  padding: 15px; /* 容器的内边距 */
+}
+
+.tag-item {
+  margin-bottom: 5px; /* 增加标签下方的间隔，避免视觉上的拥挤 */
+}
+
+.template-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px; /* 增加内部间距 */
+}
+
+.template-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start; /* 左对齐文本和标签 */
+}
+
+.template-name {
+  font-size: 14px; /* 字体大小调整 */
+  margin-bottom: 4px; /* 为名称和标签之间添加间距 */
+}
+
+.template-tag {
+  display: block; /* 确保标签作为独立的行显示 */
+}
+
+.template-action {
+  text-align: right; /* 右侧对齐详情按钮 */
+}
+
+</style>

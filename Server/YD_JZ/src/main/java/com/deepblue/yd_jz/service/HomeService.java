@@ -1,11 +1,10 @@
 package com.deepblue.yd_jz.service;
 
-import com.deepblue.yd_jz.controller.home.HomeBean;
-import com.deepblue.yd_jz.dao.account.Account;
-import com.deepblue.yd_jz.dao.account.AccountDao;
-import com.deepblue.yd_jz.dao.action.ActionDao;
-import com.deepblue.yd_jz.dao.flow.FlowDao;
-import com.deepblue.yd_jz.dao.flow.FlowYear;
+import com.deepblue.yd_jz.dto.HomeDto;
+import com.deepblue.yd_jz.entity.Account;
+import com.deepblue.yd_jz.dao.jpa.AccountRepository;
+import com.deepblue.yd_jz.dao.mybatis.FlowDao;
+import com.deepblue.yd_jz.entity.FlowYear;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,15 +22,15 @@ public class HomeService {
     FlowDao flowDao;
 
     @Autowired
-    AccountDao accountDao;
+    AccountRepository accountDao;
 
     @Autowired
-    ActionDao actionDao;
+    ActionService actionDao;
 
 
     @Transactional(rollbackFor = Exception.class)
-    public HomeBean getHomeBean() {
-        List<Account> accounts = accountDao.queryAllAccount();
+    public HomeDto getHomeBean() {
+        List<Account> accounts = accountDao.findByDisableFalse();
         BigDecimal totalAsset = new BigDecimal("0");
         BigDecimal exemptAsset = new BigDecimal("0");
         for (Account account : accounts) {
@@ -44,15 +43,15 @@ public class HomeService {
             totalAsset = totalAsset.add(accountAsset);
             exemptAsset = exemptAsset.add(exemptAccountAsset);
         }
-        HomeBean homeBean = new HomeBean();
-        homeBean.setTotalAsset(totalAsset.toString());
-        homeBean.setNetAsset(totalAsset.subtract(exemptAsset).toString());
+        HomeDto homeDto = new HomeDto();
+        homeDto.setTotalAsset(totalAsset.toString());
+        homeDto.setNetAsset(totalAsset.subtract(exemptAsset).toString());
         NumberFormat nf = NumberFormat.getPercentInstance();
-        List<HomeBean.HomeAccountBean> homeAccounts = new ArrayList<>();
+        List<HomeDto.HomeAccountBean> homeAccounts = new ArrayList<>();
         for (Account account : accounts) {
-            HomeBean.HomeAccountBean hab = new HomeBean.HomeAccountBean();
+            HomeDto.HomeAccountBean hab = new HomeDto.HomeAccountBean();
             hab.setId(account.getId());
-            hab.setAccountName(account.getaName());
+            hab.setAccountName(account.getAName());
             hab.setAccountAsset(account.getMoney());
             hab.setExemptAsset(account.getExemptMoney());
             hab.setNote(account.getNote());
@@ -63,7 +62,7 @@ public class HomeService {
             hab.setPercent(percentStr.substring(0,percentStr.length()-1));
             homeAccounts.add(hab);
         }
-        homeBean.setAccounts(homeAccounts);
+        homeDto.setAccounts(homeAccounts);
         int currentYear = Year.now().getValue();
 
         FlowYear flowYear = flowDao.getYearlySummary(currentYear);
@@ -74,9 +73,9 @@ public class HomeService {
         String formattedTotalEarns = totalEarns.setScale(2, RoundingMode.HALF_UP).toString();
         String formattedTotalBalance = totalBalance.setScale(2, RoundingMode.HALF_UP).toString();
 
-        homeBean.setYearOutCome(formattedTotalCosts);
-        homeBean.setYearIncome(formattedTotalEarns);
-        homeBean.setYearBalance(formattedTotalBalance);
-        return homeBean;
+        homeDto.setYearOutCome(formattedTotalCosts);
+        homeDto.setYearIncome(formattedTotalEarns);
+        homeDto.setYearBalance(formattedTotalBalance);
+        return homeDto;
     }
 }

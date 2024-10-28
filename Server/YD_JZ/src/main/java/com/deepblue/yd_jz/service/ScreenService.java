@@ -4,15 +4,11 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
-import com.deepblue.yd_jz.controller.flow.FlowBaseBean;
-import com.deepblue.yd_jz.controller.home.ScreenFlowGetBean;
-import com.deepblue.yd_jz.dao.account.AccountDao;
-import com.deepblue.yd_jz.dao.action.ActionDao;
-import com.deepblue.yd_jz.dao.excel.Excel;
-import com.deepblue.yd_jz.dao.excel.ExcelDao;
-import com.deepblue.yd_jz.dao.excel.ScreenExcelBean;
-import com.deepblue.yd_jz.dao.flow.FlowDao;
-import com.deepblue.yd_jz.dao.type.TypeDao;
+import com.deepblue.yd_jz.data.MonthExcelData;
+import com.deepblue.yd_jz.dto.FlowListDto;
+import com.deepblue.yd_jz.dto.ScreenFlowRequestDto;
+import com.deepblue.yd_jz.data.ScreenExcelData;
+import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.utils.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,20 +24,17 @@ import java.util.*;
 public class ScreenService {
 
     @Autowired
-    ActionDao actionDao;
+    ActionService actionService;
 
     @Autowired
-    AccountDao accountDao;
+    AccountService accountService;
 
     @Autowired
     FlowDao flowDao;
 
     @Autowired
-    TypeDao typeDao;
+    TypeService typeService;
 
-
-    @Autowired
-    ExcelDao excelDao;
 
     @Autowired
     FileMakeWebHook fileMakeWebHook;
@@ -53,14 +46,14 @@ public class ScreenService {
     public String baseExcelPath;
 
     @Transactional(rollbackFor = Exception.class)
-    public FlowBaseBean getFlowByScreen(ScreenFlowGetBean getBean) {
+    public FlowListDto getFlowByScreen(ScreenFlowRequestDto getBean) {
         List<Map<String, Object>> maps = flowDao.getFlowByScreen(getBean.getChooseHandle(),
                 getBean.getAccountId(),
                 getBean.getStartDate().trim(),
                 getBean.getEndDate().trim(),
                 getBean.isSingleMonth(),
-                getBean.isCollect());
-        FlowBaseBean baseBean = new FlowBaseBean();
+                getBean.isCollect(),getBean.getNote());
+        FlowListDto baseBean = new FlowListDto();
         baseBean.setFlows(new ArrayList<>());
         BigDecimal moneyIn = new BigDecimal("0");
         BigDecimal moneyOut = new BigDecimal("0");
@@ -84,22 +77,22 @@ public class ScreenService {
                 currentDataCanUse = (getBean.getTypes().contains(typeId) || getBean.getTypes().contains(parentTypeId)) && getBean.getActions().contains(actionId);
             }
             if (currentDataCanUse) {
-                FlowBaseBean.FlowInnerBean innerBean = new FlowBaseBean.FlowInnerBean();
+                FlowListDto.FlowListSingleDto innerBean = new FlowListDto.FlowListSingleDto();
                 innerBean.setId((Integer) map.get("id"));
                 innerBean.setMoney((String) map.get("money"));
                 innerBean.setExempt((Boolean) map.get("exempt"));
                 innerBean.setCollect((Boolean) map.get("collect"));
                 innerBean.setHandle((Integer) map.get("handle"));
-                innerBean.sethName((String) map.get("handleName"));
+                innerBean.setHName((String) map.get("handleName"));
                 innerBean.setNote((String) map.get("note"));
                 Date fDate = (Date) map.get("flowDate");
-                innerBean.setfDate(sdf.format(fDate));
-                innerBean.setaName((String) map.get("accountName"));
+                innerBean.setFDate(sdf.format(fDate));
+                innerBean.setAName((String) map.get("accountName"));
                 innerBean.setToAName((String) map.get("toAccountName"));
                 if (map.get("parentTypeName") != null) {
-                    innerBean.settName(map.get("parentTypeName") + "/" + map.get("typeName"));
+                    innerBean.setTName(map.get("parentTypeName") + "/" + map.get("typeName"));
                 } else {
-                    innerBean.settName((String) map.get("typeName"));
+                    innerBean.setTName((String) map.get("typeName"));
                 }
                 baseBean.getFlows().add(innerBean);
                 if (innerBean.getHandle() == 1) {
@@ -147,31 +140,31 @@ public class ScreenService {
         return baseBean;
     }
 
-    private List<FlowBaseBean.TypeBean> exChangeMapToList(HashMap<Integer, TMapBean> typeMap) {
-        List<FlowBaseBean.TypeBean> typeBeanList = new ArrayList<>();
+    private List<FlowListDto.FlowTypeDto> exChangeMapToList(HashMap<Integer, TMapBean> typeMap) {
+        List<FlowListDto.FlowTypeDto> flowTypeDtoList = new ArrayList<>();
         typeMap.forEach((integer, tMapBean) -> {
             if (tMapBean.isParent()) {
-                FlowBaseBean.TypeBean tl = exchangePoJo(tMapBean);
+                FlowListDto.FlowTypeDto tl = exchangePoJo(tMapBean);
                 tl.setChildren(new ArrayList<>());
-                typeBeanList.add(tl);
+                flowTypeDtoList.add(tl);
             }
         });
 
         typeMap.forEach(((integer, tMapBean) -> {
             if (!tMapBean.isParent()) {
-                typeBeanList.forEach(item -> {
+                flowTypeDtoList.forEach(item -> {
                     if (tMapBean.getParentId() == item.getTypeId()) {
-                        FlowBaseBean.TypeBean child =exchangePoJo(tMapBean);
+                        FlowListDto.FlowTypeDto child =exchangePoJo(tMapBean);
                         item.getChildren().add(child);
                     }
                 });
             }
         }));
-        return typeBeanList;
+        return flowTypeDtoList;
     }
 
-    private FlowBaseBean.TypeBean exchangePoJo(TMapBean tMapBean) {
-        FlowBaseBean.TypeBean tl = new FlowBaseBean.TypeBean();
+    private FlowListDto.FlowTypeDto exchangePoJo(TMapBean tMapBean) {
+        FlowListDto.FlowTypeDto tl = new FlowListDto.FlowTypeDto();
         tl.setParent(tMapBean.isParent());
         tl.setTypeName(tMapBean.getTypeName());
         tl.setMoney(tMapBean.getMoneyDeci().toString());
@@ -180,26 +173,26 @@ public class ScreenService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void makeScreenExcel(ScreenFlowGetBean screenFlowGetBean, String excelName) throws Exception {
-        FlowBaseBean flowBaseBean = getFlowByScreen(screenFlowGetBean);
-        if (flowBaseBean.getFlows().size() == 0) {
+    public void makeScreenExcel(ScreenFlowRequestDto screenFlowRequestDto, String excelName) throws Exception {
+        FlowListDto flowListDto = getFlowByScreen(screenFlowRequestDto);
+        if (flowListDto.getFlows().size() == 0) {
             throw new Exception("所选size 为0");
         }
-        ScreenExcelBean excelBean = new ScreenExcelBean();
+        ScreenExcelData excelBean = new ScreenExcelData();
         excelBean.setFlow(new ArrayList<>());
-        flowBaseBean.getFlows().forEach((item) -> {
-            ExcelBean.Flow flow = new ExcelBean.Flow();
-            flow.setFlowDate(item.getfDate());
-            flow.setAccountName(item.getaName());
-            flow.setTypeName(item.gettName());
+        flowListDto.getFlows().forEach((item) -> {
+            MonthExcelData.Flow flow = new MonthExcelData.Flow();
+            flow.setFlowDate(item.getFDate());
+            flow.setAccountName(item.getAName());
+            flow.setTypeName(item.getTName());
             flow.setNote(item.getNote());
-            flow.setActionName(item.gethName());
+            flow.setActionName(item.getHName());
             flow.setMoney(item.getMoney());
             excelBean.getFlow().add(flow);
         });
-        excelBean.setTotalIn(flowBaseBean.getTotalIn());
-        excelBean.setTotalOut(flowBaseBean.getTotalOut());
-        excelBean.setDate(screenFlowGetBean.getStartDate() + " 至 " + screenFlowGetBean.getEndDate());
+        excelBean.setTotalIn(flowListDto.getTotalIn());
+        excelBean.setTotalOut(flowListDto.getTotalOut());
+        excelBean.setDate(screenFlowRequestDto.getStartDate() + " 至 " + screenFlowRequestDto.getEndDate());
         excelBean.setName(excelName);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
         String dateStr = sdf.format(new Date());
@@ -213,44 +206,10 @@ public class ScreenService {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             String dateStr = sdf.format(new Date());
             fileMakeWebHook.sendFile(new File(excelPath), "screen_excel", excelFileName);
-            /*ossUtils.doUpload(new File(excelPath), "YD_JZ/excel/screen/", excelFileName, new OssUtils.OssUploadCallBack() {
-                @Override
-                public void onUploadSuccess(String ossUrl) {
-                    LogUtils.log_print("上传完成，地址为： " + ossUrl);
-                    Excel excel = new Excel();
-                    excel.setSuccess(1);
-                    excel.seteDate(dateStr);
-                    excel.setePath(ossUrl);
-                    excel.seteCondition("sdf");
-                    excel.seteName(title);
-                    excelDao.addExcel(excel);
-                    emailUtils.setTitle("筛选结果报表：  " + title);
-                    emailUtils.setContent("报表已生成");
-                    emailUtils.sendEmail(ossUrl);
-                }
-
-                @Override
-                public void onUploadFailed(String msg) {
-                    LogUtils.log_print("上传失败: " + msg);
-                    Excel excel = new Excel();
-                    excel.setSuccess(0);
-                    excel.seteDate(dateStr);
-                    excel.setePath("");
-                    excel.seteCondition("sdf");
-                    excel.seteName(title);
-                    excelDao.addExcel(excel);
-
-                }
-            });*/
         }
     }
 
-    private void sendEmail(String fileUrl, String title) {
-       /* emailUtils.setTitle(title);
-        emailUtils.sendEmail(fileUrl);*/
-    }
-
-    private String doMakeExcel(ScreenExcelBean excelBean, String excelName) {
+    private String doMakeExcel(ScreenExcelData excelBean, String excelName) {
         String excelPath = excelFolder + excelName;
         ExcelWriter excelWriter = EasyExcel.write().file(excelPath)
                 .withTemplate(baseExcelPath)

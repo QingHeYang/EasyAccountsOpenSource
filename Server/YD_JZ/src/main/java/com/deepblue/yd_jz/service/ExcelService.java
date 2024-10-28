@@ -9,11 +9,9 @@ import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
-import com.deepblue.yd_jz.dao.account.Account;
-import com.deepblue.yd_jz.dao.account.AccountDao;
-import com.deepblue.yd_jz.dao.action.ActionDao;
-import com.deepblue.yd_jz.dao.flow.FlowDao;
-import com.deepblue.yd_jz.dao.flow.FlowType;
+import com.deepblue.yd_jz.entity.Account;
+import com.deepblue.yd_jz.dao.mybatis.FlowDao;
+import com.deepblue.yd_jz.data.MonthExcelData;
 import com.deepblue.yd_jz.utils.*;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +21,6 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -32,8 +28,6 @@ import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -42,10 +36,10 @@ public class ExcelService {
     FlowDao flowDao;
 
     @Autowired
-    ActionDao actionDao;
+    ActionService actionService;
 
     @Autowired
-    AccountDao accountDao;
+    AccountService accountService;
 
     @Autowired
     FileMakeWebHook fileMakeWebHook;
@@ -56,15 +50,16 @@ public class ExcelService {
     @Value("${excelAutoFolder}")
     public String excelFolder;
 
+
     // ss mm hh dd MM yy
-    public ExcelBean makeMonthExcel(String dateStr) {
+    public MonthExcelData makeMonthExcel(String dateStr) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM"); // 格式化字符串需要与你的输入日期格式匹配
         try {
             Date date = sdf.parse(dateStr); // 尝试解析传入的日期字符串
-            ExcelBean excelBean = getExcelForMonth(date); // 获取该日期的Excel报表数据
-            log.info(new Gson().toJson(excelBean));
-            writeMonthExcel(dateStr,excelBean);
-            return excelBean;
+            MonthExcelData monthExcelData = getExcelForMonth(date); // 获取该日期的Excel报表数据
+            log.info(new Gson().toJson(monthExcelData));
+            writeMonthExcel(dateStr, monthExcelData);
+            return monthExcelData;
         } catch (ParseException e) {
             // 处理ParseException异常，可以记录日志或返回错误信息
             e.printStackTrace(); // 打印堆栈信息（在实际项目中可能需要更合适的错误处理方式）
@@ -72,7 +67,7 @@ public class ExcelService {
         }
     }
 
-    private ExcelBean getExcelForMonth(Date date) {
+    private MonthExcelData getExcelForMonth(Date date) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM");
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(date); // 设置为当前时间
@@ -81,14 +76,14 @@ public class ExcelService {
         date = calendar.getTime();
         String curDate = sdf.format(date) + "%";
         List<Map<String, Object>> flows = flowDao.getFlowByMain(3, 0, curDate);
-        List<ExcelBean.Flow> flowList = new ArrayList<>();
+        List<MonthExcelData.Flow> flowList = new ArrayList<>();
         BigDecimal moneyIn = new BigDecimal("0");
         BigDecimal moneyOut = new BigDecimal("0");
 
-        ExcelBean excelBean = new ExcelBean();
+        MonthExcelData monthExcelData = new MonthExcelData();
 
         for (Map<String, Object> map : flows) {
-            ExcelBean.Flow flow = new ExcelBean.Flow();
+            MonthExcelData.Flow flow = new MonthExcelData.Flow();
             SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd");
             Date fDate = (Date) map.get("f_date");
             flow.setFlowDate(sdfDate.format(fDate));
@@ -110,33 +105,33 @@ public class ExcelService {
                 flow.setAccountName(map.get("a_name") + "->" + map.get("t_a_name"));
             }
         }
-        excelBean.setMonthTotalIn("￥" + moneyIn.toString());
-        excelBean.setMonthTotalOut("￥" + moneyOut.toString());
-        excelBean.setMonthTotalEarn("￥" + (moneyIn.subtract(moneyOut)).toString());
+        monthExcelData.setMonthTotalIn("￥" + moneyIn.toString());
+        monthExcelData.setMonthTotalOut("￥" + moneyOut.toString());
+        monthExcelData.setMonthTotalEarn("￥" + (moneyIn.subtract(moneyOut)).toString());
         SimpleDateFormat sdfExcel = new SimpleDateFormat("yyyy年MM月");
         String excelDate = sdfExcel.format(date);
-        excelBean.setCurrentMonth(excelDate);
-        excelBean.setFlow(flowList);
+        monthExcelData.setCurrentMonth(excelDate);
+        monthExcelData.setFlow(flowList);
 
-        List<Account> accounts = accountDao.queryAllAccount();
-        List<ExcelBean.Account> excelAccounts = new ArrayList<>();
+        List<Account> accounts = accountService.getAllOriginAccounts();
+        List<MonthExcelData.Account> excelAccounts = new ArrayList<>();
         BigDecimal totalAsset = new BigDecimal("0");
         for (Account a : accounts) {
-            ExcelBean.Account excelA = new ExcelBean.Account();
+            MonthExcelData.Account excelA = new MonthExcelData.Account();
             excelA.setAccountMoney(a.getMoney());
-            excelA.setAccountName(a.getaName());
+            excelA.setAccountName(a.getAName());
             totalAsset = totalAsset.add(new BigDecimal(a.getMoney()));
             excelAccounts.add(excelA);
         }
-        excelBean.setExcelAccounts(excelAccounts);
-        excelBean.setAllAsset("￥" + totalAsset.toString());
-        return excelBean;
+        monthExcelData.setExcelAccounts(excelAccounts);
+        monthExcelData.setAllAsset("￥" + totalAsset.toString());
+        return monthExcelData;
 
     }
 
 
 
-    private void writeMonthExcel(String excelDate, ExcelBean excelBean) {
+    private void writeMonthExcel(String excelDate, MonthExcelData monthExcelData) {
         Date date = new Date();
         String excelFileName = excelDate + "月账单_" + date.getTime() + ".xls";
         String excelPath = excelFolder + excelFileName;
@@ -145,9 +140,9 @@ public class ExcelService {
                 .registerWriteHandler(new ExcelWriteHandler())
                 .build();
         WriteSheet writeSheet = EasyExcel.writerSheet().build();
-        excelWriter.fill(excelBean, writeSheet);
-        excelWriter.fill(new FillWrapper("flow", excelBean.getFlow()), writeSheet);
-        excelWriter.fill(new FillWrapper("account", excelBean.getExcelAccounts()), writeSheet);
+        excelWriter.fill(monthExcelData, writeSheet);
+        excelWriter.fill(new FillWrapper("flow", monthExcelData.getFlow()), writeSheet);
+        excelWriter.fill(new FillWrapper("account", monthExcelData.getExcelAccounts()), writeSheet);
         //excelWriter.fill(new FillWrapper("analyze",excelBean.getAnalyzeList()), writeSheet);
         //  excelWriter.write(flowList,writeSheet);
         excelWriter.finish();

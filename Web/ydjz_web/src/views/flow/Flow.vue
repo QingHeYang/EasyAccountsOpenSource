@@ -1,7 +1,8 @@
 <template>
   <div>
-    <van-nav-bar title="流水" left-text="搜索流水"  right-text="记一笔" @click-right="toAddFlow"/>
-    <van-dropdown-menu active-color="#1989fa">
+    <van-sticky :style="{background:'#FFFFFF'}">
+    <van-nav-bar  fixed placeholder   title="流水" right-text="记一笔" @click-right=toAddFlow() />
+    <van-dropdown-menu  active-color="#1989fa">
       <van-dropdown-item
           v-model="handle"
           :options="option1"
@@ -13,6 +14,7 @@
           @change="onHandleClick"
       />
     </van-dropdown-menu>
+    </van-sticky>
     <van-divider
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
     > 月度收支情况
@@ -42,14 +44,13 @@
 
     </div>
 
-
     <van-divider
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
     > 账本概览
     </van-divider>
-    <van-cell-group>
+    <van-cell-group :border="false">
       <div @click="toUpdateFlow(flow.id)" v-for="flow in flows" :key="flow.id">
-        <van-swipe-cell>
+        <van-swipe-cell >
           <template #left @open="()=>{currentFlow = flow}">
             <van-button size="small" square color="#8c8c8c" type="primary" class="delete-button"
                         @click="doShowNote(flow)">
@@ -63,20 +64,17 @@
             font-size: 13px;
             color: #4e4e4e;
           ">
-            {{ flow.fDate }}
+            {{ flow.fdate }}
           </div>
           <van-cell
               size="large"
-              :title="flow.tName"
+              :title="flow.tname"
               :value="'￥' + flow.money"
-              :label="flow.aName"
+              :label="flow.aname"
           >
             <template #default>
-              <!--            <div :style="()=>{return {color:flow.baseColor,fontsize:'40px'}}">
-                                        ￥{{ flow.money }}
-                                      </div>-->
               <div style="color: #000; font-size: 19px">￥{{ flow.money }}</div>
-              <van-tag :type="flow.tagStyle">{{ flow.hName }}</van-tag>
+              <van-tag :type="flow.tagStyle">{{ flow.hname }}</van-tag>
               <van-tag
                   v-show="flow.exempt"
                   style="margin-left: 10px"
@@ -116,6 +114,17 @@
           @confirm="this.onPickerClick"
       />
     </van-popup>
+
+<!--    <button
+        class="floating-button"
+        :class="{'dragging': isDragging}"
+        @touchstart="dragStart"
+        @touchmove="dragMove"
+        @touchend="dragEnd"
+        ref="floatBtn"
+    >
+      +
+    </button>-->
   </div>
 </template>
 
@@ -130,6 +139,10 @@ export default {
 
   data() {
     return {
+      initialX: 0,
+      initialY: 0,
+      isDragging: false,
+      moved: false,
       showPicker: false,
       hasFlow: true,
       flowId: "",
@@ -162,6 +175,8 @@ export default {
       columns: [
         // 第一列
       ],
+      offsetX: 0,
+      offsetY: 0,
     };
   },
 
@@ -169,10 +184,61 @@ export default {
     this.prepareDateDouble();
     this.chooseMonth = this.curDate.getFullYear() + "-" + (this.curDate.getMonth() + 1).toString().padStart(2, "0");
     this.getMonthFlow();
-    this.renderVChart();
+    //document.addEventListener('touchmove', this.dragMove);
   },
   methods: {
+    /*dragStart(event) {
+      this.moved = false;
+      const touch = event.touches[0];
+      this.initialX = touch.clientX;
+      this.initialY = touch.clientY;
+      this.offsetX = touch.clientX - (this.$refs.floatBtn.offsetLeft + this.$refs.floatBtn.offsetWidth / 2);
+      this.offsetY = touch.clientY - (this.$refs.floatBtn.offsetTop + this.$refs.floatBtn.offsetHeight / 2);
+      document.addEventListener('touchmove', this.dragMove, { passive: false });
+      document.addEventListener('touchend', this.dragEnd);
+    },
+    dragMove(event) {
+      if (!this.moved) {
+        const touch = event.touches[0];
+        const deltaX = Math.abs(touch.clientX - this.initialX);
+        const deltaY = Math.abs(touch.clientY - this.initialY);
+        if (deltaX > 5 || deltaY > 5) {
+          this.moved = true;
+          this.isDragging = true;
+        }
+      }
+      if (this.moved) {
+        event.preventDefault(); // 防止默认的滚动行为
+        const touch = event.touches[0];
 
+        // 根据偏移量计算新的位置
+        const newX = touch.clientX - this.offsetX - this.$refs.floatBtn.offsetWidth / 2;
+        const newY = touch.clientY - this.offsetY - this.$refs.floatBtn.offsetHeight / 2;
+
+        // 边界检测
+        const finalX = Math.max(0, Math.min(newX, window.innerWidth - this.$refs.floatBtn.offsetWidth));
+        const finalY = Math.max(100, Math.min(newY, window.innerHeight - this.$refs.floatBtn.offsetHeight - 100));
+
+        // 更新悬浮球位置
+        this.$refs.floatBtn.style.left = `${finalX}px`;
+        this.$refs.floatBtn.style.top = `${finalY}px`;
+      }
+    },
+    dragEnd(event) {
+      if (this.moved) {
+        event.preventDefault();
+      } else {
+        this.handleClick();
+      }
+      this.isDragging = false;
+      document.removeEventListener('touchmove', this.dragMove);
+      document.removeEventListener('touchend', this.dragEnd);
+    },
+    handleClick() {
+      if (!this.isDragging) {
+        this.toAddFlow();
+      }
+    },*/
     formatter(type, val) {
       if (type === 'year') {
         return `${val}年`;
@@ -183,10 +249,7 @@ export default {
       return val;
     },
 
-    renderVChart() {
-      this.$refs.chart.render();
-      // do what you want
-    },
+
     getMonthFlow() {
       request({
         url:
@@ -220,13 +283,12 @@ export default {
           if (this.handle === 3) {
             this.detail = this.chooseMonth + "总收入： ￥" + this.totalIn + "  总支出： ￥" + this.totalOut;
           }
-          flow.dateSub = flow.fDate.substring(5, 10);
+          flow.dateSub = flow.fdate.substring(5, 10);
           flow.moneyNum = parseFloat(flow.money);
         });
         var fEarn = parseFloat(this.totalIn) - parseFloat(this.totalOut);
 
         this.totalEarn = fEarn.toFixed(2)
-        this.renderVChart();
       });
     },
     onHandleClick() {
@@ -235,8 +297,8 @@ export default {
     toAddFlow() {
       this.$router.push({path: "/flow/add"});
     },
-    toUpdateFlow(flowid) {
-      this.$router.push({path: "/flow/add", query: {flowId: flowid}});
+    toUpdateFlow(flowId) {
+      this.$router.push({path: "/flow/add", query: {flowId: flowId}});
     },
 
     doConfirmDeleteFlow(flow) {
@@ -244,7 +306,7 @@ export default {
       Dialog.confirm({
         title: '确定删除吗？',
         message:
-            '确定删除 ￥' + flow.money + " 的  '" + flow.tName + "'  记录吗？",
+            '确定删除 ￥' + flow.money + " 的  '" + flow.tname + "'  记录吗？",
       })
           .then(() => {
             this.flowId = flow.id
@@ -387,4 +449,44 @@ export default {
   line-height: 100%;
   white-space: pre-wrap;
 }
+
+.floating-button {
+  position: fixed;
+  right: 15px;
+  bottom: 100px;
+  width: 50px;
+  height: 50px;
+  font-size: 24px; /* 调整字体大小确保+号看起来居中 */
+  color: white;
+  background-color: #57BD6A; /* 基础绿色 */
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s, box-shadow 0.3s, transform 0.3s;
+  display: flex; /* 使用flex布局 */
+  justify-content: center; /* 水平居中 */
+  align-items: center; /* 垂直居中 */
+  text-align: center; /* 确保文本居中 */
+  line-height: 50px; /* 增加行高以垂直居中文字 */
+  transform: scale(1); /* 初始缩放比例 */
+}
+
+
+.floating-button:hover, .floating-button.dragging {
+  background-color: #419a54; /* 交互时的更深绿色 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* 增强的阴影 */
+  transform: scale(1.05); /* 轻微放大 */
+}
+
+.floating-button:active {
+  background-color: #57BD6A; /* 点击时恢复到基础绿色 */
+  transform: scale(1); /* 恢复原始大小 */
+}
+
+
+
+
+
 </style>

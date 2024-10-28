@@ -1,5 +1,5 @@
 <template>
-  <div>404</div>
+  <van-empty image="error" description="404,你走到了荒原" />
 </template>
 
 <script>

@@ -3,6 +3,7 @@
     <van-nav-bar
       title="操作"
       left-arrow
+      fixed placeholder
       right-text="添加操作"
       @click-left="onClickLeft"
       @click-right="onClickRight"
@@ -11,7 +12,7 @@
     <van-cell-group >
       <van-cell v-for="action in allActions"  :key="action.id"  is-link  @click="onDetailClick(action.id)" >
         <template #title>
-          <span  class="custom-title">{{action.hName}}</span>
+          <span  class="custom-title">{{action.hname}}</span>
         </template>
         <template #label>
           <van-tag :type="action.style">{{action.handleText}}</van-tag>
@@ -56,6 +57,8 @@ export default {
           action.style =  action.handle===0?"success":action.handle===1?"danger":"primary"
         })
         console.log(this.allActions );
+      }).catch((error) => {
+        console.log(error);
       });
     },
   },
