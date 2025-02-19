@@ -1,5 +1,6 @@
 package com.deepblue.yd_jz.controller;
 
+import com.deepblue.yd_jz.dto.ExcelDto;
 import com.deepblue.yd_jz.dto.FlowListDto;
 import com.deepblue.yd_jz.dto.ScreenFlowRequestDto;
 import com.deepblue.yd_jz.service.ScreenService;
@@ -35,10 +36,15 @@ public class ScreenController {
 
     @ApiOperation(value = "生成Excel")
     @PostMapping("/makeExcel")
-    public BaseDto makeScreenExcel(@RequestBody ScreenFlowRequestDto screenFlowRequestDto, @RequestParam String excelName) throws Exception {
-        screenService.makeScreenExcel(screenFlowRequestDto,excelName);
+    public BaseDto<ExcelDto> makeScreenExcel(@RequestBody ScreenFlowRequestDto screenFlowRequestDto, @RequestParam String excelName) throws Exception {
+        String  result =screenService.makeScreenExcel(screenFlowRequestDto,excelName);
+        ExcelDto excelDto = new ExcelDto();
+        String flag = result.substring(result.length()-2);
+        String log = result.substring(0,result.length()-2);
+        excelDto.setLog(log);
+        excelDto.setSuccess(flag.contains("0"));
         BaseDto baseDto = BaseDto.setSuccessBean();
-        baseDto.setData(excelName);
+        baseDto.setData(excelDto);
         return baseDto;
     }
 }

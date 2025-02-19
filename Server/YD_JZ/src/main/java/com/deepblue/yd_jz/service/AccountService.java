@@ -1,18 +1,25 @@
 package com.deepblue.yd_jz.service;
 
+import com.deepblue.yd_jz.dao.jpa.FlowRepository;
 import com.deepblue.yd_jz.dto.AccountResponseDto;
 import com.deepblue.yd_jz.entity.Account;
 import com.deepblue.yd_jz.dto.AccountRequestDto;
 import com.deepblue.yd_jz.dao.jpa.AccountRepository;
+import com.deepblue.yd_jz.entity.Flow;
+import com.deepblue.yd_jz.entity.FlowJpaEntity;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.stream.Collectors;
 
+import static com.deepblue.yd_jz.utils.ContentValues.*;
+
+@Slf4j
 @Service
 public class AccountService {
 
@@ -20,6 +27,9 @@ public class AccountService {
     private AccountRepository accountRepository;
     @Autowired
     private FlowTemplateService flowTemplateService;
+
+    @Autowired
+    private FlowRepository flowRepository;
 
     @Transactional(rollbackFor = Exception.class)
     public void addAccount(AccountRequestDto postBean) {
@@ -80,6 +90,78 @@ public class AccountService {
         return accountResponseDtos;  // 返回转换后的客户端可见的账户列表
     }
 
+    /**
+     * 通过日期获取账户时间节点的账户信息
+     * @param date
+     * @return
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<Account> getAccountByDate(String date) {
+        List<Account>  accounts= getAllOriginAccounts();
+        List<Account> cloneList = accounts.stream()
+                .map(account -> cloneAccount(account))
+                .collect(Collectors.toList());
+        HashMap<Integer, Account> accountMap = new HashMap<>();
+        for (Account account : cloneList) {
+            accountMap.put(account.getId(), account);
+        }
+        List<FlowJpaEntity> flows = flowRepository.findByFDateAfter(date);
+        log.info("flows size: " + flows.size());
+        for (FlowJpaEntity flow : flows) {
+            Account account = accountMap.get(flow.getAccountId());
+            switch (flow.getAction().getHandle()){
+                case ACTION_ADD:
+                    account.setMoney(reverseMoney(account.getMoney(), flow.getMoney(), ACTION_ADD).toString());
+                    break;
+                case ACTION_SUB:
+                    account.setMoney(reverseMoney(account.getMoney(), flow.getMoney(), ACTION_SUB).toString());
+                    break;
+                case ACTION_INNER:
+                    log.info("内部转账：从"
+                            +account.getAName()
+                            +"转账到"+accountMap.get(flow.getAccountToId()).getAName()
+                            +"  金额："+flow.getMoney());
+                    account.setMoney(reverseMoney(account.getMoney(), flow.getMoney(), ACTION_SUB).toString());
+                    Account accountTo = accountMap.get(flow.getAccountToId());
+                    accountTo.setMoney(reverseMoney(accountTo.getMoney(), flow.getMoney(), ACTION_ADD).toString());
+                    break;
+            }
+        }
+        ArrayList<Account> accountList = new ArrayList<>(accountMap.values());
+        return accountList;
+    }
+
+    /**
+     * 深度克隆一个账户对象
+     * @param managed
+     * @return
+     */
+    private Account cloneAccount(Account managed) {
+        Account detached = new Account();
+        detached.setAName(managed.getAName());
+        detached.setCreateTime(managed.getCreateTime());
+        detached.setId(managed.getId());
+        detached.setMoney(managed.getMoney());
+        // 视情况复制其他字段
+        return detached;
+    }
+
+    /**
+     * 反转金额
+     * @param accountsMoneyStr
+     * @param money
+     * @param handle
+     * @return
+     */
+    private String reverseMoney(String accountsMoneyStr, String money, int handle) {
+        BigDecimal accountsMoney = new BigDecimal(accountsMoneyStr);
+        BigDecimal moneyDecimal = new BigDecimal(money);
+        if (handle == ACTION_ADD) {
+            return accountsMoney.subtract(moneyDecimal).toString();
+        } else {
+            return accountsMoney.add(moneyDecimal).toString();
+        }
+    }
 
     @Transactional(rollbackFor = Exception.class)
     public void disableAccount(int id) {

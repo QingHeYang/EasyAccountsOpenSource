@@ -34,7 +34,7 @@
       </van-field>
     </van-cell-group>
     <div style="margin: 16px">
-      <van-button @click="onSubmit" round block type="info" native-type="submit"
+      <van-button @click="onSubmit" round block type="primary" native-type="submit"
         >{{ this.$route.query.action != null ? "完成修改" : "添加" }}
       </van-button>
     </div>
@@ -42,8 +42,7 @@
 </template>
 
 <script>
-import request from "../../utils/request";
-import { Toast } from "vant";
+import {closeToast, showLoadingToast} from "vant";
 
 export default {
   name: "ActionAdd",
@@ -61,7 +60,7 @@ export default {
   },
   methods: {
     getAction() {
-      request({
+      this.$http({
         url: "/action/getAction/" + this.$route.query.action,
       }).then((res) => {
         const action = res.data.data;
@@ -69,13 +68,15 @@ export default {
         this.radio = action.handle + "";
         this.switchChecked = action.exempt;
         console.log(action);
+      }).catch(() => {
+        closeToast();
       });
     },
 
     onSubmit() {
       const toastMsg =
         this.$route.query.action == null ? "添加中..." : "修改中...";
-      const toast = Toast.loading({
+       showLoadingToast({
         message: toastMsg,
         duration: 0,
         forbidClick: true,
@@ -86,7 +87,7 @@ export default {
           ? "/action/addAction"
           : "/action/updateAction/" + this.$route.query.action;
       const method = this.$route.query.action == null ? "post" : "put";
-      request({
+      this.$http({
         url: api,
         method: method,
         data: {
@@ -96,11 +97,11 @@ export default {
         },
       })
         .then(() => {
-          toast.clear();
+          closeToast();
           this.$router.go(-1);
         })
         .catch(() => {
-          toast.clear();
+          closeToast();
         });
     },
 

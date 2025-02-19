@@ -14,7 +14,7 @@
       v-model="loading"
       :finished="finished"
       finished-text="没有更多了"
-      :error.sync="error"
+      v-model:error="error"
       error-text="请求失败，点击重新加载"
       @load="onLoad"
     >
@@ -28,7 +28,7 @@
     </van-list>
 
     <van-action-sheet
-      v-model="showPopup"
+      v-model:show="showPopup"
       :title="chooseItem.name"
       close-on-click-action
     >
@@ -50,8 +50,7 @@
 </template>
 
 <script>
-import { Dialog } from "vant";
-import request from "../../utils/request";
+import {showConfirmDialog} from "vant";
 
 export default {
   data() {
@@ -75,11 +74,11 @@ export default {
     },
     onDelete(id) {
       this.showPopup = false;
-      Dialog.confirm({
+      showConfirmDialog({
         title: "停用账户",
         message: "确定停用账户吗？\n停用后将无法在此账户下记账!\n关于此账户的数据不会删除",
       }).then(() => {
-        request({
+        this.$http({
           url: "/account/deleteAccount/" + id,
           method: "delete",
         })
@@ -113,7 +112,7 @@ export default {
       this.$router.push({ path: "/account/add" });
     },
     onReload(){
-      request({
+      this.$http({
         url: "/account/getAccount",
         method: "get",
       })
@@ -137,7 +136,7 @@ export default {
         });
     },
     onLoad() {
-      request({
+      this.$http({
         url: "/account/getAccount",
         method: "get",
       })

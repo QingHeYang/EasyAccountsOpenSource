@@ -18,7 +18,7 @@ public class HomeDto {
     //年度结余
     private String yearBalance;
     private List<HomeAccountBean> accounts;
-
+    private List<HomeMonthDetailBean> monthDetails;
 
     @Data
     public static class HomeAccountBean {
@@ -28,6 +28,13 @@ public class HomeDto {
         private String exemptAsset;
         private String percent;
         private String note;
+    }
 
+    @Data
+    public static class HomeMonthDetailBean {
+        private String month;
+        private String income;
+        private String outcome;
+        private String balance;
     }
 }

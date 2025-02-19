@@ -1,0 +1,13 @@
+databaseChangeLog:
+- changeSet:
+    id: 1738767747732-1
+    author: root (generated)
+    changes:
+    - addColumn:
+        columns:
+        - column:
+            defaultValueNumeric: 0
+            name: analysis_disable
+            type: TINYINT(3)
+        tableName: type
+

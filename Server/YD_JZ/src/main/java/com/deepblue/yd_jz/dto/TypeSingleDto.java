@@ -10,4 +10,5 @@ public class TypeSingleDto {
     private boolean disable = false;  // Default is false
     private Boolean archive;  // Nullable Boolean field
     private Integer actionId;  // Foreign key relation, could link to an 'Action' entity
+    private Boolean analysisDisable;  // Default is false
 }

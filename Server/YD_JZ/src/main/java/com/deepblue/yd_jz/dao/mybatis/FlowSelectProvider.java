@@ -62,46 +62,6 @@ public class FlowSelectProvider {
         return sqlStr;
     }
 
-    /*public String getFlowByScreen(int handle, int account, String startDate, String endDate, boolean isSingleMonth,boolean isCollect,String note) {
-        StringBuilder sql = new StringBuilder("SELECT " +
-                "flow.id,flow.f_date flowDate,flow.money,flow.collect,flow.exempt,flow.note," +
-                "a.handle,a.h_name handleName,a.id actionId," +
-                "ac.a_name accountName, ac.id accountId,acc.a_name toAccountName," +
-                "t.t_name typeName,t.id typeId,t2.t_name parentTypeName,t2.id parentTypeId\n");
-        sql.append("FROM flow\n");
-        sql.append("LEFT OUTER JOIN action a on flow.action_id = a.id\n");
-        sql.append("LEFT OUTER JOIN type t on flow.type_id = t.id\n");
-        sql.append("LEFT OUTER JOIN type t2 on t.parent = t2.id\n");
-        sql.append("LEFT OUTER JOIN account ac on flow.account_id = ac.id\n");
-        sql.append("LEFT OUTER JOIN account acc on flow.account_to_id = acc.id\n");
-        String handleSymbol = handle==3?"<":"=";
-        sql.append("WHERE ("+"\n"+"a.handle  "+handleSymbol + handle + "\n");
-        if (account>0){
-            sql.append("And (flow.account_id="+account+ " Or flow.account_to_id="+account+")\n");
-
-        }
-        if (isSingleMonth){
-            String likeDate = startDate.substring(0,7);
-            sql.append("AND flow.f_date like '"+likeDate+"%' \n");
-        }else {
-            if (!startDate.equals("null")&&!startDate.equals("")){
-                sql.append("AND flow.f_date >='"+startDate+"'\n");
-            }
-
-            if (!endDate.equals("null")&&!endDate.equals("")){
-                sql.append("AND flow.f_date <='"+endDate+"'\n");
-            }
-        }
-        if (isCollect){
-            sql.append("And flow.collect=1\n");
-
-        }
-        sql.append(")\n");
-        sql.append( "ORDER BY flow.f_date desc");
-        log.info("method: getFlowByScreen\n"+sql);
-        return sql.toString();
-    }*/
-
     public String getFlowByScreen(int handle, int account, String startDate, String endDate, boolean isSingleMonth, boolean isCollect, String note) {
         StringBuilder sql = new StringBuilder("SELECT " +
                 "flow.id, flow.f_date AS flowDate, flow.money, flow.collect, flow.exempt, flow.note," +

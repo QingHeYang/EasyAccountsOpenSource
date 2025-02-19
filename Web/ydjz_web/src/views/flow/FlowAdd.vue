@@ -10,8 +10,9 @@
           type="number"
           label="账单金额"
           placeholder="请输入账单金额"
-          @touchstart.native.stop="keyboardShow = true"
+
       />
+<!--      @touchstart.native.stop="keyboardShow = true"-->
       <van-cell title="选择收支" is-link @click="onActionClick">
         <template #default>
           <van-tag :type="chooseAction.style">{{ chooseAction.hname }}</van-tag>
@@ -53,7 +54,7 @@
           input-align="right"
       />
     </van-cell-group>
-    <van-action-sheet v-if="popupStyle<=2" v-model="actionShow" :title="popupTitle">
+    <van-action-sheet v-if="popupStyle<=2" v-model:show="actionShow" :title="popupTitle">
       <van-cell-group v-if="popupStyle == 0">
         <van-cell
             v-for="action in allActions"
@@ -82,7 +83,7 @@
                   :label="account.note" @click="onChooseAccount(account,popupStyle)"/>
       </van-cell-group>
     </van-action-sheet>
-    <van-popup v-model="typeCascaderShow" round position="bottom">
+    <van-popup v-model:show="typeCascaderShow" round position="bottom">
       <van-cascader
           v-model="cascaderValue"
           title="选择账单分类"
@@ -93,7 +94,7 @@
           @finish="onChooseCascader"
       />
     </van-popup>
-    <van-calendar v-model="calanderShow" :show-confirm="false" color="#1989fa" :min-date="minDate"
+    <van-calendar v-model:show="calanderShow" :show-confirm="false" color="#1989fa" :min-date="minDate"
                   :max-date="maxDate " @confirm="onChooseCalendar"/>
 
     <!--  追加账单 1.6版本  -->
@@ -119,14 +120,14 @@
         追加分账单
       </van-button>
 
-      <van-button @click="onSubmitBtnClick" round block type="info" native-type="submit"
+      <van-button @click="onSubmitBtnClick" round block type="primary"
       >{{ this.$route.query.flowId != null ? "修改" : "提交" }}
       </van-button>
     </div>
 
     <!--  快记模板 2.1版本  -->
     <van-popup
-        v-model="fastPopupShow"
+        v-model:show="fastPopupShow"
         position="top"
         :style="{ width: '100%',height: '100%' ,background:'#F7F8FA' }"
     >
@@ -168,7 +169,7 @@
                   <van-tag v-if="template.tag" :color="template.tag.color">{{ template.tag.name }}</van-tag>
                 </div>
                 <div class="template-action">
-                  <van-button plain hairline size="small" type="info" style="margin-left: 10px"
+                  <van-button plain hairline size="small" type="primary" style="margin-left: 10px"
                               @click.stop="fastDialogClick(template)">详情
                   </van-button>
                 </div>
@@ -180,7 +181,7 @@
       </van-cell-group>
     </van-popup>
 
-    <van-dialog v-model="fastDialogShow" closeOnClickOverlay cancel-button-text="编辑" confirm-button-text="选择"
+    <van-dialog v-model:show="fastDialogShow" closeOnClickOverlay cancel-button-text="编辑" confirm-button-text="选择"
                 cancel-button-color="#3D8AF2" @cancel="fastDialogToEdit(chooseTemplate.id)" :title="chooseTemplate.name"
                 @confirm="fastChooseClick(chooseTemplate)"
                 show-cancel-button>
@@ -213,8 +214,7 @@
 </template>
 
 <script>
-import request from "../../utils/request";
-import {Dialog, Toast} from "vant";
+import {showConfirmDialog, showFailToast, showSuccessToast} from "vant";
 import template from "@/views/setting/template/Template.vue";
 
 export default {
@@ -223,9 +223,6 @@ export default {
     template() {
       return template
     },
-    Toast() {
-      return Toast
-    }
   },
   data() {
     return {
@@ -292,7 +289,7 @@ export default {
     fastChooseClick(template) {
       this.fastPopupShow = false;
       this.fastDialogShow = false;
-      this.$toast.success(template.name);
+      showSuccessToast(template.name);
       this.money = template.money;
       this.chooseAccount = template.account;
       if (template.action != null) {
@@ -334,7 +331,7 @@ export default {
     },
 
     getAllTags() {
-      request({
+      this.$http({
         url: "/tag/getTags",
         method: "get",
       }).then((response) => {
@@ -347,7 +344,7 @@ export default {
     },
 
     getAllTemplate() {
-      request({
+      this.$http({
         url: this.chooseTag.id != null ? "/template/getAllTemplatesByTag/" + this.chooseTag.id : "/template/getAllTemplates",
         method: "get",
       }).then((response) => {
@@ -382,7 +379,7 @@ export default {
     },
 
     doGetCurrentFlow() {
-      request({
+      this.$http({
         url: "/flow/getFlow/" + this.$route.query.flowId,
         method: "get"
       }).then(response => {
@@ -440,7 +437,7 @@ export default {
       } else {
         this.submitMoney = this.money
       }
-      Dialog.confirm({
+      showConfirmDialog({
         title: '请确认账单',
         message:
             '总金额: ￥' + this.submitMoney + '\n' +
@@ -460,7 +457,7 @@ export default {
         return
       }
       if (this.chooseType.action != null && this.chooseType.action.id != this.chooseAction.id) {
-        return Dialog.confirm({
+        return showConfirmDialog({
           title: '提示',
           message:
               '当前分类存在修改收支类型的情况\n是否继续提交？',
@@ -479,7 +476,7 @@ export default {
     doSubmitRequest() {
       const api = this.$route.query.flowId == null ? "/flow/addFlow" : "/flow/updateFlow/" + this.$route.query.flowId
       const method = this.$route.query.flowId == null ? "post" : "put"
-      request({
+      this.$http({
         url: api,
         method: method,
         data: {
@@ -499,29 +496,29 @@ export default {
 
     doVertify() {
       if (this.money == "" || this.money == null) {
-        Toast.fail("请输入金额")
+        showFailToast("请输入金额")
         return false;
       }
       if (this.chooseAction.id == null) {
-        Toast.fail("请选择收支")
+        showFailToast("请选择收支")
         return false;
       }
       if (this.chooseAccount.id == null) {
-        Toast.fail("请选择账户")
+        showFailToast("请选择账户")
         return false;
       }
       if (this.chooseAction.handle == 2) {
         if (this.chooseToAccount.id == null) {
-          Toast.fail("请选择目标账户")
+          showFailToast("请选择目标账户")
           return false;
         }
       }
       if (this.chooseType.id == "" || this.chooseType.id == null) {
-        Toast.fail("请选择分类")
+        showFailToast("请选择分类")
         return false;
       }
       if (this.chooseDate == "") {
-        Toast.fail("请选择账单日期")
+        showFailToast("请选择账单日期")
         return false
       }
       return true
@@ -537,7 +534,7 @@ export default {
 
     onTypeClick() {
       if (this.chooseAction.id == null) {
-        Toast.fail("请先选择收支")
+        showFailToast("请先选择收支")
         return;
       }
       this.typeCascaderShow = true;
@@ -556,7 +553,7 @@ export default {
     },
 
     doGetActions() {
-      request({
+      this.$http({
         url: "/action/getAction",
         method: "get"
       }).then((response) => {
@@ -569,7 +566,7 @@ export default {
     },
 
     doGetAccounts() {
-      request({
+      this.$http({
         url: "/account/getAccount",
         method: "get",
       })
@@ -588,7 +585,7 @@ export default {
     },
 
     doGetTypes() {
-      request({
+      this.$http({
         url: "/type/getTypeByActionId/" + this.chooseAction.id,
         method: "get",
       })

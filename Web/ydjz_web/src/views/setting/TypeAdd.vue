@@ -48,6 +48,12 @@
           </van-tag>
         </template>
       </van-cell>
+
+      <van-cell title="不参与统计" >
+        <template #default>
+          <van-switch v-model="analysisDisable" />
+        </template>
+      </van-cell>
     </van-cell-group>
 
     <div style="margin: 20px ">
@@ -71,7 +77,7 @@
     </div>
 
     <van-popup
-        v-model="showPicker"
+        v-model:show="showPicker"
         round
         position="bottom"
 
@@ -91,7 +97,7 @@
         cancel-text="清空绑定"
         close-on-click-action
         @cancel="clearBindAction"
-        v-model="showAction" title="绑定收支">
+        v-model:show="showAction" title="绑定收支">
       <van-cell-group>
         <van-cell
             v-for="action in allActions"
@@ -119,8 +125,7 @@
 </template>
 
 <script>
-import {Dialog, Toast} from "vant";
-import request from "../../utils/request";
+import {closeToast, showConfirmDialog, showLoadingToast, showToast} from "vant";
 
 export default {
   computed: {
@@ -142,6 +147,7 @@ export default {
       chooseName: "",
       chooseId: 0,
       curParent: -1,
+      analysisDisable: false,
       canEditAction: true,
     };
   },
@@ -153,12 +159,12 @@ export default {
   methods: {
     onArchiveClick() {
       console.log("归档");
-      Dialog.confirm({
+      showConfirmDialog({
         title: '归档',
         message: this.curParent===-1?'确定将此分类归档吗？\n注意，一级分类归档会连带子分类一起归档\n归档后将不再显示，但不会删除数据':'确定将此分类归档吗？\n归档后将不再显示，但不会删除数据',
       })
           .then(() => {
-            request({
+            this.$http({
               url: "/type/archiveType/" + this.$route.query.typeId,
               params: {
                 archive : true,
@@ -174,12 +180,12 @@ export default {
     },
 
     onDeleteClick() {
-      Dialog.confirm({
+      showConfirmDialog({
         title: '停用',
         message: this.curParent===-1?'确定停用此分类吗？\n注意，一级分类停用会连带子分类一起停用\n停用后将无法再使用此分类':'确定停用此分类吗？\n停用后将无法再使用此分类',
       })
           .then(() => {
-            request({
+            this.$http({
               url: "/type/deleteType/" + this.$route.query.typeId,
               method: "delete",
             }).then(() => {
@@ -193,7 +199,7 @@ export default {
 
     onChooseAction(action) {
       if (this.curParent === -1 ){
-        Dialog.confirm({
+        showConfirmDialog({
           title: '注意！',
           message: '一级分类绑定收支后\n二级分类将自动同步绑定该收支\n是否继续？',
         })
@@ -216,20 +222,21 @@ export default {
     },
 
     onSingleType() {
-      request({
+      this.$http({
         url: "/type/getTypeSingle/" + this.$route.query.typeId,
         method: "get",
       }).then((response) => {
         console.log(response);
         this.tname = response.data.data.tname;
         this.curParent = response.data.data.parent;
+        this.analysisDisable = response.data.data.analysisDisable;
         if (response.data.data.action !== null) {
           this.action = response.data.data.action;
           this.action = this.setActionStyle(this.action)
            }
 
         if (this.curParent !== -1) {
-          request({
+          this.$http({
             url: "/type/getTypeSingle/" + response.data.data.parent,
             method: "get",
           }).then((pres) => {
@@ -238,7 +245,6 @@ export default {
             if (pres.data.data.action !== null) {
               this.canEditAction = false;
             }
-            console.log("父辈："+pres.data.data);
           });
         } else {
           this.chooseName = "";
@@ -254,33 +260,34 @@ export default {
     },
 
     onUpdateClick() {
-      Dialog.confirm({
+      showConfirmDialog({
         title: "更新",
         message: "确定更新此分类吗？",
       })
           .then(() => {
-            const toast = Toast.loading({
+             showLoadingToast({
               message: "更新中...",
               forbidClick: true,
               duration: 0,
               loadingType: "spinner",
             });
-            request({
+            this.$http({
               url: "/type/updateType/" + this.$route.query.typeId,
               method: "put",
               data: {
                 id: this.$route.query.typeId,
                 tname: this.tname,
                 parent: this.chooseType.id,
-                actionId: this.action.id
+                actionId: this.action.id,
+                analysisDisable: this.analysisDisable,
               },
             })
                 .then(() => {
                   this.$router.go(-1);
-                  toast.clear();
+                  closeToast();
                 })
                 .catch(() => {
-                  toast.clear();
+                  closeToast();
                 });
           })
           .catch(() => {
@@ -289,7 +296,7 @@ export default {
     },
 
     getAllAction() {
-      request({
+      this.$http({
         url: "/action/getAction",
         method: "get",
       }).then((response) => {
@@ -305,7 +312,7 @@ export default {
 
     onShowActionPicker() {
       if (!this.canEditAction){
-        Toast("当前分类不可绑定收支");
+        showToast("当前分类不可绑定收支");
         return;
       }
       this.showAction = true;
@@ -315,18 +322,18 @@ export default {
     onShowParentPicker() {
       if (this.$route.query.editId) {
         if (this.curParent === -1) {
-          Toast("当前已经是一级分类了");
+          showToast("当前已经是一级分类了");
           return;
         }
       }
-      request({
+      this.$http({
         url: "/type/getType/-1",
         method: "get",
       })
           .then((response) => {
             this.typeList = response.data.data;
             this.typeList.forEach((item, index) => {
-              this.columns[index] = item.tname;
+              this.columns[index] = {text:item.tname,value:item.id};
               if (item.action != null) {
                 this.setActionStyle(item.action)
               }
@@ -349,33 +356,34 @@ export default {
       this.showPicker = false;
     },
     onClickRight() {
-      const toast = Toast.loading({
+      showLoadingToast({
         message: "保存中...",
         forbidClick: true,
         duration: 0,
         loadingType: "spinner",
       });
-      request({
+      this.$http({
         url: "/type/addType",
         method: "post",
         data: {
           tname: this.tname,
           parent: this.chooseType.id,
-          actionId: this.action.id
+          actionId: this.action.id,
+          analysisDisable: this.analysisDisable,
         },
       })
           .then(() => {
             this.$router.go(-1);
-            toast.clear();
+            closeToast();
           })
           .catch(() => {
-            toast.clear();
+            closeToast();
           });
     },
 
-    onParentConfirm(value, index) {
+    onParentConfirm({ selectedIndexes  }) {
       this.showPicker = false;
-      this.chooseType = this.typeList[index];
+      this.chooseType = this.typeList[selectedIndexes];
       this.chooseName = this.chooseType.tname;
       this.curParent = this.chooseType.id;
       if (this.chooseType.action !== null) {

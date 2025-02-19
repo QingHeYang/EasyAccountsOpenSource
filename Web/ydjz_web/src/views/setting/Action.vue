@@ -24,7 +24,6 @@
 </template>
 
 <script>
-import request from "../../utils/request";
 export default {
   name: "Action.vue",
   data() {
@@ -46,7 +45,7 @@ export default {
       this.$router.push({path:"/action/add"})
     },
     getAllAction() {
-      request({
+      this.$http({
         url: "/action/getAction",
         method: "get",
       }).then((response) => {

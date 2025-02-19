@@ -198,8 +198,8 @@
     </div>
 
 
-    <van-popup v-model="showStartPicker" round position="bottom">
-      <van-datetime-picker
+    <van-popup v-model:show="showStartPicker" round position="bottom">
+      <van-date-picker
           show-toolbar
           title="选择开始年月"
           type="year-month"
@@ -212,8 +212,8 @@
       />
     </van-popup>
 
-    <van-popup v-model="showEndPicker" round position="bottom">
-      <van-datetime-picker
+    <van-popup v-model:show="showEndPicker" round position="bottom">
+      <van-date-picker
           show-toolbar
           title="选择结束年月"
           type="year-month"
@@ -229,8 +229,7 @@
 </template>
 
 <script>
-import {Dialog, Toast} from "vant";
-import request from "../../utils/request";
+import {showConfirmDialog, showFailToast} from "vant";
 
 export default {
   name: "Analysis",
@@ -321,7 +320,7 @@ export default {
 
     generateReport() {
       //this.$router.push({path: "/flow/report", query: {month: this.chooseMonth}});
-      Dialog.confirm({
+      showConfirmDialog({
         title: '确定生成报表吗？',
         message:
             '确定生成 ' +this.startChooseMonth + " 财务分析表吗？",
@@ -336,7 +335,7 @@ export default {
 
     makeExcel(){
       if (this.startChooseMonth === "" && this.endChooseMonth === "") {
-        Toast.fail('开始日期和结束日期至少选择一个');
+        showFailToast('开始日期和结束日期至少选择一个');
         return;
       }
       let startQueryStr = ""
@@ -348,7 +347,7 @@ export default {
         startQueryStr = this.startChooseMonth;
         endQueryStr = this.endChooseMonth;
       }
-      request({
+      this.$http({
         url:
             "/analysis/exportExcel?start=" +
             startQueryStr +
@@ -357,12 +356,14 @@ export default {
         method: "get"
       }).then(() => {
         this.query();
+      }).catch(() => {
+        showFailToast('生成报表失败');
       });
     },
 
     query() {
       if (this.startChooseMonth === "" && this.endChooseMonth === "") {
-        Toast.fail('开始日期和结束日期至少选择一个');
+        showFailToast('开始日期和结束日期至少选择一个');
         return;
       }
       let startQueryStr = ""
@@ -375,7 +376,7 @@ export default {
         endQueryStr = this.endChooseMonth;
       }
 
-      request({
+      this.$http({
         url:
             "/analysis/doAnalysis?start=" +
             startQueryStr +

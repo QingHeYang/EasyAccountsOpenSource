@@ -41,7 +41,6 @@
 </template>
 
 <script>
-import request from "../../utils/request";
 
 export default {
   data() {
@@ -74,7 +73,7 @@ export default {
       });
     },
     onLoad() {
-      request({
+      this.$http({
         url: "/type/getType",
         method: "get",
       })

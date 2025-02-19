@@ -30,7 +30,7 @@
           placeholder="请输入模板金额"
       />
     </van-cell-group>
-    <van-cell-group  :border="false" inset :style="{marginTop:'20px'}">
+    <van-cell-group :border="false" inset :style="{marginTop:'20px'}">
       <van-cell title="选择模板收支" is-link @click="onActionClick">
         <template #default>
           <van-tag :type="chooseAction.style">{{ chooseAction.hname }}</van-tag>
@@ -53,10 +53,11 @@
 
       <van-cell title="模板账单分类" :value="chooseType.tname" is-link @click="onTypeClick"/>
 
-      <van-cell title="模板账单日期"   >
+      <van-cell title="模板账单日期">
         <template #icon>
 
-          <van-icon name="question-o" @click="onDateClick" :style="{ marginRight:'5px',display: 'flex', justifyContent: 'center', alignItems: 'center' }"/>
+          <van-icon name="question-o" @click="onDateClick"
+                    :style="{ marginRight:'5px',display: 'flex', justifyContent: 'center', alignItems: 'center' }"/>
         </template>
         <template #right-icon>
           <van-radio-group v-model="dateTypeStr" direction="horizontal">
@@ -89,11 +90,12 @@
     </van-cell-group>
 
     <div style="margin: 20px">
-      <van-button type="primary" size="large"  @click="onSubmit">{{isEdit?"修改":"新建"}}</van-button>
-      <van-button v-if="isEdit" type="danger" size="large" style="margin-top: 5px" @click="deleteTemplate" >删除</van-button>
+      <van-button type="success" size="large" @click="onSubmit">{{ isEdit ? "修改" : "新建" }}</van-button>
+      <van-button v-if="isEdit" type="danger" size="large" style="margin-top: 5px" @click="deleteTemplate">删除
+      </van-button>
     </div>
 
-    <van-action-sheet v-if="popupStyle<=2" v-model="actionShow" :title="popupTitle">
+    <van-action-sheet v-if="popupStyle<=2" v-model:show="actionShow" :title="popupTitle">
       <van-cell-group v-if="popupStyle == 0">
         <van-cell
             v-for="action in allActions"
@@ -122,7 +124,7 @@
                   :label="account.note" @click="onChooseAccount(account,popupStyle)"/>
       </van-cell-group>
     </van-action-sheet>
-    <van-popup v-model="typeCascaderShow" round position="bottom">
+    <van-popup v-model:show="typeCascaderShow" round position="bottom">
       <van-cascader
           v-model="cascaderValue"
           title="选择账单分类"
@@ -136,8 +138,7 @@
   </div>
 </template>
 <script>
-import request from "../../../utils/request";
-import {Dialog, Toast} from "vant";
+import {showConfirmDialog, showDialog, showFailToast} from "vant";
 
 export default {
   name: "TemplateAdd.vue",
@@ -228,7 +229,7 @@ export default {
 
     onTypeClick() {
       if (this.chooseAction.id == null) {
-        Toast.fail("请先选择收支")
+        showFailToast("请先选择收支")
         return;
       }
       this.typeCascaderShow = true;
@@ -257,8 +258,8 @@ export default {
       }
     },
 
-    onDateClick(){
-      Dialog({
+    onDateClick() {
+      showDialog({
         title: '模板账单日期',
         message: '补上月-上个月最后一天\n记本月-本月记账当天',
       }).then(() => {
@@ -268,12 +269,12 @@ export default {
 
     onSubmit() {
       if (this.template.name == null || this.template.name === "") {
-        Toast.fail("请填写模板名称")
+        showFailToast("请填写模板名称")
         return
       }
-      Dialog.confirm({
+      showConfirmDialog({
         title: '确认',
-        message: '确定提交“'+this.template.name+'”吗？'
+        message: '确定提交“' + this.template.name + '”吗？'
       }).then(() => {
         this.doSubmitRequest()
       }).catch(() => {
@@ -282,7 +283,7 @@ export default {
     },
 
     doSubmitRequest() {
-      request({
+      this.$http({
         url: this.isEdit ? "/template/updateTemplate" : "/template/addTemplate",
         method: this.isEdit ? "put" : "post",
         data: {
@@ -305,7 +306,7 @@ export default {
     },
 
     getAllTags() {
-      request({
+      this.$http({
         url: "/tag/getTags",
         method: "get",
       }).then((response) => {
@@ -321,7 +322,7 @@ export default {
     },
 
     doGetActions() {
-      request({
+      this.$http({
         url: "/action/getAction",
         method: "get"
       }).then((response) => {
@@ -338,37 +339,38 @@ export default {
     },
 
     doGetAccounts() {
-      request({
+      this.$http({
         url: "/account/getAccount",
         method: "get",
+      }).then((response) => {
+        this.requestLocks.account = true;
+        if (this.isEdit) {
+          this.unLockRequest()
+        }
+        const baseData = response.data.data;
+        baseData.forEach((item) => {
+          item.money = "￥" + item.money;
+          item.exemptMoney = "￥" + item.exemptMoney;
+        });
+        this.allAccounts = baseData;
+        console.log(this.allAccounts);
       })
-          .then((response) => {
-            this.requestLocks.account = true;
-            if (this.isEdit) {
-              this.unLockRequest()
-            }
-            const baseData = response.data.data;
-            baseData.forEach((item) => {
-              item.money = "￥" + item.money;
-              item.exemptMoney = "￥" + item.exemptMoney;
-            });
-            this.allAccounts = baseData;
-            console.log(this.allAccounts);
-          })
           .catch((error) => {
             console.log(error);
           });
     },
 
     doGetTypes() {
-      request({
+      this.$http({
         url: "/type/getTypeByActionId/" + this.chooseAction.id,
         method: "get",
       })
           .then((response) => {
             this.allTypes = response.data.data;
             console.log(this.allTypes)
-          })
+          }).catch((error) => {
+        console.log(error);
+      });
     },
 
     unLockRequest() {
@@ -379,43 +381,43 @@ export default {
 
     getTemplateById() {
 
-      request({
+      this.$http({
         url: "/template/getTemplateById/" + this.$route.query.templateId,
         method: "get",
       }).then((response) => {
         this.template = response.data.data;
         if (this.template.actionId == null) {
           this.chooseAction = {}
-        }else {
+        } else {
           this.chooseAction = this.allActions.find((action) => action.id === this.template.actionId);
         }
 
         if (this.template.accountId == null) {
           this.chooseAccount = {}
-        }else {
+        } else {
           this.chooseAccount = this.allAccounts.find((account) => account.id === this.template.accountId);
           this.doGetTypes()
         }
 
         if (this.template.accountToId == null) {
           this.chooseAccountTo = {}
-        }else {
+        } else {
           this.chooseAccountTo = this.allAccounts.find((account) => account.id === this.template.accountToId);
         }
 
         if (this.template.typeId == null) {
           this.chooseType = {}
-        }else {
+        } else {
           this.chooseType.id = this.template.typeId;
           this.chooseType.tname = this.template.type.tname;
         }
 
         if (this.template.tagId == null) {
           this.chooseTag = {}
-        }else {
+        } else {
           this.chooseTag = this.allTags.find((tag) => tag.id === this.template.tagId);
         }
-        this.dateTypeStr = this.template.dateType==null?"":this.template.dateType.toString();
+        this.dateTypeStr = this.template.dateType == null ? "" : this.template.dateType.toString();
         console.log(this.template);
       }).catch((error) => {
         console.log(error);
@@ -440,11 +442,11 @@ export default {
     },
 
     deleteTemplate() {
-      Dialog.confirm({
+      showConfirmDialog({
         title: '确认',
-        message: '确定删除“'+this.template.name+'”吗？'
+        message: '确定删除“' + this.template.name + '”吗？'
       }).then(() => {
-        request({
+        this.$http({
           url: "/template/deleteTemplate/" + this.template.id,
           method: "delete",
         }).then((response) => {
@@ -457,7 +459,8 @@ export default {
         // on cancel
       });
     },
-  }
+  },
+
 }
 </script>
 <style scoped>

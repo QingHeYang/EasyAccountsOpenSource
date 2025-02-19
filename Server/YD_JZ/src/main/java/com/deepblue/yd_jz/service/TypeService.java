@@ -29,7 +29,7 @@ public class TypeService {
         type.setParent(typeSingleDto.getParent());
         type.setParent(typeSingleDto.getParent() == null ? -1 : typeSingleDto.getParent());
         type.setActionId(typeSingleDto.getActionId());
-
+        type.setAnalysisDisable(typeSingleDto.getAnalysisDisable());
         typeRepository.save(type);
     }
 
@@ -38,16 +38,25 @@ public class TypeService {
         Type type = new Type();
         type.setId(typeSingleDto.getId());
         type.setTName(typeSingleDto.getTName());
-        if (typeSingleDto.getParent()==null){
+        type.setAnalysisDisable(typeSingleDto.getAnalysisDisable());
+        if (typeSingleDto.getParent() == null) {
             type.setParent(-1);
-        }else {
+        } else {
             type.setParent(typeSingleDto.getParent());
         }
-        if ((typeSingleDto.getParent() == null||typeSingleDto.getParent() == -1)&&typeSingleDto.getActionId()!=null){
-            List<Type> typeList= typeRepository.findByParent(typeSingleDto.getId());
-            for (Type t:typeList){
-                t.setActionId(typeSingleDto.getActionId());
-                typeRepository.save(t);
+        if ((typeSingleDto.getParent() == null || typeSingleDto.getParent() == -1) ) {
+            List<Type> typeList = typeRepository.findByParent(typeSingleDto.getId());
+            if (typeSingleDto.getActionId() != null) {
+                for (Type t : typeList) {
+                    t.setActionId(typeSingleDto.getActionId());
+                    typeRepository.save(t);
+                }
+            }
+            if (typeSingleDto.getAnalysisDisable()!=null){
+                for (Type t : typeList) {
+                    t.setAnalysisDisable(typeSingleDto.getAnalysisDisable());
+                    typeRepository.save(t);
+                }
             }
         }
         type.setActionId(typeSingleDto.getActionId());
@@ -60,7 +69,7 @@ public class TypeService {
             type.setDisable(true);
             typeRepository.save(type);
             flowTemplateService.clearType(id);
-            if (type.getParent()==-1){
+            if (type.getParent() == -1) {
                 typeRepository.findByParent(id).forEach(childType -> {
                     childType.setDisable(true);
                     typeRepository.save(childType);
@@ -76,7 +85,7 @@ public class TypeService {
             type.setArchive(archive);
             typeRepository.save(type);
             flowTemplateService.clearType(id);
-            if (type.getParent()==-1){
+            if (type.getParent() == -1) {
                 typeRepository.findByParentNoLimit(id).forEach(childType -> {
                     childType.setArchive(archive);
                     typeRepository.save(childType);
@@ -88,7 +97,7 @@ public class TypeService {
 
     @Transactional(rollbackFor = Exception.class)
     public List<Type> queryTypeList(int parent) {
-        List<Type> typeList= typeRepository.findByParent(parent);
+        List<Type> typeList = typeRepository.findByParent(parent);
         log.info("typeList: " + typeList);
         return typeRepository.findByParent(parent);
     }
@@ -109,7 +118,7 @@ public class TypeService {
 
     @Transactional(rollbackFor = Exception.class)
     public List<TypeListResponseDto> queryAllType(boolean limit) {
-        List<Type> allTypes = limit?typeRepository.findAllTypes():typeRepository.findAll();
+        List<Type> allTypes = limit ? typeRepository.findAllTypes() : typeRepository.findAll();
         List<TypeListResponseDto> toClients = new ArrayList<>();
         for (Type type : allTypes) {
             if (type.getParent() == -1) {

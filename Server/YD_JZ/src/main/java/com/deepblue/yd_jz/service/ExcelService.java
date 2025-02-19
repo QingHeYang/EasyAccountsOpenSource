@@ -44,6 +44,9 @@ public class ExcelService {
     @Autowired
     FileMakeWebHook fileMakeWebHook;
 
+    @Autowired
+    DateUtils dateUtils;
+
     @Value("${baseAutoExcel}")
     public String baseExcelPath;
 
@@ -52,18 +55,18 @@ public class ExcelService {
 
 
     // ss mm hh dd MM yy
-    public MonthExcelData makeMonthExcel(String dateStr) {
+    public String makeMonthExcel(String dateStr) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM"); // 格式化字符串需要与你的输入日期格式匹配
         try {
             Date date = sdf.parse(dateStr); // 尝试解析传入的日期字符串
             MonthExcelData monthExcelData = getExcelForMonth(date); // 获取该日期的Excel报表数据
             log.info(new Gson().toJson(monthExcelData));
-            writeMonthExcel(dateStr, monthExcelData);
-            return monthExcelData;
+            String result = writeMonthExcel(dateStr, monthExcelData);
+            return "文件生成成功"+result;
         } catch (ParseException e) {
             // 处理ParseException异常，可以记录日志或返回错误信息
             e.printStackTrace(); // 打印堆栈信息（在实际项目中可能需要更合适的错误处理方式）
-            return null; // 返回null或者抛出一个自定义异常
+            return "Excel生成失败|1"; // 返回null或者抛出一个自定义异常
         }
     }
 
@@ -113,7 +116,9 @@ public class ExcelService {
         monthExcelData.setCurrentMonth(excelDate);
         monthExcelData.setFlow(flowList);
 
-        List<Account> accounts = accountService.getAllOriginAccounts();
+        String accountsDate = dateUtils.buildFullDate(sdf.format(date), false);
+        log.info("accountsDate: " + accountsDate);
+        List<Account> accounts = accountService.getAccountByDate(accountsDate);
         List<MonthExcelData.Account> excelAccounts = new ArrayList<>();
         BigDecimal totalAsset = new BigDecimal("0");
         for (Account a : accounts) {
@@ -131,7 +136,7 @@ public class ExcelService {
 
 
 
-    private void writeMonthExcel(String excelDate, MonthExcelData monthExcelData) {
+    private String writeMonthExcel(String excelDate, MonthExcelData monthExcelData) {
         Date date = new Date();
         String excelFileName = excelDate + "月账单_" + date.getTime() + ".xls";
         String excelPath = excelFolder + excelFileName;
@@ -146,12 +151,14 @@ public class ExcelService {
         //excelWriter.fill(new FillWrapper("analyze",excelBean.getAnalyzeList()), writeSheet);
         //  excelWriter.write(flowList,writeSheet);
         excelWriter.finish();
-        uploadExcel(excelPath, excelFileName, excelDate);
+        return uploadExcel(excelPath, excelFileName, excelDate);
     }
 
-    private void uploadExcel(String excelPath, String excelFileName, String title) {
+    private String uploadExcel(String excelPath, String excelFileName, String title) {
         if (FileUtils.isExist(excelPath)) {
-            fileMakeWebHook.sendFile(new File(excelPath), "month_excel", excelFileName);
+            return fileMakeWebHook.sendFile(new File(excelPath), "month_excel", excelFileName);
+        }else {
+            return "\n文件上传失败\n"+excelPath+excelFileName+"不存在|1";
         }
     }
 

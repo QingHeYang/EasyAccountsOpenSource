@@ -23,6 +23,8 @@ public class TypeListResponseDto {
 
     private Action action;  // Entity relationship
 
+    private Boolean analysisDisable=false;  // Default is false
+
     public TypeListResponseDto convertToDto(Type type) {
         if (type == null) {
             return this;
@@ -39,9 +41,10 @@ public class TypeListResponseDto {
         typeListResponseDto.setTName(type.getTName()+noticeStr);
         typeListResponseDto.setParent(type.getParent());
         typeListResponseDto.setDisable(type.isDisable());
-        typeListResponseDto.setHasChild(type.isHasChild());
+        typeListResponseDto.setHasChild(type.getHasChild());
         typeListResponseDto.setArchive(type.getArchive());
         typeListResponseDto.setAction(type.getAction());
+        typeListResponseDto.setAnalysisDisable(type.getAnalysisDisable());
         return typeListResponseDto;
     }
 }

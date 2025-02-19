@@ -173,10 +173,10 @@ public class ScreenService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void makeScreenExcel(ScreenFlowRequestDto screenFlowRequestDto, String excelName) throws Exception {
+    public String makeScreenExcel(ScreenFlowRequestDto screenFlowRequestDto, String excelName) throws Exception {
         FlowListDto flowListDto = getFlowByScreen(screenFlowRequestDto);
         if (flowListDto.getFlows().size() == 0) {
-            throw new Exception("所选size 为0");
+            return "筛选条件无数据|1";
         }
         ScreenExcelData excelBean = new ScreenExcelData();
         excelBean.setFlow(new ArrayList<>());
@@ -198,14 +198,14 @@ public class ScreenService {
         String dateStr = sdf.format(new Date());
         excelName = excelName + "_" + dateStr + ".xls";
         String excelPath = doMakeExcel(excelBean, excelName);
-        uploadExcel(excelPath, excelName + ".xls", excelBean.getName());
+        return uploadExcel(excelPath, excelName + ".xls", excelBean.getName());
     }
 
-    private void uploadExcel(String excelPath, String excelFileName, String title) {
+    private String uploadExcel(String excelPath, String excelFileName, String title) {
         if (FileUtils.isExist(excelPath)) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            String dateStr = sdf.format(new Date());
-            fileMakeWebHook.sendFile(new File(excelPath), "screen_excel", excelFileName);
+            return fileMakeWebHook.sendFile(new File(excelPath), "screen_excel", excelFileName);
+        }else {
+            return "\n文件上传失败\n"+excelPath+excelFileName+"文件不存在|1";
         }
     }
 

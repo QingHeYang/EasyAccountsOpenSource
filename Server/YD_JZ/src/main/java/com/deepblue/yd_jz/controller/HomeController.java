@@ -1,6 +1,7 @@
 package com.deepblue.yd_jz.controller;
 
 import com.deepblue.yd_jz.dto.HomeDto;
+import com.deepblue.yd_jz.dto.VersionDto;
 import com.deepblue.yd_jz.service.HomeService;
 import com.deepblue.yd_jz.service.ScreenService;
 import com.deepblue.yd_jz.dto.BaseDto;
@@ -33,6 +34,23 @@ public class HomeController {
         HomeDto homeDto = homeService.getHomeBean();
         BaseDto baseDto = new BaseDto();
         baseDto.setData(homeDto);
+        return baseDto;
+    }
+
+    @ApiOperation(value = "V2版本获取首页信息")
+    @GetMapping("/getHomeInfoV2/{year}")
+    public BaseDto<HomeDto> getHomeInfoV2(@PathVariable int year) {
+        HomeDto homeDto = homeService.getHomeInfoByTime(year);
+        BaseDto baseDto = new BaseDto();
+        baseDto.setData(homeDto);
+        return baseDto;
+    }
+
+    @ApiOperation(value = "获取版本信息")
+    @GetMapping("/getVersion")
+    public BaseDto<VersionDto> getVersion() {
+        BaseDto baseDto = new BaseDto();
+        baseDto.setData(homeService.getVersion());
         return baseDto;
     }
 }

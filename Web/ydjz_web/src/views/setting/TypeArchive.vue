@@ -38,8 +38,8 @@
 </template>
 
 <script>
-import request from "../../utils/request";
-import {Dialog} from "vant";
+import {showConfirmDialog, showToast} from "vant";
+
 export default {
   data() {
     return {
@@ -59,7 +59,7 @@ export default {
     },
 
     showToast(message) {
-      this.$toast(message);
+      showToast(message);
     },
 
     onDisableArchiveClick(type) {
@@ -69,12 +69,12 @@ export default {
       }else {
         msg = "该分类为：一级分类\n确定取出“"+type.tname+"”吗？\n一级分类取出后，下属二级分类会一同取出"
       }
-      Dialog.confirm({
+      showConfirmDialog({
         title: "提示",
         message: msg,
       })
           .then(() => {
-            request({
+            this.$http({
               url: "/type/archiveType/" + type.id,
               params: {
                 archive : false,
@@ -94,7 +94,7 @@ export default {
     },
 
     getAllArchive() {
-      request({
+      this.$http({
         url: "/type/getTypeArchive",
         method: "get",
       }).then((response) => {

@@ -1,11 +1,14 @@
-import Vue from "vue";
-import Vuex from "vuex";
+import { createStore } from 'vuex';  // 使用 Vuex 4 的创建 store 的方法
 
-Vue.use(Vuex);
-
-export default new Vuex.Store({
-  state: {},
-  mutations: {},
+export default createStore({
+  state: {
+    redirectToVerify: false,
+  },
+  mutations: {
+    setRedirectToVerify(state, value) {
+      state.redirectToVerify = value;
+    },
+  },
   actions: {},
   modules: {},
 });

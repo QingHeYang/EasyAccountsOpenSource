@@ -1,11 +1,8 @@
 package com.deepblue.yd_jz.controller;
 
-import com.deepblue.yd_jz.dto.FlowAddRequestDto;
-import com.deepblue.yd_jz.dto.FlowListDto;
-import com.deepblue.yd_jz.dto.FlowSingleResponseDto;
+import com.deepblue.yd_jz.dto.*;
 import com.deepblue.yd_jz.service.ExcelService;
 import com.deepblue.yd_jz.service.FlowService;
-import com.deepblue.yd_jz.dto.BaseDto;
 import com.deepblue.yd_jz.data.MonthExcelData;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -80,10 +77,15 @@ public class FlowController {
 
     @ApiOperation(value = "月度流水Excel")
     @GetMapping("/makeExcel/{date}")
-    public BaseDto<MonthExcelData> getExcel(@PathVariable String date){
-        MonthExcelData monthExcelData =excelService.makeMonthExcel(date);
+    public BaseDto<ExcelDto> getExcel(@PathVariable String date){
+        String  result =excelService.makeMonthExcel(date);
+        ExcelDto excelDto = new ExcelDto();
+        String flag = result.substring(result.length()-2);
+        String log = result.substring(0,result.length()-2);
+        excelDto.setLog(log);
+        excelDto.setSuccess(flag.contains("0"));
         BaseDto baseDto = BaseDto.setSuccessBean();
-        baseDto.setData(monthExcelData);
+        baseDto.setData(excelDto);
         return baseDto;
     }
 }

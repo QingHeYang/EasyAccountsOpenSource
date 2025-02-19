@@ -2,7 +2,7 @@
   <div>
     <!--  1.8版本 筛选功能  -->
     <van-sticky :style="{background:'#FFFFFF'}">
-      <van-nav-bar fixed placeholder title="筛选" left-text="备注筛选" right-text="更多条件"
+      <van-nav-bar fixed placeholder title="筛选" left-arrow right-text="更多条件"
                    @click-right="()=>{morePopupShow=true}"
                    @click-left="onClickLeft"/>
       <!--   备注搜索 2.1.0版本   -->
@@ -62,7 +62,7 @@
       <div @click="toUpdateFlow(flow.id)" v-for="flow in flows" :key="flow.id">
         <van-swipe-cell>
           <template #left>
-            <van-button size="small" square color="#8c8c8c" type="primary" class="delete-button"
+            <van-button size="small" square color="#8c8c8c" type="success" class="delete-button"
                         @click="doShowNote(flow)">
               {{ doGetNotString(flow) }}
             </van-button>
@@ -106,11 +106,12 @@
           <div style="height: 1px"></div>
         </van-swipe-cell>
       </div>
+      <van-back-top right="10vw" bottom="15vh"/>
     </van-cell-group>
     <van-empty v-show="flows.length==0" description="当期无账单"/>
 
     <van-popup
-        v-model="accountPopupShow"
+        v-model:show="accountPopupShow"
         round
         position="bottom"
         :style="{ height: '50%' }"
@@ -128,7 +129,7 @@
     </van-popup>
 
     <van-popup
-        v-model="morePopupShow"
+        v-model:show="morePopupShow"
         position="top"
         :style="{ width: '100%',height: '100%' ,background:'#F7F8FA' }"
     >
@@ -230,19 +231,19 @@
       <van-tree-select
           :style="{margin:'15px'}"
           :items="allTypes"
-          :active-id.sync="chooseTypes"
-          :main-active-index.sync="activeIndex"
+          v-model:active-id="chooseTypes"
+          v-model:main-active-index="activeIndex"
           @click-item="onTypesClick"
       />
       <div style="margin-left: 15px;margin-right: 15px;margin-bottom:20px;border-radius: 8px">
-        <van-button type="info" style="margin-top: 5px" size="large" @click="()=>{excelDialogShow=true}">生成EXCEL
+        <van-button type="primary" style="margin-top: 5px" size="large" @click="()=>{excelDialogShow=true}">生成EXCEL
         </van-button>
 
       </div>
     </van-popup>
 
-    <van-popup v-model="showTimeDatePicker" close-on-click-overlay  round position="bottom" :style="{height:'60%'}" @click-overlay="showTimeDatePicker = false">
-      <van-datetime-picker
+    <van-popup v-model:show="showTimeDatePicker" close-on-click-overlay  round position="bottom" :style="{height:'60%'}" @click-overlay="showTimeDatePicker = false">
+      <van-date-picker
           v-if="setStartDate"
           show-toolbar
           title="选择开始日期"
@@ -253,11 +254,12 @@
           :formatter="formatter"
           @cancel="showTimeDatePicker = false"
           @confirm="onDatePickerClick"
+          :columns-type="columnsType"
       />
-      <van-datetime-picker
+      <van-date-picker
           v-else
           show-toolbar
-          title="选择结束"
+          title="选择结束日期"
           type="date"
           v-model="currentTime"
           :min-date="minDate"
@@ -265,6 +267,7 @@
           :formatter="formatter"
           @cancel="showTimeDatePicker = false"
           @confirm="onDatePickerClick"
+          :columns-type="columnsType"
       />
     </van-popup>
 
@@ -275,7 +278,7 @@
     <!--        :style="{ height: '70%' }"-->
     <!--    >-->
 
-    <van-action-sheet v-model="typeMoneyListShow" title="当期分类收支明细">
+    <van-action-sheet v-model:show="typeMoneyListShow" title="当期分类收支明细">
       <van-cell-group>
         <div v-for="type in allTypesMoney" :key="type.typeId">
           <van-cell :value="'合计 ￥'+type.money">
@@ -294,7 +297,7 @@
 
       </van-cell-group>
     </van-action-sheet>
-    <van-dialog v-model="excelDialogShow" closeOnClickOverlay @confirm="onMakeExcelClick"
+    <van-dialog v-model:show="excelDialogShow" closeOnClickOverlay @confirm="onMakeExcelClick"
                 @cancel="excelDialogShow=false" title="生成Excel" show-cancel-button>
       <van-field v-model="excelName" label="Excel标题" placeholder="请输入Excel标题"/>
     </van-dialog>
@@ -302,8 +305,7 @@
 </template>
 
 <script>
-import request from "../../utils/request";
-import {Dialog, Toast} from "vant";
+import {closeToast, showDialog, showFailToast, showLoadingToast} from "vant";
 
 export default {
   name: "Screen",
@@ -323,7 +325,7 @@ export default {
       condition: "",//当前选择的筛选条件
       chooseTypes: [],//当前选择的分类
       chooseActions: [],//当前选择的操作
-      useNote: false,//是否使用备注
+      useNote: true,//是否使用备注
       note: "",//备注
 
       //以下是网络内容
@@ -336,6 +338,7 @@ export default {
       //以下是日历
       minDate: new Date(2021, 10, 1),
       maxDate: new Date(),
+      columnsType: ["year", "month","day"], //vant4.0.0版本以上需要设置
 
       excelDialogShow: false,
       typeMoneyListShow: false,
@@ -343,7 +346,7 @@ export default {
       morePopupShow: false,
       showTimeDatePicker: false,
       setStartDate: true,
-      currentTime: new Date(),
+      currentTime: [ new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()],
       fastChoose: '0',
 
       excelName: "",
@@ -376,10 +379,11 @@ export default {
     },
     onMakeExcelClick() {
       if (this.excelName == null || this.excelName == "") {
-        Toast.fail('请输入Excel标题');
+        showFailToast('请输入Excel标题');
         return
       }
-      request({
+      showLoadingToast('正在生成Excel');
+      this.$http({
         url: "/screen/makeExcel?excelName=" + this.excelName,
         method: "post",
         data: {
@@ -392,33 +396,38 @@ export default {
           types: this.chooseTypes,
           actions: this.chooseActions
         }
-      }).then(() => {
+      }).then((resp) => {
         this.excelName = ""
         this.excelDialogShow = false
+        var excelresult = resp.data.data;
+        var title = excelresult.success?'成功':'失败';
+        closeToast();
+        showDialog({
+          title: '报表生成'+title,
+          message: excelresult.log,
+          cancelButtonText: '确定',
+        })
       }).catch(() => {
         this.excelName = ""
         this.excelDialogShow = false
       });
     },
 
-    formatter(type, val) {
+    formatter(type, option) {
       if (type === 'year') {
-        return `${val}年`;
+        option.text += '年';
       }
       if (type === 'month') {
-        return `${val}月`;
+        option.text += '月';
       }
       if (type === 'day') {
-        return `${val}日`;
+        option.text += '日';
       }
-      return val;
+      return option;
     },
+
     onClickLeft() {
-      this.useNote = !this.useNote
-      if (!this.useNote) {
-        this.note = ""
-        this.doGetCurrentFlow()
-      }
+      this.$router.go(-1)
     },
 
     onNoteSearch() {
@@ -426,7 +435,7 @@ export default {
     },
 
     doGetCurrentFlow() {
-      request({
+      this.$http({
         url: "/screen/getFlowByScreen",
         method: "post",
         data: {
@@ -478,7 +487,7 @@ export default {
     },
 
     doGetActions() {
-      request({
+      this.$http({
         url: "/action/getAction",
         method: "get"
       }).then((response) => {
@@ -489,7 +498,7 @@ export default {
     },
 
     doGetAccounts() {
-      request({
+      this.$http({
         url: "/account/getAccountNoLimit",
         method: "get",
       })
@@ -514,7 +523,7 @@ export default {
     },
 
     doGetTypes() {
-      request({
+      this.$http({
         url: "/type/getType/noLimit",
         method: "get",
       })
@@ -608,13 +617,14 @@ export default {
       this.doGetCurrentFlow()
     },
 
-    onDatePickerClick(value) {
+    onDatePickerClick({ selectedValues }) {
+      let pickDate = new Date(selectedValues[0], selectedValues[1] - 1, selectedValues[2]);
       this.fastChoose = -1
       this.showTimeDatePicker = false
       if (this.setStartDate) {
-        this.startDate = this.fomatTime(value)
+        this.startDate = this.fomatTime(pickDate)
       } else {
-        this.endDate = this.fomatTime(value)
+        this.endDate = this.fomatTime(pickDate)
       }
     },
 
@@ -630,7 +640,7 @@ export default {
 
     doShowNote(flow) {
       if (flow.note != null && flow.note.length > 4) {
-        Dialog.alert({
+        showDialog({
           title: '备注',
           message: flow.note,
         }).then(() => {

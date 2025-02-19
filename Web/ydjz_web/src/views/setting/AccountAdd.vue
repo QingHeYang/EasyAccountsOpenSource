@@ -58,9 +58,7 @@
 
 <script>
 // import { Toast } from 'vant';
-import { Toast } from "vant";
-import { Notify } from "vant";
-import request from "../../utils/request";
+import {closeToast, showFailToast, showLoadingToast, showToast} from "vant";
 
 export default {
   data() {
@@ -80,7 +78,7 @@ export default {
 
   methods: {
     getAccountSingle() {
-      request({
+      this.$http({
         url: "/account/getAccount/" + this.$route.query.accountId,
         method: "get"
       }).then((respons) => {
@@ -91,6 +89,8 @@ export default {
         this.exempt = account.exemptMoney;
         this.note = account.note;
         this.money = account.money;
+      }).catch((error) => {
+        console.log(error);
       });
     },
 
@@ -100,13 +100,13 @@ export default {
 
     doAdd() {
 
-      const toast = Toast.loading({
+      showLoadingToast({
         message: "保存中...",
         duration: 0,
         forbidClick: true,
         loadingType: "spinner"
       });
-      request({
+      this.$http({
         url: "/account/addAccount",
         method:"post",
         data: {
@@ -118,26 +118,26 @@ export default {
         }
       })
         .then((response) => {
-          toast.clear();
-          Notify({ type: "success", message: "保存成功" });
+          closeToast();
+          showToast({ type: "success", message: "保存成功" });
           this.$router.go(-1);
           console.log(response.data);
         })
         .catch((error) => {
-          toast.clear();
+          closeToast();
          // Notify({ type: "danger", message: "保存失败" });
           console.log(error);
         });
     },
 
     doUpdate() {
-      const toast = Toast.loading({
+      showLoadingToast({
         message: "更新中...",
         duration: 0,
         forbidClick: true,
         loadingType: "spinner"
       });
-      request({
+      this.$http({
         url: "/account/updateAccount/"+this.$route.query.accountId,
         method:"put",
         data: {
@@ -149,13 +149,13 @@ export default {
         }
       })
         .then(() => {
-          toast.clear();
-          Notify({ type: "success", message: "更新成功" });
+          closeToast();
+          showToast({ type: "success", message: "更新成功" });
           this.$router.go(-1);
         })
         .catch((error) => {
-          toast.clear();
-          Notify({ type: "danger", message: "更新失败" ,duration:600});
+          closeToast();
+          showToast({ type: "danger", message: "更新失败" ,duration:600});
           console.log(error);
         });
     },
@@ -163,15 +163,15 @@ export default {
     onClickRight() {
       /* */
       if (this.aName === "") {
-        Toast.fail("账号名为空");
+        showFailToast("账号名为空");
         return;
       }
       if (this.money === "") {
-        Toast.fail("初始金额为空");
+        showFailToast("初始金额为空");
         return;
       }
       if (parseInt(this.exempt)>parseInt(this.money)){
-        Toast.fail("不计入总金额钱数不得大于账户余额")
+        showFailToast("不计入总金额钱数不得大于账户余额")
         return
       }
       if (this.$route.query.accountId != null) {

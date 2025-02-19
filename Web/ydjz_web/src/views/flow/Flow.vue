@@ -1,8 +1,8 @@
 <template>
   <div>
-    <van-sticky :style="{background:'#FFFFFF'}">
-    <van-nav-bar  fixed placeholder   title="流水" right-text="记一笔" @click-right=toAddFlow() />
-    <van-dropdown-menu  active-color="#1989fa">
+    <van-nav-bar fixed placeholder title="明细" right-text="筛选" @click-right=toScreen() />
+    <van-floating-bubble icon="plus" axis="xy" magnetic="x" v-model:offset="offset" @click="toAddFlow"/>
+    <van-dropdown-menu active-color="#1989fa">
       <van-dropdown-item
           v-model="handle"
           :options="option1"
@@ -14,32 +14,30 @@
           @change="onHandleClick"
       />
     </van-dropdown-menu>
-    </van-sticky>
     <van-divider
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
     > 月度收支情况
     </van-divider>
     <div style=" height:80px;background: #FFF;margin-left: 20px">
       <div style="margin-top: 10px; float: left">
-        <div v-show="this.totalIn!='0'">当月总收入： <span style="color: #42b983">￥{{
-            this.totalIn
-          }}</span></div>
-        <div v-show="this.totalOut!='0'">当月总支出： <span style="color: #f54949">￥{{
-            this.totalOut
-          }}</span></div>
+        <div v-show="this.totalIn!='0'">当月总收入： <span style="color: #42b983">￥{{ this.totalIn }}</span></div>
+        <div v-show="this.totalOut!='0'">当月总支出： <span style="color: #f54949">￥{{ this.totalOut }}</span></div>
         <div v-show="this.handle===3">当月结余： ￥{{ this.totalEarn }}</div>
         <div v-show="this.handle===2">内部转账笔数： {{ this.flows.length }}</div>
       </div>
       <div style="display: flex; flex-direction: column; float: right;  margin-top: 5px; margin-right: 20px">
         <div style="display: flex; justify-content: space-around; align-items: center; width: 100%;">
-          <van-button size="mini" plain type="info" icon="minus" @click="toLastMonth"></van-button>
-          <van-button type="info" round size="small" plain style="margin-left: 5px; margin-right: 5px" icon="clock-o"
+          <van-button size="mini" plain type="primary" icon="minus" @click="toLastMonth"></van-button>
+          <van-button type="primary" round size="small" plain style="margin-left: 5px; margin-right: 5px" icon="clock-o"
                       @click="()=>{showPicker = true}">
             {{ this.chooseMonth }}
           </van-button>
-          <van-button size="mini" v-show="showNextMonthButton" plain type="info" icon="plus" @click="toNextMonth"></van-button>
+          <van-button size="mini" v-show="showNextMonthButton" plain type="primary" icon="plus"
+                      @click="toNextMonth"></van-button>
         </div>
-        <van-button  type="default" v-show="flows.length!=0" round size="small" style="margin-top: 10px;" @click="generateReport">生成报表</van-button>
+        <van-button type="default" v-show="flows.length!=0" round size="small" style="margin-top: 10px;"
+                    @click="generateReport">生成报表
+        </van-button>
       </div>
 
     </div>
@@ -48,11 +46,13 @@
         :style="{ color: '#1989fa', borderColor: '#1989fa', padding: '0 16px' }"
     > 账本概览
     </van-divider>
+
     <van-cell-group :border="false">
       <div @click="toUpdateFlow(flow.id)" v-for="flow in flows" :key="flow.id">
-        <van-swipe-cell >
-          <template #left @open="()=>{currentFlow = flow}">
-            <van-button size="small" square color="#8c8c8c" type="primary" class="delete-button"
+        <van-swipe-cell>
+          <!--          <template #left @open="handleOpen">-->
+          <template #left>
+            <van-button size="small" square color="#8c8c8c" type="success" class="delete-button"
                         @click="doShowNote(flow)">
               {{ doGetNotString(flow) }}
             </van-button>
@@ -91,54 +91,44 @@
             <van-button v-if="flow.collect" square type="warning" class="delete-button" @click="doCollectFlow(flow)">
               取消<br>收藏
             </van-button>
-            <van-button v-else type="primary" color="#1989fa" class="delete-button" @click="doCollectFlow(flow)">收藏<br>账单
+            <van-button v-else type="success" color="#1989fa" class="delete-button" @click="doCollectFlow(flow)">
+              收藏<br>账单
             </van-button>
             <van-button square text="删除" type="danger" class="delete-button" @click="doConfirmDeleteFlow(flow)"/>
           </template>
         </van-swipe-cell>
       </div>
     </van-cell-group>
-    <van-empty v-show="flows.length==0" description="当月无账单" />
+    <van-empty v-show="flows.length==0" description="当月无账单"/>
 
 
-    <van-popup v-model="showPicker" round position="bottom">
-      <van-datetime-picker
+    <van-popup v-model:show="showPicker" round position="bottom">
+      <van-date-picker
           show-toolbar
           title="选择年月"
           type="year-month"
-          v-model="currentTime"
+          v-model="currentChooseTime"
           :min-date="minDate"
           :max-date="maxDate"
           :formatter="formatter"
           @cancel="showPicker = false"
           @confirm="this.onPickerClick"
+          :columns-type="columnsType"
       />
     </van-popup>
-
-<!--    <button
-        class="floating-button"
-        :class="{'dragging': isDragging}"
-        @touchstart="dragStart"
-        @touchmove="dragMove"
-        @touchend="dragEnd"
-        ref="floatBtn"
-    >
-      +
-    </button>-->
   </div>
 </template>
 
-<flow/>
 
 <script>
-import request from "../../utils/request";
-import {Dialog, Toast} from 'vant';
+import {closeToast, showConfirmDialog, showDialog, showFailToast, showLoadingToast} from 'vant';
 
 export default {
   name: "Flow.vue",
 
   data() {
     return {
+      columnsType: ["year", "month"],
       initialX: 0,
       initialY: 0,
       isDragging: false,
@@ -148,15 +138,15 @@ export default {
       flowId: "",
       currentFlow: {},
       handle: 3,
-      minDate: new Date(2021, 10),
+      minDate: new Date(2021, 10, 1),
       maxDate: new Date(),
-      currentTime: new Date(),
+      currentChooseTime: [new Date().getFullYear(), new Date().getMonth() + 1],
       order: 0,
       option1: [
-        {text: "总览", value: 3},
-        {text: "只看流入", value: 0},
-        {text: "只看流出", value: 1},
-        {text: "只看内部转账", value: 2}
+        {text: "全部", value: 3},
+        {text: "资金流入", value: 0},
+        {text: "资金流出", value: 1},
+        {text: "内部转账", value: 2}
       ],
       option2: [
         {text: "按时间排序", value: 0},
@@ -177,6 +167,7 @@ export default {
       ],
       offsetX: 0,
       offsetY: 0,
+      offset: {x: 0, y: 0},
     };
   },
 
@@ -185,73 +176,34 @@ export default {
     this.chooseMonth = this.curDate.getFullYear() + "-" + (this.curDate.getMonth() + 1).toString().padStart(2, "0");
     this.getMonthFlow();
     //document.addEventListener('touchmove', this.dragMove);
+    this.offset = {x: window.innerWidth - 83, y: window.innerHeight - 180};
+  },
+  watch: {
+    '$route': 'handleRouteChange'
   },
   methods: {
-    /*dragStart(event) {
-      this.moved = false;
-      const touch = event.touches[0];
-      this.initialX = touch.clientX;
-      this.initialY = touch.clientY;
-      this.offsetX = touch.clientX - (this.$refs.floatBtn.offsetLeft + this.$refs.floatBtn.offsetWidth / 2);
-      this.offsetY = touch.clientY - (this.$refs.floatBtn.offsetTop + this.$refs.floatBtn.offsetHeight / 2);
-      document.addEventListener('touchmove', this.dragMove, { passive: false });
-      document.addEventListener('touchend', this.dragEnd);
-    },
-    dragMove(event) {
-      if (!this.moved) {
-        const touch = event.touches[0];
-        const deltaX = Math.abs(touch.clientX - this.initialX);
-        const deltaY = Math.abs(touch.clientY - this.initialY);
-        if (deltaX > 5 || deltaY > 5) {
-          this.moved = true;
-          this.isDragging = true;
-        }
-      }
-      if (this.moved) {
-        event.preventDefault(); // 防止默认的滚动行为
-        const touch = event.touches[0];
 
-        // 根据偏移量计算新的位置
-        const newX = touch.clientX - this.offsetX - this.$refs.floatBtn.offsetWidth / 2;
-        const newY = touch.clientY - this.offsetY - this.$refs.floatBtn.offsetHeight / 2;
-
-        // 边界检测
-        const finalX = Math.max(0, Math.min(newX, window.innerWidth - this.$refs.floatBtn.offsetWidth));
-        const finalY = Math.max(100, Math.min(newY, window.innerHeight - this.$refs.floatBtn.offsetHeight - 100));
-
-        // 更新悬浮球位置
-        this.$refs.floatBtn.style.left = `${finalX}px`;
-        this.$refs.floatBtn.style.top = `${finalY}px`;
+    handleRouteChange() {
+      const newMonth = this.$route.query.month;
+      if (newMonth !== this.chooseMonth) {
+        this.chooseMonth = newMonth || this.curDate.getFullYear() + "-" + (this.curDate.getMonth() + 1).toString().padStart(2, "0");
+        this.getMonthFlow();
       }
     },
-    dragEnd(event) {
-      if (this.moved) {
-        event.preventDefault();
-      } else {
-        this.handleClick();
-      }
-      this.isDragging = false;
-      document.removeEventListener('touchmove', this.dragMove);
-      document.removeEventListener('touchend', this.dragEnd);
-    },
-    handleClick() {
-      if (!this.isDragging) {
-        this.toAddFlow();
-      }
-    },*/
-    formatter(type, val) {
+
+    formatter(type, option) {
       if (type === 'year') {
-        return `${val}年`;
+        option.text += '年';
       }
       if (type === 'month') {
-        return `${val}月`;
+        option.text += '月';
       }
-      return val;
+      return option;
     },
 
 
     getMonthFlow() {
-      request({
+      this.$http({
         url:
             "/flow/getFlowListMain/" +
             this.handle +
@@ -297,13 +249,18 @@ export default {
     toAddFlow() {
       this.$router.push({path: "/flow/add"});
     },
+
+    toScreen() {
+      this.$router.push({path: "/screen"});
+    },
+
     toUpdateFlow(flowId) {
       this.$router.push({path: "/flow/add", query: {flowId: flowId}});
     },
 
     doConfirmDeleteFlow(flow) {
       console.log(this.flow)
-      Dialog.confirm({
+      showConfirmDialog({
         title: '确定删除吗？',
         message:
             '确定删除 ￥' + flow.money + " 的  '" + flow.tname + "'  记录吗？",
@@ -319,7 +276,7 @@ export default {
     },
 
     doDeleteFlow() {
-      request({
+      this.$http({
         url: "/flow/deleteFlow/" + this.flowId,
         method: "delete"
       }).then(() => {
@@ -329,7 +286,7 @@ export default {
 
     doCollectFlow(flow) {
       console.log("/flow/collectFlow/" + flow.id + "/" + (flow.collect ? 0 : 1))
-      request({
+      this.$http({
         url: "/flow/collectFlow/" + flow.id + "/" + (flow.collect ? 0 : 1),
         method: "put"
       }).then(() => {
@@ -338,8 +295,8 @@ export default {
     },
 
     doShowNote(flow) {
-      if (flow.note != null&&flow.note.length>4) {
-        Dialog.alert({
+      if (flow.note != null && flow.note.length > 4) {
+        showDialog({
           title: '备注',
           message: flow.note,
         }).then(() => {
@@ -348,12 +305,12 @@ export default {
       }
     },
 
-    doGetNotString(flow){
-      if (flow.note==null||flow.note==""){
+    doGetNotString(flow) {
+      if (flow.note == null || flow.note == "") {
         return "无备注"
-      }else if (flow.note.length>4){
-        return flow.note.substring(0,3)+".."
-      }else {
+      } else if (flow.note.length > 4) {
+        return flow.note.substring(0, 3) + ".."
+      } else {
         return flow.note
       }
     },
@@ -361,9 +318,10 @@ export default {
     prepareDateDouble() {
 
     },
-    onPickerClick(value) {
-      console.log(new Date(value));
-      this.chooseMonth = value.getFullYear() + "-" + (value.getMonth() + 1).toString().padStart(2, "0");
+    onPickerClick({selectedValues}) {
+      let pickDate = new Date(selectedValues[0], selectedValues[1] - 1);
+      console.log(new Date(selectedValues[0], selectedValues[1] - 1));
+      this.chooseMonth = pickDate.getFullYear() + "-" + (pickDate.getMonth() + 1).toString().padStart(2, "0");
       this.getMonthFlow()
       this.showPicker = false;
     },
@@ -379,6 +337,7 @@ export default {
         this.chooseMonth = year + "-" + (month - 1).toString().padStart(2, "0");
       }
 
+      this.currentChooseTime = [this.chooseMonth.split("-")[0], this.chooseMonth.split("-")[1]];
       this.getMonthFlow(); // 假设这个方法用来获取指定月份的数据
     },
 
@@ -396,35 +355,54 @@ export default {
         } else {
           this.chooseMonth = year + "-" + (month + 1).toString().padStart(2, "0");
         }
+        this.currentChooseTime = [year, month + 1];
         this.getMonthFlow(); // 更新数据
-      }else {
-        Toast.fail("已经到最后了")
+      } else {
+        showFailToast("已经到最后了")
       }
     },
 
     generateReport() {
       //this.$router.push({path: "/flow/report", query: {month: this.chooseMonth}});
-      Dialog.confirm({
+      showConfirmDialog({
         title: '确定生成报表吗？',
         message:
-            '确定生成 ' +this.chooseMonth + " 月度报表吗？",
+            '确定生成 ' + this.chooseMonth + " 月度报表吗？",
       })
           .then(() => {
             this.makeExcel()
           })
           .catch(() => {
-            // on cancel
+
           });
     },
-    makeExcel(){
-      request({
+    makeExcel() {
+      showLoadingToast({
+        message: '生成中...',
+        forbidClick: true,
+      });
+      this.$http({
         url: "/flow/makeExcel/" + this.chooseMonth,
         method: "get"
-      }).then(() => {
-        this.getMonthFlow();
-      });
+      }).then((resp) => {
+        // {
+        //   "code": 0,
+        //     "msg": "Success",
+        //     "data": {
+        //   "success": true,
+        //       "log": "文件生成成功\n调用webhook成功\n月度 Excel 发送功能已关闭"
+        //
+        // }
+        var excelresult = resp.data.data;
+        var title = excelresult.success?'成功':'失败';
+        closeToast();
+        showDialog({
+          title: '报表生成'+title,
+          message: excelresult.log,
+          cancelButtonText: '确定',
+        })
+      })
     }
-
   },
 
 };
@@ -484,9 +462,5 @@ export default {
   background-color: #57BD6A; /* 点击时恢复到基础绿色 */
   transform: scale(1); /* 恢复原始大小 */
 }
-
-
-
-
 
 </style>

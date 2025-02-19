@@ -1,5 +1,4 @@
-import Vue from "vue";
-import VueRouter from "vue-router";
+import {createRouter, createWebHistory} from "vue-router";
 import SettingLayout from "@/layouts/SettingLayout";
 import HomeLayout from "@/layouts/HomeLayout";
 import NotFound from "../views/404";
@@ -7,12 +6,15 @@ import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import Dashbord from "@/views/board/Dashbord";
 
-Vue.use(VueRouter);
 
 const routes = [
   {
-    path: "*",
+    path: "/:pathMatch(.*)*",
     component: NotFound,
+  },
+  {
+    path: "/",
+    redirect: "/board" // 访问 / 时，自动重定向到 /board
   },
   {
     path: "/",
@@ -29,16 +31,16 @@ const routes = [
         component: () =>
           import(/* webpackChunkName: "home" */ "../views/flow/Flow.vue"),
       },
-      /*{
-        path: "/analysis",
-        component: () =>
-            import(/!* webpackChunkName: "flow" *!/ "../views/analysis/Analysis.vue"),
-      },*/
       {
+        path: "/analysisV2",
+        component: () =>
+            import(/* webpackChunkName: "flow" */ "../views/analysis/AnalysisV2.vue"),
+      },
+/*      {
         path: "/screen",
         component: () =>
-            import(/* webpackChunkName: "flow" */ "../views/screen/Screen.vue"),
-      },
+            import(/!* webpackChunkName: "flow" *!/ "../views/screen/Screen.vue"),
+      },*/
       {
         path: "/board",
        component: Dashbord,
@@ -72,11 +74,11 @@ const routes = [
       import(/* webpackChunkName: "action" */ "../views/setting/ActionAdd.vue"),
   },
   {
-    path: "/login",
-    name: "Login",
-    component: () =>
-      import(/* webpackChunkName: "login" */ "../views/login/Login.vue"),
+    path: '/auth',
+    name: 'Auth',
+    component: () => import(/* webpackChunkName: "auth" */ "../views/login/LoginRegister.vue"),
   },
+
   {
     path: "/flow",
     name: "Flow",
@@ -87,13 +89,31 @@ const routes = [
     path: "/analysis",
     name: "Analysis",
     component: () =>
-        import(/* webpackChunkName: "flow" */ "../views/analysis/Analysis.vue"),
+        import(/* webpackChunkName: "analysis" */ "../views/analysis/Analysis.vue"),
+  },
+  {
+    path: "/analysisV2",
+    name: "AnalysisV2",
+    component: () =>
+        import(/* webpackChunkName: "analysis" */ "../views/analysis/AnalysisV2.vue"),
+  },
+  {
+    path: "/analysis/type",
+    name: "AnalysisType",
+    component: () =>
+        import(/* webpackChunkName: "analysis" */ "../views/analysis/type/AnalysisType.vue"),
+  },
+  {
+    path: "/verify",
+    name: "Verify",
+    component: () =>
+        import(/* webpackChunkName: "verify" */ "../views/Verify.vue"),
   },
   {
     path: "/screen",
     name: "Screen",
     component: () =>
-        import(/* webpackChunkName: "flow" */ "../views/screen/Screen.vue"),
+        import(/* webpackChunkName: "screen" */ "../views/screen/Screen.vue"),
   },
   {
     path: "/flow/add",
@@ -150,14 +170,21 @@ const routes = [
           import(
             /* webpackChunkName: "setting" */ "../views/setting/template/Template.vue"
           ),
+      },
+      {
+        path: "/setting/config",
+        name: "Config",
+        component: () =>
+          import(
+            /* webpackChunkName: "setting" */ "../views/setting/Config.vue"
+          ),
       }
     ],
   },
 ];
 
-const router = new VueRouter({
-  mode: "hash",
-  base: process.env.BASE_URL,
+const router = createRouter({
+  history: createWebHistory(process.env.BASE_URL),
   routes,
 });
 

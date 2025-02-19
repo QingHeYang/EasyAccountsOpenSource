@@ -27,10 +27,10 @@
     </div>
     <van-empty v-else description="当前无标签"/>
     <div style="padding: 30px">
-      <van-button type="primary" @click="newPopupShow=true;isEdit = false" block size="large">新建标签</van-button>
+      <van-button type="success" @click="newPopupShow=true;isEdit = false" block size="large">新建标签</van-button>
     </div>
 
-    <van-popup title="选择标签" round closeable v-model="newPopupShow"
+    <van-popup title="选择标签" round closeable v-model:show="newPopupShow"
                @close="newPopupShow=false,usedName='',usedColor=''"
                :style="{background:'#F7F8FA', height: '70%',width:'75%',padding:'10px' }">
       <div style="text-align: center; color: #333; font-size: 16px; margin-top: 10px">
@@ -60,7 +60,7 @@
         </van-grid>
       </van-cell-group>
       <div style="margin: 20px">
-        <van-button size="large" type="info" @click="isEdit?updateTag():addNewTag()">{{ isEdit ? "修改" : "新建" }}
+        <van-button size="large" type="primary" @click="isEdit?updateTag():addNewTag()">{{ isEdit ? "修改" : "新建" }}
         </van-button>
         <van-button v-if="isEdit" size="large" type="danger" style="margin-top: 10px" @click="deleteTag">删除
         </van-button>
@@ -70,8 +70,7 @@
 
 </template>
 <script>
-import request from "../../../utils/request";
-import {Dialog} from "vant";
+import {showConfirmDialog, showFailToast} from "vant";
 
 export default {
   name: "TemplateTag.vue",
@@ -143,7 +142,7 @@ export default {
     },
 
     getAllTags() {
-      request({
+      this.$http({
         url: "/tag/getTags",
         method: "get",
       }).then((response) => {
@@ -156,10 +155,10 @@ export default {
 
     addNewTag() {
       if (this.usedName === "" || this.usedColor === "") {
-        this.$toast.fail("请填写完整信息");
+        showFailToast("请填写完整信息");
         return;
       }
-      request({
+      this.$http({
         url: "/tag/addTag",
         method: "post",
         data: {
@@ -177,10 +176,10 @@ export default {
 
     updateTag() {
       if (this.chooseTag.name === "" || this.chooseTag.color === "") {
-        this.$toast.fail("请填写完整信息");
+        showFailToast("请填写完整信息");
         return;
       }
-      request({
+      this.$http({
         url: "/tag/updateTag",
         method: "put",
         data: {
@@ -198,11 +197,11 @@ export default {
     },
 
     deleteTag() {
-      Dialog.confirm({
+      showConfirmDialog({
         title: '删除',
         message: '确定删除此标签吗？\n删除后模板中的标签将一并删除',
       }).then(() => {
-        request({
+        this.$http({
           url: "/tag/deleteTag/" + this.chooseTag.id,
           method: "delete",
         }).then((response) => {

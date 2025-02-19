@@ -27,4 +27,8 @@ public interface TypeRepository extends JpaRepository<Type, Integer> {
 
     @Query("SELECT t FROM Type t WHERE t.archive = true")
     List<Type> findTypesByArchive();
+
+    @Query("SELECT t FROM Type t WHERE t.id = :id")
+    Type findTypeById(@Param("id") int id);
+
 }

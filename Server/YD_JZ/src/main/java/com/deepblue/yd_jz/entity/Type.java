@@ -24,13 +24,16 @@ public class Type {
     private boolean disable = false;  // Default is false
 
     @Column(name = "has_child", nullable = true)
-    private boolean hasChild = false;  // Default is false
+    private Boolean hasChild = false;  // Default is false
 
     @Column(name = "archive", nullable = true)
     private Boolean archive = false;  // Nullable Boolean field
 
     @Column(name = "action_id", nullable = true)
     private Integer actionId;  // Foreign key relation, could link to an 'Action' entity
+
+    @Column(name = "analysis_disable", nullable = true)
+    private Boolean analysisDisable=false;  // Default is false
 
     // If there is a foreign key relation to 'Action' entity
     @ManyToOne(fetch = FetchType.EAGER)

@@ -1,22 +1,21 @@
-import Vue from "vue";
-import App from "./App.vue";
-import router from "./router";
-import store from "./store";
+import { createApp } from 'vue'; // 使用 Vue 3 的 API
+import App from './App.vue';
+import router from './router';
+import store from './store';
 import Vant from 'vant';
 import 'vant/lib/index.css';
-import axios from "axios";
-//import VConsole from "vconsole/src/vconsole";
-Vue.config.productionTip = false;
-Vue.use(Vant)
+import request from './axios'; // 引入 Axios
+import VueApexCharts from "vue3-apexcharts";
+import { ConfigProvider } from 'vant';
 
-axios.defaults.timeout = 5000 // 请求超时
-//axios.defaults.baseURL = 'http://easy_accounts_net:10670/'
-axios.defaults.baseURL = window.config.apiBaseUrl
-//axios.defaults.baseURL = 'http://192.168.50.226:10670'
+// 不需要 Vue.config.productionTip = false 和 Vue.use(Vant)
+const app = createApp(App);
 
-//new VConsole()
-new Vue({
-  router,
-  store,
-  render: (h) => h(App),
-}).$mount("#app");
+// 使用 Vant 和其它插件
+app.use(store).use(router).use(Vant).use(VueApexCharts).use(ConfigProvider);
+
+// 将 $http 挂载到 Vue 3 实例
+app.config.globalProperties.$http = request;
+
+// 挂载应用
+app.mount('#app');

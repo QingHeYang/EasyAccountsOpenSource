@@ -66,8 +66,7 @@
 </template>
 
 <script>
-import request from "../../../utils/request";
-import {Toast} from "vant";
+import {showLoadingToast} from "vant";
 
 export default {
   name: "Template.vue",
@@ -100,7 +99,7 @@ export default {
     },
 
     getAllTemplate() {
-      request({
+      this.$http({
         url: this.chooseTag.id!=null? "/template/getAllTemplatesByTag/"+this.chooseTag.id : "/template/getAllTemplates",
         method: "get",
       }).then((response) => {
@@ -122,7 +121,7 @@ export default {
     },
 
     getAllTags() {
-      request({
+      this.$http({
         url: "/tag/getTags",
         method: "get",
       }).then((response) => {
@@ -142,7 +141,7 @@ export default {
     },
 
     showLoading() {
-      Toast.loading({
+      showLoadingToast({
         message: '加载中...',
         forbidClick: true,
       });
