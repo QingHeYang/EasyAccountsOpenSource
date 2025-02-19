@@ -1,0 +1,126 @@
+databaseChangeLog:
+    - changeSet:
+          id: 1722098465080-1
+          author: root (generated)
+          changes:
+              - createTable:
+                    columns:
+                        - column:
+                              autoIncrement: true
+                              constraints:
+                                  nullable: false
+                                  primaryKey: true
+                              name: id
+                              type: INT
+                        - column:
+                              defaultValueNumeric: 0
+                              name: date_type
+                              type: TINYINT(3)
+                        - column:
+                              defaultValue: '0'
+                              name: money
+                              type: VARCHAR(20)
+                        - column:
+                              name: type_id
+                              type: INT
+                        - column:
+                              name: action_id
+                              type: INT
+                        - column:
+                              name: account_id
+                              type: INT
+                        - column:
+                              name: account_to_id
+                              type: INT
+                        - column:
+                              name: tag_id
+                              type: INT
+                        - column:
+                              constraints:
+                                  nullable: false
+                              name: name
+                              type: VARCHAR(50)
+                    tableName: flow_template
+    - changeSet:
+          id: 1722098465080-2
+          author: root (generated)
+          changes:
+              - createTable:
+                    columns:
+                        - column:
+                              autoIncrement: true
+                              constraints:
+                                  nullable: false
+                                  primaryKey: true
+                              name: id
+                              type: INT
+                        - column:
+                              constraints:
+                                  nullable: false
+                              name: name
+                              type: VARCHAR(30)
+                        - column:
+                              constraints:
+                                  nullable: false
+                              name: color
+                              type: VARCHAR(15)
+                    tableName: tag
+    - changeSet:
+          id: 1722098465080-3
+          author: root (generated)
+          changes:
+              - addColumn:
+                    columns:
+                        - column:
+                              name: token
+                              type: VARCHAR(150)
+                    tableName: user
+    - changeSet:
+          id: 1722098465080-4
+          author: root (generated)
+          changes:
+              - addColumn:
+                    columns:
+                        - column:
+                              name: authenticator
+                              type: VARCHAR(100)
+                    tableName: user
+    - changeSet:
+          id: 1722098465080-5
+          author: root (generated)
+          changes:
+              - addColumn:
+                    columns:
+                        - column:
+                              name: archive
+                              type: BIT(1)
+                    tableName: type
+    - changeSet:
+          id: 1722098465080-6
+          author: root (generated)
+          changes:
+              - addColumn:
+                    columns:
+                        - column:
+                              defaultValueNumeric: 0
+                              name: disable
+                              type: BIT(1)
+                    tableName: account
+    - changeSet:
+          id: 1722098465080-7
+          author: root (generated)
+          changes:
+              - addColumn:
+                    columns:
+                        - column:
+                              name: action_id
+                              type: INT
+                    tableName: type
+    - changeSet:
+          id: 1722098465080-8
+          author: root (generated)
+          changes:
+              - dropColumn:
+                    columnName: a_disable
+                    tableName: account
+

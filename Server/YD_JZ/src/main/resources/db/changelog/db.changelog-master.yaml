@@ -1,0 +1,5 @@
+databaseChangeLog:
+  - include:
+      file: classpath:/db/changelog/yd_jz_2.1.0.yaml
+  - include:
+      file: classpath:/db/changelog/yd_jz_2.3.0.yaml
