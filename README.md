@@ -75,7 +75,7 @@ apt-get install maven
 ### Web
 nginx 文件夹下存放了nginx的配置文件  
 ydjz_web 文件夹下是前端代码，使用的是vue框架  
-node.js版本为v18.12.1，如果你的node.js版本不是这个，可能会出现编译错误  
+node.js版本为v16，如果你的node.js版本不是这个，可能会出现编译错误  
 安装完node你需要下载依赖包，使用以下命令下载依赖包  
 ```Shell
 npm install
