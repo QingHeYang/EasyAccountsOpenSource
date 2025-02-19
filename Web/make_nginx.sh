@@ -1,1 +1,0 @@
-cd ydjz_web && npm run build &&  cd ..&& docker build -t 775495797/easyaccounts-nginx:latest . 
