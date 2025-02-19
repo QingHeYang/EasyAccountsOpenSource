@@ -4,6 +4,11 @@
 如果你有一定开发能力，可以根据这个源码进行二次开发，或者自己编译打包成docker文件  
 如果你只是想使用记账软件，可以直接下载[EasyAccounts](https://github.com/QingHeYang/EasyAccounts)  
 
+## 版本
+v2.4.0   
+更新时间：2025.02.19  
+项目说明：https://qingheyang.github.io/EasyAccounts/#/function/README
+
 ## 项目结构
 ```Shell
 (base) root@mercy-server:~/EasyAccountsProjects/EasyAccountsSource# tree -L 3
