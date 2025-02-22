@@ -63,9 +63,17 @@
             margin-top: 5px;
             font-size: 13px;
             color: #4e4e4e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-right: 15px;
           ">
-            {{ flow.fdate }}
+            <div>
+              {{ flow.fdate }} <span style="color: #ccc;margin-left: 5px;">#{{ flow.id }}</span>
+            </div>
+            <van-icon name="link-o" color="#1989fa" style=" font-size: 14px;"/>
           </div>
+          
           <van-cell
               size="large"
               :title="flow.tname"

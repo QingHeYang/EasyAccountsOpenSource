@@ -1,16 +1,23 @@
 <template>
   <div style="width:100vw; height:100vh; background: #F7F8FA">
-    <van-nav-bar v-if="this.$route.query.flowId==null" title="新增账单" left-arrow @click-left="onClickLeft"
+    <van-nav-bar v-if="this.$route.query.flowId==null" title="新增明细" left-arrow @click-left="onClickLeft"
                  right-text="快记模板" @click-right="fastPopupShow = true"/>
-    <van-nav-bar v-else title="修改账单" left-arrow @click-left="onClickLeft"/>
+    <van-nav-bar v-else title="修改明细" left-arrow @click-left="onClickLeft"/>
     <van-cell-group>
+      <!-- 新增明细编号显示  v2.5版本 -->
+      <van-cell 
+        v-if="$route.query.flowId" 
+        title="明细编号" 
+        :value="'#' + $route.query.flowId"
+        :value-style="{ color: '#999' }"
+      />
+      
       <van-field
           input-align="right"
           v-model="money"
           type="number"
-          label="账单金额"
-          placeholder="请输入账单金额"
-
+          label="明细金额"
+          placeholder="请输入明细金额"
       />
 <!--      @touchstart.native.stop="keyboardShow = true"-->
       <van-cell title="选择收支" is-link @click="onActionClick">
@@ -32,9 +39,9 @@
       <van-cell v-show="chooseAction.handle==2" title="选择目标账户" is-link @click="onAccountClick(2)"
                 :value="chooseToAccount.name"/>
 
-      <van-cell title="账单分类" :value="chooseType.tname" is-link @click="onTypeClick"/>
+      <van-cell title="明细分类" :value="chooseType.tname" is-link @click="onTypeClick"/>
 
-      <van-cell title="账单日期" :value="chooseDate" is-link @click="onCalanderClick"/>
+      <van-cell title="明细日期" :value="chooseDate" is-link @click="onCalanderClick"/>
 
       <van-field name="switch" label="是否收藏">
         <template #right-icon>
@@ -86,7 +93,7 @@
     <van-popup v-model:show="typeCascaderShow" round position="bottom">
       <van-cascader
           v-model="cascaderValue"
-          title="选择账单分类"
+          title="选择明细分类"
           :options="allTypes"
           active-color="#1989fa"
           @close="typeCascaderShow = false"
@@ -97,7 +104,7 @@
     <van-calendar v-model:show="calanderShow" :show-confirm="false" color="#1989fa" :min-date="minDate"
                   :max-date="maxDate " @confirm="onChooseCalendar"/>
 
-    <!--  追加账单 1.6版本  -->
+    <!--  追加明细 1.6版本  -->
     <van-cell-group v-for="child in childMoneyItem" :key="child.index" inset
                     style="margin-top: 10px;margin-bottom: 10px">
       <van-swipe-cell>
@@ -105,8 +112,8 @@
             input-align="left"
             v-model="child.money"
             type="number"
-            label="账单金额"
-            placeholder="请输入追加账单金额"
+            label="明细金额"
+            placeholder="请输入追加明细金额"
         />
         <van-field v-model="child.note" label="追加备注" placeholder="请输入追加备注"/>
         <template #right>
@@ -114,10 +121,10 @@
         </template>
       </van-swipe-cell>
     </van-cell-group>
-    <!--  追加账单 1.6版本  -->
+    <!--  追加明细 1.6版本  -->
     <div style="margin: 16px">
       <van-button @click="doAddNewItemMoney" style="margin-bottom: 5px" round block type="warning" native-type="submit">
-        追加分账单
+        追加分明细
       </van-button>
 
       <van-button @click="onSubmitBtnClick" round block type="primary"
@@ -438,7 +445,7 @@ export default {
         this.submitMoney = this.money
       }
       showConfirmDialog({
-        title: '请确认账单',
+        title: '请确认明细',
         message:
             '总金额: ￥' + this.submitMoney + '\n' +
             "备注：" + this.submitNote,
@@ -518,7 +525,7 @@ export default {
         return false;
       }
       if (this.chooseDate == "") {
-        showFailToast("请选择账单日期")
+        showFailToast("请选择明细日期")
         return false
       }
       return true
@@ -548,7 +555,7 @@ export default {
 
     onActionClick() {
       this.actionShow = true;
-      this.popupTitle = "选择账单收支";
+      this.popupTitle = "选择明细收支";
       this.popupStyle = 0;
     },
 

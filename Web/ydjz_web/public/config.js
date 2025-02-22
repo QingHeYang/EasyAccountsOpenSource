@@ -1,4 +1,4 @@
 window.config = {
-  //apiBaseUrl: "http://localhost:8085"
-  apiBaseUrl: "${API_BASE_URL}"
+  apiBaseUrl: "http://192.168.50.226:10670"
+  //apiBaseUrl: "${API_BASE_URL}"
 };
