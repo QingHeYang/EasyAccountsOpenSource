@@ -83,4 +83,19 @@ public class FlowAddRequestDto {
     public void setNote(String note) {
         this.note = note;
     }
+
+    @Override
+    public String toString() {
+        return "FlowAddRequestDto{" +
+                "money='" + money + '\'' +
+                ", fDate='" + fDate + '\'' +
+                ", createDate='" + createDate + '\'' +
+                ", actionId=" + actionId +
+                ", accountId=" + accountId +
+                ", accountToId=" + accountToId +
+                ", typeId=" + typeId +
+                ", isCollect=" + isCollect +
+                ", note='" + note + '\'' +
+                '}';
+    }
 }
