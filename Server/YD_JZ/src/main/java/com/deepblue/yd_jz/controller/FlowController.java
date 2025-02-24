@@ -144,12 +144,7 @@ public class FlowController {
 
             // 获取到一组Gson解析好的对象，挨个调用addFlow服务
             for (FlowAddRequestDto flowAddRequestDto : flowAddRequestDtoList) {
-                System.out.println("开始添加每一条流水");
-                System.out.println(flowAddRequestDto);
-
                 flowService.doAddFlow(flowAddRequestDto);
-
-                System.out.println("本条流水添加成功！！");
             }
 
         }catch (Exception e) {

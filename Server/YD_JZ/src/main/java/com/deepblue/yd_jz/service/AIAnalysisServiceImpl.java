@@ -4,6 +4,7 @@ import com.alibaba.dashscope.aigc.generation.GenerationResult;
 import com.alibaba.dashscope.exception.InputRequiredException;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.alibaba.dashscope.exception.UploadFileException;
+import com.alibaba.dashscope.threads.runs.Run;
 import com.deepblue.yd_jz.dto.AccountResponseDto;
 import com.deepblue.yd_jz.dto.FlowAddRequestDto;
 import com.deepblue.yd_jz.dto.TypeListResponseDto;
@@ -60,7 +61,6 @@ public class AIAnalysisServiceImpl implements AIAnalysisService {
         }
         String actionMapString = actionBuilder.toString();
 
-        StringBuilder typeBuilder = new StringBuilder();
         List<TypeListResponseDto> typeListResponseDtos = typeService.queryAllType(false);
         String typeMapString = typeListResponseDtos.stream()
                 .filter(type -> !type.getTName().contains("停用")) // 过滤掉含有"停用"的元素
@@ -71,6 +71,11 @@ public class AIAnalysisServiceImpl implements AIAnalysisService {
         List<AccountResponseDto> defaultAccounts = allAccount.stream()
                 .filter(account -> account.getNote().contains("默认"))
                 .collect(Collectors.toList());
+        // 如果defaultAccounts的size=0，提示：账户必须在备注中包含“默认账户”的指定
+        if(defaultAccounts.size() == 0){
+            throw new RuntimeException("请在账户的备注中包含“默认账户”的指定");
+        }
+
         Random random = new Random();
         int randomIndex = random.nextInt(defaultAccounts.size());
         AccountResponseDto randomAccount = defaultAccounts.get(randomIndex);
