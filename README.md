@@ -4,117 +4,159 @@
 如果你有一定开发能力，可以根据这个源码进行二次开发，或者自己编译打包成docker文件  
 如果你只是想使用记账软件，可以直接下载[EasyAccounts](https://github.com/QingHeYang/EasyAccounts)  
 
-## 贡献指南  
-[贡献指南](./CONTRIBUTING.md)
-
 ## 版本
 v2.4.0   
 更新时间：2025.02.19  
-项目说明：https://qingheyang.github.io/EasyAccounts/#/function/README
+项目说明：https://qingheyang.github.io/EasyAccounts/#/README
 
-## 项目结构
-```Shell
-(base) root@mercy-server:~/EasyAccountsProjects/EasyAccountsSource# tree -L 3
+
+## 主要目录结构(有删减)
+```bash
 .
-├── README.md
-├── Server
-│   ├── Dockerfile
-│   ├── excel_template
-│   │   ├── auto_excel.xls
-│   │   └── screen_excel.xls
-│   ├── make_jar.sh
-│   └── YD_JZ
-│       ├── pom.xml
-│       ├── src
-│       ├── target
-│       └── YD_JZ.iml
-├── Web
-│   ├── Dockerfile
-│   ├── make_nginx.sh
-│   ├── nginx
-│   │   └── default.conf
-│   └── ydjz_web
-│       ├── babel.config.js
-│       ├── dist
-│       ├── jest.config.js
-│       ├── node_modules
-│       ├── nohup.out
-│       ├── package.json
-│       ├── package-lock.json
-│       ├── public
-│       ├── README.md
-│       ├── src
-│       ├── tests
-│       └── vue.config.js
-└── WebHook
-    ├── Dockerfile
-    ├── make_webhook.sh
-    ├── requirements.txt
-    └── webhook.py
-```
+├── CONTRIBUTING.md             # 贡献指南
+├── README.md                     
+├── Server                      # 服务端文件夹
+│   ├── Dockerfile                # Dockerfile
+│   ├── excel_template            # 账单模板
+│   │   ├── analysis_excel.xls    # 分析账单模板
+│   │   ├── auto_excel.xls        # 月度账单模板
+│   │   └── screen_excel.xls      # 筛选账单模板
+│   ├── make_jar.sh               # 打包脚本，制作jar&docker镜像
+│   └── YD_JZ                     # 服务端源码
+│
+├── Web                         # 前端文件夹
+│   ├── Dockerfile                # Dockerfile
+│   ├── make_nginx.sh             # 打包脚本，制作nginx镜像
+│   ├── nginx                     # nginx文件夹
+│   │   └── default.conf          # nginx配置文件
+│   └── ydjz_web                  # 前端源码
+│       └── public                # 公共文件夹
+│           └── config.js         # 配置文件，本地运行修改IP链接后台使用
+│
+└── WebHook                      # WebHook文件夹
+    ├── Dockerfile                # Dockerfile
+    ├── make_webhook.sh           # 打包脚本，制作webhook镜像
+    ├── requirements.txt          # 依赖文件
+    └── webhook.py                # webhook源码
+```  
 
 ## 项目说明
-### Server
-excel_template 文件夹下存放了两个excel模板文件，用于导出excel文件
-- auto_excel.xls: 月度记账模板
-- screen_excel.xls: 筛选记账模板  
 
-不推荐修改这两个文件  
-YD_JZ 文件夹下是后端代码，使用的是SpringBoot框架，数据库使用的是mysql
-- pom.xml: 项目依赖
-- src: 项目源码
-- target: 项目编译后的文件
-
-java版本是11，如果你的java版本不是11，可能会出现编译错误，使用下面的命令安装openjdk11  
-```Shell
-apt-get install openjdk-11-jdk
-```  
-编译该项目还需要安装maven，如果没有安装maven，可以使用以下命令安装  
-```Shell
-apt-get install maven
-```
-编译制作镜像的脚本是make_jar.sh，执行这个脚本会自动编译项目，并制作镜像  
+### 服务端  
+- 服务端语言：Java
+- 服务端框架：SpringBoot
+- 服务端数据库：MySQL
+- 服务端日志：Log4j  
+- 服务端构建工具：Maven
+- 服务端运行环境：JDK11
+- 服务端部署方式：Docker  
+- swagger文档：http://{YOUR_IP}:8085/swagger-ui/index.html  
   
-### Web
-nginx 文件夹下存放了nginx的配置文件  
-ydjz_web 文件夹下是前端代码，使用的是vue框架  
-node.js版本为v16，如果你的node.js版本不是这个，可能会出现编译错误  
-安装完node你需要下载依赖包，使用以下命令下载依赖包  
-```Shell
-npm install
+- 本地运行端口号：8085
+- docker运行端口号：10670
+- MySQL版本：8.0.31
+
+配置文件：
+- application.properties            # 本地运行配置文件
+- application-dev.properties        # 开发环境配置文件
+- application-server.properties     # 服务器环境配置文件
+- application-windows.properties    # 本地windows环境配置文件  
+
+本地运行指南：  
+- 选择本地运行配置文件：application-windows.properties
+- 修改数据库链接：
+```bash
+spring.datasource.url=jdbc:mysql://{YOUR_MYSQL_IP}:3306/easy_accounts?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+spring.datasource.username={YOUR_MYSQL_USERNAME}
+spring.datasource.password={YOUR_MYSQL_PASSWORD}
 ```
-然后执行编译  
-```Shell
-npm run build
-```
-编译制作镜像的脚本是make_nginx.sh，执行这个脚本会自动编译项目，并制作镜像  
 
-### WebHook  
-webhook.py 是一个简单的webhook服务，用于接收服务端生成sql、excel的文件  
-方便你拓展功能，比如你可以在这个文件中加入发送邮件的功能  
-需要注意的是，这个服务的requirements.txt文件中依赖比较少，如果你需要添加额外的功能，记得在 /WebHook/requestments.txt 中添加依赖  
-执行make_webhook.sh脚本会自动编译项目，并制作镜像  
+制作镜像指南：  
+- 运行脚本：`./make_jar.sh`，如需更换tag，请自行修改
 
-## 项目部署
-如果你修改了某个端，重启Docker容器即可生效，也可以down掉compose，重新up  
-```Shell
-cd EasyAccounts
-docker-compose down; docker-compose up -d
-```  
-前提是你没修改docker容器的tag，如果修改了tag，需要修改docker-compose.yml文件中的tag  
+### 前端
+- 前端语言：Vue
+- 前端框架：Vue3
+- 前端构建工具：VueCli
+- 前端组件：Vant4
+- 前端运行环境：Node.js 18-22版本均可
+- 前端部署方式：Docker
 
-## 项目维护  
-我会不定期更新这个项目，如果你有什么问题，欢迎提Issues，我会尽快回复  
-如果帮助到你了，欢迎给我一个star，谢谢！  
+- 本地运行端口号：8081
+- docker运行端口号：10669
+
+本地运行指南：
+- 修改后端链接：public/config.js  
+- 字段：`apiBaseUrl: "${YOUR_IP}:8085"`
+
+制作镜像指南：  
+- 运行脚本：`./make_nginx.sh`，如需更换tag，请自行修改
+
+### WebHook
+- 服务端语言：Python
+- 服务端框架：FastAPI
+- 服务端运行环境：Python3.10
+- 服务端部署方式：Docker
+
+- 本地运行端口号：8083
+- docker运行端口号：10671
+
+本地运行指南：
+1. 安装requirements.txt依赖：`pip install -r requirements.txt`  
+2. 运行webhook.py：`uvicorn webhook:app --host 0.0.0.0 --port 8083`
+
+制作镜像指南：  
+- 运行脚本：`./make_webhook.sh`，如需更换tag，请自行修改  
+
+## 项目开发建议  
+### 轻度开发  
+基于WebHook开发  
+1. 使用已有swagger文档，开发新功能，一般可以用查询、筛选等功能
+2. 在已有的webhook中调用对应的接口即可，使用python编码  
+3. 打包镜像：`./make_webhook.sh`，如需引用额外的python包，修改requirements.txt文件  
+
+轻度开发适用场景：1. 创新性开发、2. 不变更主体逻辑、3. 映射文件后方便修改。
+
+需要能力：  
+- 轻度python编码(AI辅助即可)
+- 使用docker
+- 阅读swagger文档
+
+### 中度开发  
+基于服务端、前端开发  
+1. 使用源码开发，开发对应功能，不变更数据库，例如修改登录等功能 
+2. 基于服务端、前端源码进行修改
+3. 打包镜像：`./make_nginx.sh`、`./make_jar.sh`  
+
+中度开发适用场景：1.原有记账逻辑不符合需求、2.有修改界面等需求
+
+需要能力：  
+- java编码(修改服务端)
+- 使用docker
+- vue编码(修改前端)
+
+### 重度开发  
+基于服务端、前端开发  
+1. 使用源码开发，开发对应功能，变更数据库，例如新增数据库表等 
+2. 打包镜像：`./make_jar.sh`  
+
+重度开发适用场景：1. 原有记账逻辑不符合需求、2. 有新增数据库表等需求
+
+需要能力：  
+- java编码(修改服务端)
+- 使用docker
+- vue编码(修改前端)  
+
+## 贡献指南
+[点击这里查看贡献指南](develop/CONTRIBUTING.md)  
+>Tips: 仅接受轻度、中度开发PR
 
 ## 安全声明  
-这个项目是开源项目，你可以自由使用，但是请不要将这个项目用于商业用途，否则后果自负  
+本项目是开源项目，你可以自由使用，但是请不要将这个项目用于商业用途，无法支撑起商业用途   
 本项目没有上传任何使用者的数据，如果你发现有上传数据的行为，请及时联系我  
 欢迎审查代码  
 
-## 最后再说点别的事情  
+## 开发者的话
 这个项目是我业余时间开发的，可能会有很多不完善的地方  
 我本职是一个Android开发工程师，对于前端、后端、数据库等方面的知识了解不多  
-所以代码并不是很规范  
-如果你想根据后台接口重新写一个前端界面，项目运行起来是有Swagger的，可以查看接口文档  
-或者你根据接口文档，套用自己的别的服务也是可以的，例如你可以调用screen筛选接口，查询出来一段时间的收支情况
+所以代码并不是很规范，还望谅解  
