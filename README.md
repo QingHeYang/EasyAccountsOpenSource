@@ -148,7 +148,7 @@ spring.datasource.password={YOUR_MYSQL_PASSWORD}
 - vue编码(修改前端)  
 
 ## 贡献指南
-[点击这里查看贡献指南](develop/CONTRIBUTING.md)  
+[点击这里查看贡献指南](CONTRIBUTING.md)  
 >Tips: 仅接受轻度、中度开发PR
 
 ## 安全声明  
