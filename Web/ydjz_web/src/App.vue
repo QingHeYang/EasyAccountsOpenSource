@@ -1,11 +1,18 @@
 <template>
   <div id="app">
-  <router-view :key="$route.fullPath"></router-view>
+    <keep-alive :include="cacheComponents">
+      <router-view></router-view>
+    </keep-alive>
   </div>
 </template>
 <script>
 export default {
   name: 'App',
+  data() {
+    return {
+      cacheComponents: ['FlowAdd', 'ScreenChoose'] // 只缓存这些组件
+    };
+  },
   watch: {
     '$store.state.redirectToVerify': function (newValue) {
       if (newValue) {

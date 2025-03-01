@@ -96,13 +96,34 @@
           <div style="height: 1px"></div>
 
           <template #right>
-            <van-button v-if="flow.collect" square type="warning" class="delete-button" @click="doCollectFlow(flow)">
-              取消<br>收藏
-            </van-button>
-            <van-button v-else type="success" color="#1989fa" class="delete-button" @click="doCollectFlow(flow)">
-              收藏<br>账单
-            </van-button>
-            <van-button square text="删除" type="danger" class="delete-button" @click="doConfirmDeleteFlow(flow)"/>
+            <div style="display: flex;  align-items: center; height: 100%;">
+              <!-- 文字需要在最中间，纵向也居中 -->
+              <div 
+                v-if="flow.collect" 
+                style="background-color: #ffc107; cursor: pointer; color: #fff;
+                height: 100%; font-size: 14px;width: 60px; text-align: center;
+                display: flex;align-items: center;justify-content: center;" 
+                @click="doCollectFlow(flow)"
+              >
+                取消<br>收藏
+              </div>
+              <div 
+                v-else 
+                style="background-color: #1989fa; cursor: pointer; 
+                color: #fff;height: 100%; font-size: 14px;width: 60px; text-align: 
+                center;display: flex;align-items: center;justify-content: center;" 
+                @click="doCollectFlow(flow)"
+              >
+                收藏<br>账单
+              </div>
+              <div 
+                style="background-color: #28a745;color: #fff;height: 100%; 
+                font-size: 14px;width: 60px; text-align: center;
+                display: flex;align-items: center;justify-content: center;" 
+              >
+                查看<br>关联
+              </div>
+            </div>
           </template>
         </van-swipe-cell>
       </div>
@@ -185,6 +206,7 @@ export default {
     this.getMonthFlow();
     //document.addEventListener('touchmove', this.dragMove);
     this.offset = {x: window.innerWidth - 83, y: window.innerHeight - 180};
+    localStorage.removeItem('selectedRelatedFlow');
   },
   watch: {
     '$route': 'handleRouteChange'
@@ -420,6 +442,7 @@ export default {
 .delete-button {
   height: 100%;
   white-space: pre-wrap;
+  width: 65px;
 }
 
 .note {

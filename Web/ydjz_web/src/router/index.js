@@ -181,6 +181,12 @@ const routes = [
       }
     ],
   },
+  {
+    path: "/screen/choose",
+    name: "ScreenChoose",
+    component: () =>
+      import(/* webpackChunkName: "screen" */ "../views/screen/ScreenChoose.vue"),
+  },
 ];
 
 const router = createRouter({
