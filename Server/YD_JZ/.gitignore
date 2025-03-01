@@ -55,3 +55,4 @@ gen/
 logs/
 log
 temp/
+application-windows.properties

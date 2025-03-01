@@ -1,7 +1,9 @@
 package com.deepblue.yd_jz.dto;
 
-public class FlowAddRequestDto {
+import lombok.Data;
 
+@Data
+public class FlowAddRequestDto {
     private String money;
     private String fDate;
     private String createDate;
@@ -11,14 +13,8 @@ public class FlowAddRequestDto {
     private int typeId;
     private boolean isCollect;
     private String note;
-
-    public String getMoney() {
-        return money;
-    }
-
-    public void setMoney(String money) {
-        this.money = money;
-    }
+    private FlowLinkDto relatedFlow;
+    private boolean automatic;
 
     public String getfDate() {
         return fDate;
@@ -26,61 +22,5 @@ public class FlowAddRequestDto {
 
     public void setfDate(String fDate) {
         this.fDate = fDate;
-    }
-
-    public String getCreateDate() {
-        return createDate;
-    }
-
-    public void setCreateDate(String createDate) {
-        this.createDate = createDate;
-    }
-
-    public int getActionId() {
-        return actionId;
-    }
-
-    public void setActionId(int actionId) {
-        this.actionId = actionId;
-    }
-
-    public int getAccountId() {
-        return accountId;
-    }
-
-    public void setAccountId(int accountId) {
-        this.accountId = accountId;
-    }
-
-    public int getAccountToId() {
-        return accountToId;
-    }
-
-    public void setAccountToId(int accountToId) {
-        this.accountToId = accountToId;
-    }
-
-    public int getTypeId() {
-        return typeId;
-    }
-
-    public void setTypeId(int typeId) {
-        this.typeId = typeId;
-    }
-
-    public boolean isCollect() {
-        return isCollect;
-    }
-
-    public void setCollect(boolean collect) {
-        isCollect = collect;
-    }
-
-    public String getNote() {
-        return note;
-    }
-
-    public void setNote(String note) {
-        this.note = note;
     }
 }

@@ -49,10 +49,9 @@ public class FlowJpaEntity {
     @JoinColumn(name = "account_id", insertable = false, updatable = false)
     private Account account;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)  // 设置 optional = true 允许为空，fetch 设置为 LAZY
+    @ManyToOne(fetch = FetchType.LAZY, optional = true) // 设置 optional = true 允许为空，fetch 设置为 LAZY
     @JoinColumn(name = "account_to_id", insertable = false, updatable = false)
     private Account accountTo;
-
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "action_id", insertable = false, updatable = false)
@@ -61,4 +60,13 @@ public class FlowJpaEntity {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "type_id", insertable = false, updatable = false)
     private Type type;
+
+    @Column(name = "link_id", nullable = true)
+    private int linkId;
+
+    @Column(name = "link_handle", nullable = true)
+    private int linkHandle;
+
+    @Column(name = "automatic", nullable = true)
+    private boolean automatic;
 }

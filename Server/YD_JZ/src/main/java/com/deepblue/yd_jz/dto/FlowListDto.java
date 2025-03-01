@@ -13,7 +13,6 @@ public class FlowListDto {
 
     private List<FlowListSingleDto> flows;
 
-
     @Data
     public static class FlowListSingleDto {
         private int id;
@@ -27,16 +26,16 @@ public class FlowListDto {
         private String aName;
         private String toAName;
         private String fDate;
+        private FlowLinkDto relatedFlow;
+        private boolean automatic;
     }
 
-@Data
+    @Data
     public static class FlowTypeDto {
         private String typeName;
         private String money;
         private int typeId;
         private boolean parent;
         private List<FlowTypeDto> children;
-
-
     }
 }

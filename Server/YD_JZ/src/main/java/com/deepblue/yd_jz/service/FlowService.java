@@ -11,7 +11,9 @@ import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.entity.Type;
 import com.deepblue.yd_jz.utils.ContentValues;
 import com.deepblue.yd_jz.utils.LogUtils;
+import com.deepblue.yd_jz.dto.FlowLinkDto;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -40,43 +42,59 @@ public class FlowService {
     @Autowired
     TypeService typeService;
 
-
     @Transactional(rollbackFor = Exception.class)
     public void doAddFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
-        String log = "新增flow\n"+"金额： "+ flowAddRequestDto.getMoney()+"";
-        LogUtils.log_print(log);
+        String logMessage = "新增flow\n" + "金额： " + flowAddRequestDto.getMoney() + "";
+        LogUtils.log_print(logMessage);
         Flow flow = setNewFlow(flowAddRequestDto);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
         String createDate = sdf.format(new Date());
-        flow.setFCreateDate(createDate);
+
+        // 先复制DTO属性到flow对象
         BeanUtils.copyProperties(flowAddRequestDto, flow);
+
+        // 设置创建日期
+        flow.setFCreateDate(createDate);
+
+        if (flowAddRequestDto.getRelatedFlow() != null) {
+            flow.setLinkHandle(flowAddRequestDto.getRelatedFlow().getHandle());
+            flow.setLinkId(flowAddRequestDto.getRelatedFlow().getLinkId());
+            flow.setAutomatic(flowAddRequestDto.isAutomatic());
+        }
+        flow.setFDate(flowAddRequestDto.getfDate());
+        log.info("---------------flowAddRequestDto: " + flowAddRequestDto);
+        log.info("---------------flow: " + flow);
         flowDao.addFlow(flow);
     }
 
     private Flow setNewFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
         Action action = actionService.getAction(flowAddRequestDto.getActionId());
-        Account account = accountService.getOriginAccountById(flowAddRequestDto.getAccountId() );
+        Account account = accountService.getOriginAccountById(flowAddRequestDto.getAccountId());
         Account toAccount = null;
         BigDecimal flowMoney = new BigDecimal(flowAddRequestDto.getMoney());
         BigDecimal accountMoney = new BigDecimal(account.getMoney());
         switch (action.getHandle()) {
             case ContentValues.ACTION_ADD:
-                account = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), account, action.isExempt());
+                account = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), account,
+                        action.isExempt());
                 break;
             case ContentValues.ACTION_SUB:
                 if (accountMoney.compareTo(flowMoney) < 0) {
                     throw new Exception("减少金额不允许大于账户金额");
                 }
-                account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account, action.isExempt());
+                account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account,
+                        action.isExempt());
                 break;
             case ContentValues.ACTION_INNER:
                 if (accountMoney.compareTo(flowMoney) < 0) {
                     throw new Exception("减少金额不允许大于账户金额");
                 }
                 toAccount = accountService.getOriginAccountById(flowAddRequestDto.getAccountToId());
-                toAccount = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), toAccount, action.isExempt());
+                toAccount = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), toAccount,
+                        action.isExempt());
                 accountService.updateOriginAccount(toAccount);
-                account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account, action.isExempt());
+                account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account,
+                        action.isExempt());
                 break;
         }
         accountService.updateOriginAccount(account);
@@ -88,34 +106,39 @@ public class FlowService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void doUpdateFlowCollect(int id,int collect) {
+    public void doUpdateFlowCollect(int id, int collect) {
         flowDao.updateFlowCollect(id, collect);
     }
-    public void doCollectFlow(int id, int collect){
-        flowDao.collectFlowById(id,collect);
+
+    public void doCollectFlow(int id, int collect) {
+        flowDao.collectFlowById(id, collect);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void doUpdateFlow(int id, FlowAddRequestDto flowAddRequestDto) throws Exception {
-        String log = "更新flow\n"+"id: "+id+"\n金额： "+ flowAddRequestDto.getMoney()+"\n原操作： ";
+        String log = "更新flow\n" + "id: " + id + "\n金额： " + flowAddRequestDto.getMoney() + "\n原操作： ";
         Flow lastFlow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(lastFlow.getActionId());
-        Account lastAccount = accountService.getOriginAccountById(lastFlow.getAccountId() );
+        Account lastAccount = accountService.getOriginAccountById(lastFlow.getAccountId());
         switch (lastAction.getHandle()) {
             case ContentValues.ACTION_ADD:
-                log = log+"金额增加\n";
-                lastAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastAccount, lastAction.isExempt());
+                log = log + "金额增加\n";
+                lastAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastAccount,
+                        lastAction.isExempt());
                 break;
             case ContentValues.ACTION_SUB:
-                log = log+"金额减少\n";
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastAction.isExempt());
+                log = log + "金额减少\n";
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount,
+                        lastAction.isExempt());
                 break;
             case ContentValues.ACTION_INNER:
-                log = log+"内部转账\n";
+                log = log + "内部转账\n";
                 Account lastToAccount = accountService.getOriginAccountById(lastFlow.getAccountToId());
-                lastToAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastToAccount, lastAction.isExempt());
+                lastToAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastToAccount,
+                        lastAction.isExempt());
                 accountService.updateOriginAccount(lastToAccount);
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount,
+                        lastAction.isExempt());
                 break;
         }
         LogUtils.log_print(log);
@@ -123,17 +146,21 @@ public class FlowService {
         Flow flow = setNewFlow(flowAddRequestDto);
         flow.setId(id);
         BeanUtils.copyProperties(flowAddRequestDto, flow);
+        flow.setFDate(flowAddRequestDto.getfDate());
+        flow.setLinkHandle(flowAddRequestDto.getRelatedFlow().getHandle());
+        flow.setLinkId(flowAddRequestDto.getRelatedFlow().getLinkId());
         flowDao.updateFlow(flow);
     }
 
     private Account handleAccount(int handle, String money, Account account, boolean isExempt) {
-        String log = "账户操作日志\n"+"账户名称： "+account.getAName()+"\n原始金额： "+account.getMoney()+"\n操作金额： "+money+"\n当前操作： ";
+        String log = "账户操作日志\n" + "账户名称： " + account.getAName() + "\n原始金额： " + account.getMoney() + "\n操作金额： " + money
+                + "\n当前操作： ";
         BigDecimal flowMoney = new BigDecimal(money);
         BigDecimal accountMoney = new BigDecimal(account.getMoney());
         BigDecimal accountExemptMoney = isExempt ? new BigDecimal(account.getExemptMoney()) : null;
         switch (handle) {
             case ContentValues.ACTION_ADD:
-                log=log+"+\n";
+                log = log + "+\n";
                 accountMoney = accountMoney.add(flowMoney);
                 if (isExempt) {
                     accountExemptMoney = accountExemptMoney.add(flowMoney);
@@ -141,7 +168,7 @@ public class FlowService {
                 }
                 break;
             case ContentValues.ACTION_SUB:
-                log=log+"-\n";
+                log = log + "-\n";
                 accountMoney = accountMoney.subtract(flowMoney);
                 if (isExempt) {
                     accountExemptMoney = accountExemptMoney.subtract(flowMoney);
@@ -150,14 +177,14 @@ public class FlowService {
                 break;
         }
         account.setMoney(accountMoney.toString());
-        log=log+"结转金额： "+account.getMoney();
+        log = log + "结转金额： " + account.getMoney();
         LogUtils.log_print(log);
         return account;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public FlowSingleResponseDto doQueryFlow(int id) {
-        String log = "查询flow\n"+"id： "+id+"";
+        String log = "查询flow\n" + "id： " + id + "";
         List<Flow> flows = flowDao.queryFlowById(id);
         if (flows == null || flows.size() == 0) {
             return null;
@@ -165,7 +192,13 @@ public class FlowService {
         FlowSingleResponseDto toClientBean = new FlowSingleResponseDto();
         Flow flow = flows.get(0);
         BeanUtils.copyProperties(flow, toClientBean);
-        Account account = accountService.getOriginAccountById(flow.getAccountId() );
+        FlowLinkDto relatedFlow = new FlowLinkDto();
+        if (flow.getLinkId() != -1) {
+            relatedFlow.setHandle(flow.getLinkHandle());
+            relatedFlow.setLinkId(flow.getLinkId());
+            toClientBean.setRelatedFlow(relatedFlow);
+        }
+        Account account = accountService.getOriginAccountById(flow.getAccountId());
         Action action = actionService.getAction(flow.getActionId());
         Type type = typeService.queryTypeSingle(flow.getTypeId());
         TypeListResponseDto typeListResponseDto = new TypeListResponseDto();
@@ -188,23 +221,27 @@ public class FlowService {
 
     @Transactional(rollbackFor = Exception.class)
     public void doDeleteFlow(int id) throws Exception {
-        String log = "删除flow\n"+"id： "+id+"";
+        String log = "删除flow\n" + "id： " + id + "";
         LogUtils.log_print(log);
         Flow flow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(flow.getActionId());
-        Account lastAccount = accountService.getOriginAccountById(flow.getAccountId() );
+        Account lastAccount = accountService.getOriginAccountById(flow.getAccountId());
         switch (lastAction.getHandle()) {
             case ContentValues.ACTION_ADD:
-                lastAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastAccount,
+                        lastAction.isExempt());
                 break;
             case ContentValues.ACTION_SUB:
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount,
+                        lastAction.isExempt());
                 break;
             case ContentValues.ACTION_INNER:
                 Account lastToAccount = accountService.getOriginAccountById(flow.getAccountToId());
-                lastToAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastToAccount, lastAction.isExempt());
+                lastToAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastToAccount,
+                        lastAction.isExempt());
                 accountService.updateOriginAccount(lastToAccount);
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount,
+                        lastAction.isExempt());
                 break;
         }
 
@@ -218,8 +255,8 @@ public class FlowService {
         FlowListDto flowListDto = new FlowListDto();
         SimpleDateFormat sdf1 = new SimpleDateFormat("yyyyMMdd_HHmm");
         String time = sdf1.format(new Date());
-        log.info("time:  "+time+"   date: " + monthStr + "  handle: " + handle);
-        List<Map<String, Object>> maps = flowDao.getFlowByMain(handle, order, monthStr) ;
+        log.info("time:  " + time + "   date: " + monthStr + "  handle: " + handle);
+        List<Map<String, Object>> maps = flowDao.getFlowByMain(handle, order, monthStr);
         List<FlowListDto.FlowListSingleDto> flows = new ArrayList<>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         BigDecimal moneyIn = new BigDecimal("0");

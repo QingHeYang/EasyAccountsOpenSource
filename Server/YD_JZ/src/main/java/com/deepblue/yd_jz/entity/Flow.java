@@ -15,5 +15,7 @@ public class Flow {
     private String note;
     private boolean collect;
     private String fCreateDate;
-
+    private int linkId;
+    private int linkHandle;
+    private boolean automatic;
 }

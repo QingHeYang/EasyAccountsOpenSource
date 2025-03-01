@@ -15,5 +15,6 @@ public class FlowSingleResponseDto {
     private TypeListResponseDto type;
     private boolean isCollect;
     private String note;
-
+    private FlowLinkDto flowLinkDto;
+    private boolean automatic;
 }
