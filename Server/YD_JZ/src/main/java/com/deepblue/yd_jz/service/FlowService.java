@@ -196,7 +196,7 @@ public class FlowService {
         if (flow.getLinkId() != -1) {
             relatedFlow.setHandle(flow.getLinkHandle());
             relatedFlow.setLinkId(flow.getLinkId());
-            toClientBean.setRelatedFlow(relatedFlow);
+            toClientBean.setFlowLinkDto(relatedFlow);
         }
         Account account = accountService.getOriginAccountById(flow.getAccountId());
         Action action = actionService.getAction(flow.getActionId());
