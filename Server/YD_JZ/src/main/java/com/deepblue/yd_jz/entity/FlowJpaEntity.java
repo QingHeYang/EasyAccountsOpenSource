@@ -62,11 +62,11 @@ public class FlowJpaEntity {
     private Type type;
 
     @Column(name = "link_id", nullable = true)
-    private int linkId;
+    private Integer linkId;
 
     @Column(name = "link_handle", nullable = true)
-    private int linkHandle;
+    private Integer linkHandle;
 
     @Column(name = "automatic", nullable = true)
-    private boolean automatic;
+    private Boolean automatic;
 }

@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Properties>
-        <Property name="log-path">/Ledger/logs</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n</Property>
+        <Property name="LOG_PATH">logs</Property>
     </Properties>
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
+            <PatternLayout pattern="${LOG_PATTERN}"/>
         </Console>
 
-        <File name="FileLogger" fileName="${log-path}/app.log">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
-        </File>
-
-        <RollingFile name="RollingFileLogger" fileName="${log-path}/app-rolling.log" filePattern="${log-path}/app-rolling-%d{yyyy-MM-dd}-%i.log">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
+        <RollingFile name="FileAppender" 
+                     fileName="${LOG_PATH}/app.log"
+                     filePattern="${LOG_PATH}/app-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
             <Policies>
-                <TimeBasedTriggeringPolicy/>
+                <TimeBasedTriggeringPolicy interval="1"/>
                 <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
             <DefaultRolloverStrategy max="20"/>
@@ -25,14 +24,12 @@
     <Loggers>
         <Root level="info">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileLogger"/>
-            <AppenderRef ref="RollingFileLogger"/>
+            <AppenderRef ref="FileAppender"/>
         </Root>
-
+        
         <Logger name="com.deepblue.yd_jz" level="debug" additivity="false">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileLogger"/>
-            <AppenderRef ref="RollingFileLogger"/>
+            <AppenderRef ref="FileAppender"/>
         </Logger>
     </Loggers>
 </Configuration>
