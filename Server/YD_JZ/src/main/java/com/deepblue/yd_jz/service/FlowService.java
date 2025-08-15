@@ -11,6 +11,7 @@ import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.entity.Type;
 import com.deepblue.yd_jz.utils.ContentValues;
 import com.deepblue.yd_jz.utils.LogUtils;
+import com.deepblue.yd_jz.utils.MoneyUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,9 @@ public class FlowService {
 
     @Transactional(rollbackFor = Exception.class)
     public void doAddFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
+        // 格式化金额，确保只有2位小数
+        flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
+        
         String log = "新增flow\n"+"金额： "+ flowAddRequestDto.getMoney()+"";
         LogUtils.log_print(log);
         Flow flow = setNewFlow(flowAddRequestDto);
@@ -97,6 +101,9 @@ public class FlowService {
 
     @Transactional(rollbackFor = Exception.class)
     public void doUpdateFlow(int id, FlowAddRequestDto flowAddRequestDto) throws Exception {
+        // 格式化金额，确保只有2位小数
+        flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
+        
         String log = "更新flow\n"+"id: "+id+"\n金额： "+ flowAddRequestDto.getMoney()+"\n原操作： ";
         Flow lastFlow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(lastFlow.getActionId());
@@ -149,7 +156,7 @@ public class FlowService {
                 }
                 break;
         }
-        account.setMoney(accountMoney.toString());
+        account.setMoney(accountMoney.setScale(2, java.math.RoundingMode.HALF_UP).toString());
         log=log+"结转金额： "+account.getMoney();
         LogUtils.log_print(log);
         return account;

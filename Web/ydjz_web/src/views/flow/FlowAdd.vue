@@ -10,7 +10,7 @@
           type="number"
           label="账单金额"
           placeholder="请输入账单金额"
-
+          @blur="formatMainMoney"
       />
 <!--      @touchstart.native.stop="keyboardShow = true"-->
       <van-cell title="选择收支" is-link @click="onActionClick">
@@ -107,6 +107,7 @@
             type="number"
             label="账单金额"
             placeholder="请输入追加账单金额"
+            @blur="formatChildMoney(child)"
         />
         <van-field v-model="child.note" label="追加备注" placeholder="请输入追加备注"/>
         <template #right>
@@ -216,6 +217,7 @@
 <script>
 import {showConfirmDialog, showFailToast, showSuccessToast} from "vant";
 import template from "@/views/setting/template/Template.vue";
+import { addMoney, formatMoney } from "@/utils/money";
 
 export default {
   name: "FlowAdd",
@@ -365,6 +367,20 @@ export default {
       });
     },
 
+    // 格式化主金额输入
+    formatMainMoney() {
+      if (this.money && this.money !== '') {
+        this.money = formatMoney(this.money)
+      }
+    },
+    
+    // 格式化追加金额输入
+    formatChildMoney(child) {
+      if (child.money && child.money !== '') {
+        child.money = formatMoney(child.money)
+      }
+    },
+    
     doRemoveMoneyItem(item) {
       console.log(item)
       this.childMoneyItem.splice(this.childMoneyItem.indexOf(item), 1)
@@ -420,22 +436,28 @@ export default {
     },
 
     onSubmitHandle() {
-      var moneyInt = parseFloat(this.money)
+      // 使用工具函数处理金额，避免精度问题
       this.submitNote = this.note
-
+      
+      // 收集所有需要相加的金额
+      const moneyList = [this.money]
+      
       if (this.childMoneyItem.length > 0 && !this.submitNote.includes("(￥")) {
-        this.submitNote = this.submitNote + "(￥" + this.money + ")"
+        this.submitNote = this.submitNote + "(￥" + formatMoney(this.money) + ")"
       }
+      
       this.childMoneyItem.forEach(chileMoney => {
-        if (chileMoney.money != null) {
-          moneyInt = moneyInt + parseFloat(chileMoney.money)
-          this.submitNote = this.submitNote + "\n" + chileMoney.note + "(￥" + chileMoney.money + ")"
+        if (chileMoney.money != null && chileMoney.money !== '') {
+          moneyList.push(chileMoney.money)
+          this.submitNote = this.submitNote + "\n" + chileMoney.note + "(￥" + formatMoney(chileMoney.money) + ")"
         }
       })
+      
+      // 使用工具函数计算总金额，自动处理精度问题
       if (this.childMoneyItem.length > 0) {
-        this.submitMoney = moneyInt + ""
+        this.submitMoney = addMoney(...moneyList)
       } else {
-        this.submitMoney = this.money
+        this.submitMoney = formatMoney(this.money)
       }
       showConfirmDialog({
         title: '请确认账单',
