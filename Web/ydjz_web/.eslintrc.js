@@ -20,5 +20,12 @@ module.exports = {
     'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'vue/multi-word-component-names': 'off' // 关闭 Vue3 组件名警告
   },
-  // 删除 overrides 部分（除非有特殊需求）
+  overrides: [
+    {
+      files: ['tests/unit/**/*.spec.{j,t}s?(x)'],
+      env: {
+        jest: true
+      }
+    }
+  ]
 }

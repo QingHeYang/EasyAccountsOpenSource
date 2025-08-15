@@ -1,0 +1,14 @@
+url:
+ws://localhost:8001
+path:
+/ws/chat?
+参数：
+user_id=user_67ce21d6-a11c-4340-851b-7a8949906aa3(固定值)
+&app_id=easy-accounts-assistant（固定值）
+&use_think_llm=false （有一个开关可以控制，是否启用思考）
+
+message：
+{
+    "conversation_id":"",（如果缓存中有，则用缓存的，没有传空）
+    "content":"如果有一天我变得很有钱，我会买下所有难得一见的笑脸~~" （请在对话框中获得）
+}

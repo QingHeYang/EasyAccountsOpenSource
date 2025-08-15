@@ -19,4 +19,4 @@ EXPOSE 80
 
 # 启动Nginx
 # 替换模板中的环境变量并启动Nginx
-CMD /bin/sh -c "envsubst '\$API_BASE_URL' < /usr/share/nginx/html/config.js > /usr/share/nginx/html/config.tmp && cp /usr/share/nginx/html/config.tmp /usr/share/nginx/html/config.js && nginx -g 'daemon off;'"
+CMD /bin/sh -c "envsubst '\$API_BASE_URL \$AI_WEBSOCKET_URL' < /usr/share/nginx/html/config.js > /usr/share/nginx/html/config.tmp && cp /usr/share/nginx/html/config.tmp /usr/share/nginx/html/config.js && nginx -g 'daemon off;'"

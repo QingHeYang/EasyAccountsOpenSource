@@ -21,6 +21,14 @@ cd Server/YD_JZ
 # 使用 Maven 构建（需要 Java 11）
 mvn clean package
 
+# 运行带特定配置文件
+mvn clean package -P dev
+mvn clean package -P server  
+mvn clean package -P windows
+
+# 运行测试
+mvn test
+
 # 构建 Docker 镜像
 cd ../
 ./make_jar.sh
@@ -34,16 +42,19 @@ cd Web/ydjz_web
 # 安装依赖（需要 Node.js v16）
 npm install
 
-# 开发服务器
+# 开发服务器 (http://localhost:8081)
 npm run serve
 
 # 生产构建
 npm run build
 
-# 运行测试
+# 运行单个测试文件
+npm run test:unit -- tests/unit/example.spec.js
+
+# 运行所有测试
 npm run test:unit
 
-# 代码检查
+# 代码检查和自动修复
 npm run lint
 
 # 构建 Docker 镜像
@@ -55,6 +66,9 @@ cd ../
 ```bash
 # 进入桌面应用目录
 cd Web/ydjz_web_desktop
+
+# 安装依赖
+npm install
 
 # 开发模式
 npm run dev
@@ -110,10 +124,30 @@ cd WebHook
 
 服务运行时，可通过 Swagger UI 查看 API 文档和进行测试。
 
+## 开发工作流程
+
+### 前端开发
+- 开发服务器运行在 `http://localhost:8081`
+- API 代理配置：所有 `/api/*` 请求会代理到 `http://yd_service:8081/`
+- 使用 Jest 进行单元测试，配置文件：`jest.config.js`
+- 代码规范使用 ESLint + Prettier，配置在 `.eslintrc.js` 和 `prettier.config.js`
+
+### 后端开发  
+- 使用 Maven profiles 管理不同环境配置 (`dev`, `server`, `windows`)
+- 数据库迁移通过 Liquibase 管理，配置文件在 `src/main/resources/db/changelog/`
+- Swagger UI 可用于 API 测试，运行后访问 `/swagger-ui.html`
+- 双重数据访问模式：JPA 用于简单 CRUD，MyBatis 用于复杂查询
+
+### 测试策略
+- 前端：Jest 单元测试位于 `tests/unit/`
+- 后端：Spring Boot Test 框架，测试类应放在 `src/test/java/`
+- 运行前端测试前确保依赖已安装：`npm install`
+
 ## 重要说明
 
 - 后端开发需要 Java 11 和 Maven
 - 前端开发需要 Node.js v16
-- `Server/excel_template/` 中的 Excel 模板不应修改
+- `Server/excel_template/` 中的 Excel 模板不应修改（包含导出模板）
 - WebHook 服务提供可扩展的通知系统
 - 所有 Docker 构建脚本都在各组件根目录中
+- 修改代码后需要重新构建 Docker 镜像才能生效
