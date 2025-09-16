@@ -6,3 +6,100 @@ CLAUDE.md
 question/*
 *.tar.gz
 *.zip
+
+# Python相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 虚拟环境
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+conda-meta/
+
+# 测试和覆盖率
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+test/log/
+
+# IDE配置
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+resource/database/*.db
+
+# 配置文件（包含敏感信息）
+config/llm_config.ini
+config/servers_config.json
+resource/mcp/servers_config.json
+.env.local
+.env.*.local
+
+# 日志文件
+logs/
+*.log.*
+*.log-*
+
+# uv/pip lock文件（通常不提交）
+uv.lock
+poetry.lock
+
+# MCP和LLM相关临时文件
+.mcp/
+.llm_cache/
+temp/
+tmp/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
