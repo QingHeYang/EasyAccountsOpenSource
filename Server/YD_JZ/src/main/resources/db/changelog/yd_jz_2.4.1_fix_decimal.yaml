@@ -1,0 +1,28 @@
+databaseChangeLog:
+    - changeSet:
+          id: fix-decimal-precision-2024
+          author: system
+          comment: 修复flow和account表中的小数精度问题
+          changes:
+              - sql:
+                    sql: |
+                        -- 修复flow表中的金额，保留2位小数
+                        UPDATE flow 
+                        SET money = CAST(CAST(money AS DECIMAL(20,2)) AS CHAR)
+                        WHERE money REGEXP '\\.[0-9]{3,}$';
+                        
+                        -- 修复account表中的金额
+                        UPDATE account 
+                        SET money = CAST(CAST(money AS DECIMAL(20,2)) AS CHAR)
+                        WHERE money REGEXP '\\.[0-9]{3,}$';
+                        
+                        -- 修复account表中的免计金额
+                        UPDATE account 
+                        SET exempt_money = CAST(CAST(exempt_money AS DECIMAL(20,2)) AS CHAR)
+                        WHERE exempt_money REGEXP '\\.[0-9]{3,}$';
+                        
+          rollback:
+              - sql:
+                    sql: |
+                        -- 此操作不可回滚
+                        SELECT 'Decimal precision fix cannot be rolled back' AS warning;
