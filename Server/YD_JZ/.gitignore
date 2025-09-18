@@ -42,7 +42,7 @@ build/
 .mvn
 mvnw*
 
-
+docs/*
 
 ### generated files ###
 bin/
@@ -55,3 +55,4 @@ gen/
 logs/
 log
 temp/
+CLAUDE.md
