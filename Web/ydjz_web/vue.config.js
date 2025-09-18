@@ -8,19 +8,19 @@ module.exports = {
       "/ai-api":{
         changeOrigin: true,
         ws: false,
-        target: "http://192.168.50.226:8001",
+        target: "http://localhost:8001",
         pathRewrite: {
           "^/ai-api": ""
         },
         logLevel: 'debug',
         onProxyReq: function(proxyReq, req, res) {
-          console.log('Proxying:', req.method, req.url, '-> http://192.168.50.226:8001' + req.url.replace('/ai-api', ''));
+          console.log('Proxying:', req.method, req.url, '-> http://localhost:8001' + req.url.replace('/ai-api', ''));
         }
       },
       "/api":{
         changeOrigin:true,
         ws:false,
-        target: "http://yd_service:8081/",
+        target: "http://www.lllama.cn:10672/",
         pathRewrite:{
           "^/api":""
         }

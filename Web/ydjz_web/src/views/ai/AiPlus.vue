@@ -29,7 +29,7 @@
       <div class="messages-container">
         <van-empty 
           v-if="messages.length === 0 && !loading"
-          description="有什么问题想问小易呢？"
+          description="有什么问题想问我呢？"
         />
         
         <!-- 消息列表 -->
