@@ -7,6 +7,7 @@ import com.deepblue.yd_jz.dto.TypeListResponseDto;
 import com.deepblue.yd_jz.entity.Account;
 import com.deepblue.yd_jz.entity.Action;
 import com.deepblue.yd_jz.entity.Flow;
+import com.deepblue.yd_jz.entity.FlowImage;
 import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.entity.Type;
 import com.deepblue.yd_jz.utils.ContentValues;
@@ -207,6 +208,17 @@ public class FlowService {
         toClientBean.setType(typeListResponseDto);
         toClientBean.setAccount(account);
         toClientBean.setAction(action);
+        
+        // 获取图片列表
+        List<FlowImage> flowImages = imageService.getFlowImages(id);
+        if (flowImages != null && !flowImages.isEmpty()) {
+            List<String> imageNames = new ArrayList<>();
+            for (FlowImage flowImage : flowImages) {
+                imageNames.add(flowImage.getImageName());
+            }
+            toClientBean.setImages(imageNames);
+        }
+        
         LogUtils.log_print(log);
         LogUtils.log_json(toClientBean);
         return toClientBean;
@@ -265,6 +277,11 @@ public class FlowService {
             flow.setNote((String) map.get("note"));
             flow.setToAName((String) map.get("t_a_name"));
             flow.setFrom((String) map.get("from_source"));
+            
+            // 查询是否有图片
+            Integer flowId = (Integer) map.get("id");
+            List<FlowImage> images = imageService.getFlowImages(flowId);
+            flow.setHasImages(images != null && !images.isEmpty());
 
             if (map.get("p_t_name") != null) {
                 flow.setTName(map.get("p_t_name") + "/" + map.get("t_name"));

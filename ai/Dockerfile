@@ -4,8 +4,8 @@ FROM python:3.10-slim
 # 设置工作目录
 WORKDIR /app
 
-# 复制项目文件
-COPY koalaq_hub_python /app/koalaq_hub_python
+# 先复制requirements.txt（依赖文件变化较少）
+COPY koalaq_hub_python/requirements.txt /app/requirements.txt
 
 # 安装Python依赖（使用清华源）
 RUN pip install --upgrade pip && \
@@ -13,7 +13,10 @@ RUN pip install --upgrade pip && \
     -i https://pypi.tuna.tsinghua.edu.cn/simple \
     --trusted-host pypi.tuna.tsinghua.edu.cn \
     --timeout=1000 \
-    -r /app/koalaq_hub_python/requirements.txt
+    -r /app/requirements.txt
+
+# 最后复制项目代码（代码变化频繁）
+COPY koalaq_hub_python /app/koalaq_hub_python
 
 # 设置Python路径
 ENV PYTHONPATH="/app/koalaq_hub_python"

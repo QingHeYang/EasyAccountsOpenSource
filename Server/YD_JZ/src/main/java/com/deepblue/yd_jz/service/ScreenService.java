@@ -38,6 +38,9 @@ public class ScreenService {
 
     @Autowired
     FileMakeWebHook fileMakeWebHook;
+    
+    @Autowired
+    ImageService imageService;
 
     @Value("${excelScreenFolder}")
     public String excelFolder;
@@ -90,6 +93,12 @@ public class ScreenService {
                 innerBean.setAName((String) map.get("accountName"));
                 innerBean.setToAName((String) map.get("toAccountName"));
                 innerBean.setFrom((String) map.get("fromSource"));
+                
+                // 查询是否有图片
+                Integer flowId = (Integer) map.get("id");
+                List<com.deepblue.yd_jz.entity.FlowImage> images = imageService.getFlowImages(flowId);
+                innerBean.setHasImages(images != null && !images.isEmpty());
+                
                 if (map.get("parentTypeName") != null) {
                     innerBean.setTName(map.get("parentTypeName") + "/" + map.get("typeName"));
                 } else {

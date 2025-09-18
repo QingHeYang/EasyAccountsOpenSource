@@ -83,4 +83,11 @@ public class ImageService {
     public void deleteFlowImages(Integer flowId) {
         flowImageRepository.deleteByFlowId(flowId);
     }
+    
+    /**
+     * 获取流水的图片列表
+     */
+    public List<FlowImage> getFlowImages(Integer flowId) {
+        return flowImageRepository.findByFlowId(flowId);
+    }
 }

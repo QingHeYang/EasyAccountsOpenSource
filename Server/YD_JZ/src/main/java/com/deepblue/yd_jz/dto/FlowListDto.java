@@ -28,6 +28,7 @@ public class FlowListDto {
         private String toAName;
         private String fDate;
         private String from;
+        private boolean hasImages;
     }
 
 @Data

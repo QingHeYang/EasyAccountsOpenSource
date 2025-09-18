@@ -26,6 +26,11 @@ request.interceptors.request.use(
 // 添加响应拦截器
 request.interceptors.response.use(
     response => {
+        // 图片上传接口特殊处理（返回 code: 0 表示成功）
+        if (response.config.url === '/image/upload' && response.data.code === 0) {
+            return response;
+        }
+        
         if (response.data.code !== 0) {
 
             if (response.data.code === 401) {
@@ -99,8 +104,8 @@ request.interceptors.response.use(
                 duration: 800,
             });
         }
-        //return Promise.reject(error);
-        return error;
+        return Promise.reject(error);
+        // return error; // 这里应该返回 Promise.reject
     }
 );
 
