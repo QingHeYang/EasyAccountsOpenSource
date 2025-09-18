@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2.5.0-1
+      author: system
+      changes:
+        - addColumn:
+            tableName: flow
+            columns:
+              - column:
+                  name: from_source
+                  type: VARCHAR(50)
+                  remarks: 流水来源标识，如ai表示AI记录

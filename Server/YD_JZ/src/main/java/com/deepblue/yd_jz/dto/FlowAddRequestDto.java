@@ -11,6 +11,7 @@ public class FlowAddRequestDto {
     private int typeId;
     private boolean isCollect;
     private String note;
+    private String from;
 
     public String getMoney() {
         return money;
@@ -82,5 +83,13 @@ public class FlowAddRequestDto {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getFrom() {
+        return from;
+    }
+
+    public void setFrom(String from) {
+        this.from = from;
     }
 }

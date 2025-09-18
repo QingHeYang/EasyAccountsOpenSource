@@ -89,6 +89,7 @@ public class ScreenService {
                 innerBean.setFDate(sdf.format(fDate));
                 innerBean.setAName((String) map.get("accountName"));
                 innerBean.setToAName((String) map.get("toAccountName"));
+                innerBean.setFrom((String) map.get("fromSource"));
                 if (map.get("parentTypeName") != null) {
                     innerBean.setTName(map.get("parentTypeName") + "/" + map.get("typeName"));
                 } else {

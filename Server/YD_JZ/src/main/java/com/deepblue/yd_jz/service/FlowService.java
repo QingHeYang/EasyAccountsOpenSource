@@ -104,6 +104,11 @@ public class FlowService {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
         
+        // 处理from字段：如果没有传入from字段，则置空
+        if (flowAddRequestDto.getFrom() == null) {
+            flowAddRequestDto.setFrom("");
+        }
+        
         String log = "更新flow\n"+"id: "+id+"\n金额： "+ flowAddRequestDto.getMoney()+"\n原操作： ";
         Flow lastFlow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(lastFlow.getActionId());
@@ -245,6 +250,7 @@ public class FlowService {
             flow.setAName((String) map.get("a_name"));
             flow.setNote((String) map.get("note"));
             flow.setToAName((String) map.get("t_a_name"));
+            flow.setFrom((String) map.get("from_source"));
 
             if (map.get("p_t_name") != null) {
                 flow.setTName(map.get("p_t_name") + "/" + map.get("t_name"));

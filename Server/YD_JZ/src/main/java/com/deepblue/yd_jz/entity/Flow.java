@@ -15,5 +15,6 @@ public class Flow {
     private String note;
     private boolean collect;
     private String fCreateDate;
+    private String from;
 
 }

@@ -27,6 +27,7 @@ public class FlowListDto {
         private String aName;
         private String toAName;
         private String fDate;
+        private String from;
     }
 
 @Data

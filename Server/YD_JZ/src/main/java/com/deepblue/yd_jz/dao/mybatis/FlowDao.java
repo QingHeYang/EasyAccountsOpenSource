@@ -20,7 +20,8 @@ public interface FlowDao {
             "f_create_date," +
             "account_id," +
             "account_to_id," +
-            "collect) values (" +
+            "collect," +
+            "from_source) values (" +
             "#{flow.fDate}," +
             "#{flow.money}," +
             "#{flow.typeId},#{flow.actionId}," +
@@ -28,10 +29,11 @@ public interface FlowDao {
             "#{flow.fCreateDate}," +
             "#{flow.accountId}," +
             "#{flow.accountToId}," +
-            "#{flow.collect})")
+            "#{flow.collect}," +
+            "#{flow.from})")
     void addFlow(@Param("flow") Flow flow);
 
-    @Select("select * from flow  where id = #{id} ")
+    @Select("select *, from_source as `from` from flow where id = #{id} ")
     List<Flow> queryFlowById(@Param("id") int id);
 
     @Update("update flow set f_date= #{flow.fDate}, " +
@@ -41,7 +43,8 @@ public interface FlowDao {
             "f_create_date=#{flow.fCreateDate}," +
             "account_id=#{flow.accountId}," +
             "account_to_id = #{flow.accountToId}," +
-            "collect =#{flow.collect}" +
+            "collect =#{flow.collect}," +
+            "from_source = #{flow.from}" +
             " where id = #{flow.id} ")
     void updateFlow(@Param("flow") Flow flow);
     @Update("update flow set collect =#{collect} where id = #{id}")
