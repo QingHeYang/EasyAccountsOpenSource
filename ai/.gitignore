@@ -1,4 +1,4 @@
-# Pythonøs
+# Pythonï¿½s
 __pycache__/
 *.py[cod]
 *$py.class
@@ -24,7 +24,7 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Zß¯ƒ
+# Zß¯ï¿½
 .env
 .venv
 env/
@@ -35,7 +35,7 @@ venv.bak/
 .conda/
 conda-meta/
 
-# KÕŒ†Ö‡
+# KÕŒï¿½Ö‡
 htmlcov/
 .tox/
 .nox/
@@ -50,11 +50,11 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# KÕå×
+# Kï¿½ï¿½ï¿½
 test/log/
 */test/log/
 
-# IDEŒ‘h
+# IDEï¿½ï¿½h
 .idea/
 .vscode/
 *.swp
@@ -74,14 +74,14 @@ dmypy.json
 .pytype/
 cython_debug/
 
-# pn“‡ö
+# pnï¿½ï¿½ï¿½
 *.db
 *.sqlite
 *.sqlite3
 koalaq_hub_python/resource/database/*.db
 */resource/database/*.db
 
-# Mn‡ö+Oáo	
+# Mnï¿½ï¿½+Oï¿½o	
 */config/llm_config.ini
 */config/servers_config.json
 */resource/mcp/servers_config.json
@@ -89,18 +89,18 @@ koalaq_hub_python/resource/database/*.db
 .env.*.local
 *.env
 
-# å×‡ö
+# ï¿½×‡ï¿½
 logs/
 *.log
 *.log.*
 *.log-*
 
-# V‡öyîyš	
+# ï¿½Vï¿½ï¿½yï¿½yï¿½	
 uv.lock
 poetry.lock
 Pipfile.lock
 
-# MCPŒLLMøs4ö‡ö
+# MCPï¿½LLMï¿½s4ï¿½ï¿½ï¿½
 .mcp/
 .llm_cache/
 temp/
@@ -241,3 +241,5 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+koalaq_hub_webui/*
+docs/*
