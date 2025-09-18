@@ -31,6 +31,7 @@ public interface FlowDao {
             "#{flow.accountToId}," +
             "#{flow.collect}," +
             "#{flow.from})")
+    @Options(useGeneratedKeys = true, keyProperty = "flow.id")
     void addFlow(@Param("flow") Flow flow);
 
     @Select("select *, from_source as `from` from flow where id = #{id} ")

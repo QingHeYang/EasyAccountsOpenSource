@@ -40,6 +40,9 @@ public class FlowService {
 
     @Autowired
     TypeService typeService;
+    
+    @Autowired
+    ImageService imageService;
 
 
     @Transactional(rollbackFor = Exception.class)
@@ -55,6 +58,11 @@ public class FlowService {
         flow.setFCreateDate(createDate);
         BeanUtils.copyProperties(flowAddRequestDto, flow);
         flowDao.addFlow(flow);
+        
+        // 保存图片关联
+        if (flowAddRequestDto.getImages() != null && !flowAddRequestDto.getImages().isEmpty()) {
+            imageService.saveFlowImages(flow.getId(), flowAddRequestDto.getImages());
+        }
     }
 
     private Flow setNewFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
@@ -136,6 +144,12 @@ public class FlowService {
         flow.setId(id);
         BeanUtils.copyProperties(flowAddRequestDto, flow);
         flowDao.updateFlow(flow);
+        
+        // 更新图片关联（先删后加）
+        imageService.deleteFlowImages(id);
+        if (flowAddRequestDto.getImages() != null && !flowAddRequestDto.getImages().isEmpty()) {
+            imageService.saveFlowImages(id, flowAddRequestDto.getImages());
+        }
     }
 
     private Account handleAccount(int handle, String money, Account account, boolean isExempt) {
