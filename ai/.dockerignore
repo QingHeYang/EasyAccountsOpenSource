@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+.env.local
+
+# 测试文件
+test_*.py
+*_test.py
+tests/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 数据文件
+data/
+*.db
+*.sqlite
+*.log
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 构建文件
+build/
+dist/
+*.egg-info/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 旧的 MCP 项目（已集成到内部）
+easyaccounts-mcp/

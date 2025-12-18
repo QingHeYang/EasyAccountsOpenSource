@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2.5.0-1
+      author: system
+      changes:
+        - addColumn:
+            tableName: flow
+            columns:
+              - column:
+                  name: from_source
+                  type: VARCHAR(50)
+                  remarks: 流水来源标识，如ai表示AI记录
+  - changeSet:
+      id: 2.5.0-2
+      author: system
+      changes:
+        - createTable:
+            tableName: flow_image
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: flow_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: image_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: upload_time
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - createIndex:
+            tableName: flow_image
+            indexName: idx_flow_id
+            columns:
+              - column:
+                  name: flow_id

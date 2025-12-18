@@ -122,6 +122,12 @@ const routes = [
       import(/* webpackChunkName: "flow" */ "../views/flow/FlowAdd.vue"),
   },
   {
+    path: "/ai-plus",
+    name: "AiPlus",
+    component: () =>
+      import(/* webpackChunkName: "ai" */ "../views/ai/AiPlus.vue"),
+  },
+  {
     path: "/template/add",
     name: "TemplateAdd",
     component: () =>

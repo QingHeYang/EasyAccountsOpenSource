@@ -1,5 +1,7 @@
 package com.deepblue.yd_jz.dto;
 
+import java.util.List;
+
 public class FlowAddRequestDto {
 
     private String money;
@@ -11,6 +13,8 @@ public class FlowAddRequestDto {
     private int typeId;
     private boolean isCollect;
     private String note;
+    private String from;
+    private List<String> images;
 
     public String getMoney() {
         return money;
@@ -82,5 +86,21 @@ public class FlowAddRequestDto {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getFrom() {
+        return from;
+    }
+
+    public void setFrom(String from) {
+        this.from = from;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
     }
 }

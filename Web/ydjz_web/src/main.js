@@ -8,6 +8,14 @@ import request from './axios'; // 引入 Axios
 import VueApexCharts from "vue3-apexcharts";
 import { ConfigProvider } from 'vant';
 
+// 开发环境启用 VConsole（已关闭）
+// if (process.env.NODE_ENV === 'development') {
+//   import('vconsole').then(({ default: VConsole }) => {
+//     new VConsole();
+//     console.log('VConsole 已启动');
+//   });
+// }
+
 // 不需要 Vue.config.productionTip = false 和 Vue.use(Vant)
 const app = createApp(App);
 

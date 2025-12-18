@@ -3,6 +3,7 @@ package com.deepblue.yd_jz.dto;
 import com.deepblue.yd_jz.entity.Account;
 import com.deepblue.yd_jz.entity.Action;
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class FlowSingleResponseDto {
@@ -15,5 +16,7 @@ public class FlowSingleResponseDto {
     private TypeListResponseDto type;
     private boolean isCollect;
     private String note;
+    private String from;
+    private List<String> images;
 
 }

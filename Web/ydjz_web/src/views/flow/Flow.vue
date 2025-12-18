@@ -74,6 +74,14 @@
           >
             <template #default>
               <div style="color: #000; font-size: 19px">￥{{ flow.money }}</div>
+              <van-tag 
+                  v-if="flow.hasImages"
+                  style="margin-right: 5px; background: #4CAF50; color: white; border: none;"
+              >图</van-tag>
+              <van-tag 
+                  v-if="flow.from === 'ai'"
+                  style="margin-right: 5px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;"
+              >AI</van-tag>
               <van-tag :type="flow.tagStyle">{{ flow.hname }}</van-tag>
               <van-tag
                   v-show="flow.exempt"

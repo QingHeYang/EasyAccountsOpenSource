@@ -10,7 +10,7 @@
           type="number"
           label="账单金额"
           placeholder="请输入账单金额"
-
+          @blur="formatMainMoney"
       />
 <!--      @touchstart.native.stop="keyboardShow = true"-->
       <van-cell title="选择收支" is-link @click="onActionClick">
@@ -53,6 +53,22 @@
           show-word-limit
           input-align="right"
       />
+      
+      <van-field name="uploader" label="图片">
+        <template #input>
+          <van-uploader
+            v-model="fileList"
+            :max-count="3"
+            :max-size="20 * 1024 * 1024"
+            :after-read="afterRead"
+            :before-delete="beforeDelete"
+            multiple
+            preview-size="80px"
+            @oversize="onOversize"
+            @click-preview="onClickPreview"
+          />
+        </template>
+      </van-field>
     </van-cell-group>
     <van-action-sheet v-if="popupStyle<=2" v-model:show="actionShow" :title="popupTitle">
       <van-cell-group v-if="popupStyle == 0">
@@ -107,6 +123,7 @@
             type="number"
             label="账单金额"
             placeholder="请输入追加账单金额"
+            @blur="formatChildMoney(child)"
         />
         <van-field v-model="child.note" label="追加备注" placeholder="请输入追加备注"/>
         <template #right>
@@ -214,8 +231,10 @@
 </template>
 
 <script>
-import {showConfirmDialog, showFailToast, showSuccessToast} from "vant";
+import {showConfirmDialog, showFailToast, showSuccessToast, showToast, showLoadingToast, showImagePreview} from "vant";
 import template from "@/views/setting/template/Template.vue";
+import { addMoney, formatMoney } from "@/utils/money";
+import { compressImage } from "@/utils/image-compress";
 
 export default {
   name: "FlowAdd",
@@ -264,6 +283,11 @@ export default {
       note: "",
       submitMoney: "",
       submitNote: "",
+      fromSource: null, // 存储流水来源（如：ai）
+      
+      // 图片上传相关
+      fileList: [], // Uploader 组件的文件列表
+      
       //以下是分类级联
       cascaderNames: {
         text: 'tname',
@@ -292,6 +316,8 @@ export default {
       showSuccessToast(template.name);
       this.money = template.money;
       this.chooseAccount = template.account;
+      // 不清空图片列表，保留已上传的图片
+      // this.fileList = [];
       if (template.action != null) {
         this.chooseAction = this.setActionStyle(template.action);
         if (this.chooseAction.id != null) {
@@ -365,6 +391,20 @@ export default {
       });
     },
 
+    // 格式化主金额输入
+    formatMainMoney() {
+      if (this.money && this.money !== '') {
+        this.money = formatMoney(this.money)
+      }
+    },
+    
+    // 格式化追加金额输入
+    formatChildMoney(child) {
+      if (child.money && child.money !== '') {
+        child.money = formatMoney(child.money)
+      }
+    },
+    
     doRemoveMoneyItem(item) {
       console.log(item)
       this.childMoneyItem.splice(this.childMoneyItem.indexOf(item), 1)
@@ -384,7 +424,9 @@ export default {
         method: "get"
       }).then(response => {
         const flow = response.data.data;
-        console.log(flow)
+        console.log('获取的流水数据:', flow);
+        console.log('图片数组:', flow.images);
+        console.log('API基础地址:', window.config.apiBaseUrl);
         this.money = flow.money
         this.chooseAccount = flow.account
         this.chooseAccount.name = flow.account.aname
@@ -393,11 +435,64 @@ export default {
         console.log(this.chooseType)
         this.isCollect = flow.collect
         this.note = flow.note
+        this.fromSource = flow.from || null // 保存原始的from值
         if (flow.action.handle == "2") {
           this.chooseToAccount = flow.accountTo
           this.chooseToAccount.name = flow.accountTo.aname
         }
         this.chooseDate = flow.fdate
+        
+        // 处理已有图片
+        if (flow.images && flow.images.length > 0) {
+          // 显示加载提示
+          const loadingToast = showLoadingToast({
+            message: '加载图片中...',
+            forbidClick: true,
+            duration: 0 // 不自动关闭
+          });
+          
+          let loadedCount = 0;
+          const totalCount = flow.images.length;
+          
+          // 转换为 Uploader 组件需要的格式
+          this.fileList = flow.images.map((fileName) => {
+            // 确保每个文件名都拼接完整的 URL
+            const fullUrl = `${window.config.apiBaseUrl}/image/${fileName}`;
+            console.log('处理图片:', fileName, '->', fullUrl);
+            
+            // 创建文件对象
+            const fileItem = {
+              url: fullUrl,
+              status: 'done',
+              isImage: true,
+              serverFileName: fileName // 保存服务器文件名用于提交
+            };
+            
+            // 预加载图片
+            const img = new Image();
+            img.onload = () => {
+              loadedCount++;
+              console.log(`图片加载完成 (${loadedCount}/${totalCount}):`, fileName);
+              if (loadedCount >= totalCount) {
+                loadingToast.close();
+              }
+            };
+            img.onerror = () => {
+              loadedCount++;
+              fileItem.status = 'failed';
+              console.error('图片加载失败:', fileName);
+              if (loadedCount >= totalCount) {
+                loadingToast.close();
+              }
+            };
+            img.src = fullUrl;
+            
+            return fileItem;
+          });
+          console.log('编辑时加载的图片列表:', this.fileList);
+          console.log('图片 URLs:', this.fileList.map(f => f.url));
+        }
+        
         this.doGetTypes()
       })
     },
@@ -420,22 +515,28 @@ export default {
     },
 
     onSubmitHandle() {
-      var moneyInt = parseFloat(this.money)
+      // 使用工具函数处理金额，避免精度问题
       this.submitNote = this.note
-
+      
+      // 收集所有需要相加的金额
+      const moneyList = [this.money]
+      
       if (this.childMoneyItem.length > 0 && !this.submitNote.includes("(￥")) {
-        this.submitNote = this.submitNote + "(￥" + this.money + ")"
+        this.submitNote = this.submitNote + "(￥" + formatMoney(this.money) + ")"
       }
+      
       this.childMoneyItem.forEach(chileMoney => {
-        if (chileMoney.money != null) {
-          moneyInt = moneyInt + parseFloat(chileMoney.money)
-          this.submitNote = this.submitNote + "\n" + chileMoney.note + "(￥" + chileMoney.money + ")"
+        if (chileMoney.money != null && chileMoney.money !== '') {
+          moneyList.push(chileMoney.money)
+          this.submitNote = this.submitNote + "\n" + chileMoney.note + "(￥" + formatMoney(chileMoney.money) + ")"
         }
       })
+      
+      // 使用工具函数计算总金额，自动处理精度问题
       if (this.childMoneyItem.length > 0) {
-        this.submitMoney = moneyInt + ""
+        this.submitMoney = addMoney(...moneyList)
       } else {
-        this.submitMoney = this.money
+        this.submitMoney = formatMoney(this.money)
       }
       showConfirmDialog({
         title: '请确认账单',
@@ -476,19 +577,34 @@ export default {
     doSubmitRequest() {
       const api = this.$route.query.flowId == null ? "/flow/addFlow" : "/flow/updateFlow/" + this.$route.query.flowId
       const method = this.$route.query.flowId == null ? "post" : "put"
+      
+      // 从 fileList 中提取已上传成功的图片文件名
+      const uploadedImages = this.fileList
+        .filter(item => item.status === 'done' && item.serverFileName)
+        .map(item => item.serverFileName);
+      
+      console.log('提交前的图片列表:', uploadedImages);
+      console.log('fileList:', this.fileList);
+      
+      const submitData = {
+        money: this.submitMoney,
+        fDate: this.chooseDate,
+        actionId: parseInt(this.chooseAction.id),
+        accountId: parseInt(this.chooseAccount.id),
+        accountToId: parseInt(this.chooseToAccount.id),
+        typeId: parseInt(this.chooseType.id),
+        collect: this.isCollect,
+        note: this.submitNote,
+        from: this.$route.query.flowId != null ? null : undefined, // 修改时清空from字段
+        images: uploadedImages // 添加图片列表
+      };
+      
+      console.log('提交数据:', submitData);
+      
       this.$http({
         url: api,
         method: method,
-        data: {
-          money: this.submitMoney,
-          fDate: this.chooseDate,
-          actionId: parseInt(this.chooseAction.id),
-          accountId: parseInt(this.chooseAccount.id),
-          accountToId: parseInt(this.chooseToAccount.id),
-          typeId: parseInt(this.chooseType.id),
-          collect: this.isCollect,
-          note: this.submitNote
-        }
+        data: submitData
       }).then(() => {
         this.$router.go(-1)
       })
@@ -631,6 +747,165 @@ export default {
       this.calanderShow = false;
       this.chooseDate = this.formatDate(date);
       console.log(this.chooseDate)
+    },
+    
+    // 图片上传相关方法
+    afterRead(file, detail) {
+      console.log('afterRead 被调用:', file, detail);
+      // 处理单个或多个文件
+      const files = Array.isArray(file) ? file : [file];
+      
+      files.forEach(async (item) => {
+        // 设置上传状态
+        item.status = 'uploading';
+        item.message = '压缩中...';
+        
+        try {
+          // 压缩图片
+          let fileToUpload = item.file;
+          if (item.file.type.startsWith('image/')) {
+            console.log(`开始压缩图片: ${item.file.name}, 原始大小: ${(item.file.size / 1024 / 1024).toFixed(2)}MB`);
+            item.message = '压缩图片中...';
+            
+            fileToUpload = await compressImage(item.file, {
+              maxWidth: 1920,      // 最大宽度
+              maxHeight: 1920,     // 最大高度
+              quality: 0.8,        // 压缩质量
+              maxSizeMB: 2         // 最大 2MB
+            });
+            
+            console.log(`压缩完成，新大小: ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+          }
+          
+          item.message = '上传中...';
+          
+          // 创建 FormData
+          const formData = new FormData();
+          formData.append('file', fileToUpload);
+        
+        // 调用上传接口
+        this.$http({
+          url: '/image/upload',
+          method: 'post',
+          data: formData,
+          timeout: 30000, // 30秒超时，图片上传需要更长时间
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            // 计算上传进度
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            console.log(`上传进度: ${percentCompleted}%`);
+            item.message = `上传中...${percentCompleted}%`;
+          }
+        }).then(response => {
+          console.log('上传响应:', response);
+          console.log('响应数据:', response.data);
+          
+          // 检查响应是否存在
+          if (!response || !response.data) {
+            console.error('响应格式错误:', response);
+            item.status = 'failed';
+            item.message = '响应格式错误';
+            showFailToast('上传失败：响应格式错误');
+            return;
+          }
+          
+          // 服务器返回 code: 0 表示成功
+          if (response.data.code === 0 && response.data.data) {
+            // 上传成功
+            const fileName = response.data.data.fileName;
+            
+            if (!fileName) {
+              console.error('未返回文件名');
+              item.status = 'failed';
+              item.message = '未返回文件名';
+              showFailToast('上传失败：未返回文件名');
+              return;
+            }
+            
+            // 重要：设置状态和 URL
+            item.status = 'done';
+            item.message = '';
+            // 使用配置的 API 地址
+            item.url = `${window.config.apiBaseUrl}/image/${fileName}`;
+            // 保存服务器返回的文件名，用于提交
+            item.serverFileName = fileName;
+            
+            console.log('上传成功，文件名:', fileName);
+            console.log('当前 fileList:', this.fileList);
+            
+            showSuccessToast('上传成功');
+          } else {
+            // 上传失败
+            console.error('上传失败，响应:', response.data);
+            item.status = 'failed';
+            item.message = response.data?.msg || '上传失败';
+            showFailToast(response.data?.msg || '上传失败');
+          }
+        }).catch((error) => {
+          // 网络错误
+          console.error('上传请求错误:', error);
+          console.error('错误详情:', error.response);
+          item.status = 'failed';
+          item.message = '上传失败';
+          
+          // 检查是否是响应错误
+          if (error.response) {
+            showFailToast(`上传失败: ${error.response.status}`);
+          } else if (error.request) {
+            showFailToast('网络错误，无法连接服务器');
+          } else {
+            showFailToast('上传失败');
+          }
+        });
+        } catch (error) {
+          // 压缩错误
+          console.error('压缩图片失败:', error);
+          item.status = 'failed';
+          item.message = '压缩失败';
+          showFailToast('图片压缩失败');
+        }
+      });
+    },
+    
+    beforeDelete(file, detail) {
+      console.log('beforeDelete 被调用:', file, detail);
+      return new Promise((resolve) => {
+        showConfirmDialog({
+          message: '确定删除该图片吗？',
+        }).then(() => {
+          console.log('删除文件:', file);
+          console.log('剩余 fileList:', this.fileList);
+          resolve(true);
+        }).catch(() => {
+          resolve(false);
+        });
+      });
+    },
+    
+    onOversize() {
+      showToast('图片大小不能超过 20MB');
+    },
+    
+    onClickPreview(file, detail) {
+      console.log('预览图片:', file, detail);
+      // 获取所有图片的 URL
+      const images = this.fileList
+        .filter(item => item.url)
+        .map(item => item.url);
+      
+      // 找到当前点击的图片索引
+      const startPosition = images.indexOf(file.url);
+      
+      // 使用 showImagePreview 显示图片
+      showImagePreview({
+        images: images,
+        startPosition: startPosition >= 0 ? startPosition : 0,
+        closeable: true, // 显示关闭按钮
+        closeIcon: 'clear', // 关闭图标
+        closeIconPosition: 'top-right' // 关闭按钮位置
+      });
     },
 
 

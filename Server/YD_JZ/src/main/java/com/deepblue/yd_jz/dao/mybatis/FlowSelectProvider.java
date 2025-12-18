@@ -13,7 +13,7 @@ public class FlowSelectProvider {
             , @Param("date") String date) {
         String sqlStr = new SQL() {
             {
-                SELECT("flow.id,flow.f_date,flow.money,flow.collect,flow.exempt,flow.note,a.handle,a.h_name,ac.a_name,acc.a_name t_a_name,t.t_name,t2.t_name p_t_name");
+                SELECT("flow.id,flow.f_date,flow.money,flow.collect,flow.exempt,flow.note,flow.from_source,a.handle,a.h_name,ac.a_name,acc.a_name t_a_name,t.t_name,t2.t_name p_t_name");
                 FROM("flow");
                 LEFT_OUTER_JOIN("action a on flow.action_id = a.id");
                 LEFT_OUTER_JOIN("type t on flow.type_id = t.id");
@@ -64,7 +64,7 @@ public class FlowSelectProvider {
 
     public String getFlowByScreen(int handle, int account, String startDate, String endDate, boolean isSingleMonth, boolean isCollect, String note) {
         StringBuilder sql = new StringBuilder("SELECT " +
-                "flow.id, flow.f_date AS flowDate, flow.money, flow.collect, flow.exempt, flow.note," +
+                "flow.id, flow.f_date AS flowDate, flow.money, flow.collect, flow.exempt, flow.note, flow.from_source AS fromSource," +
                 "a.handle, a.h_name AS handleName, a.id AS actionId," +
                 "ac.a_name AS accountName, ac.id AS accountId, acc.a_name AS toAccountName," +
                 "t.t_name AS typeName, t.id AS typeId, t2.t_name AS parentTypeName, t2.id AS parentTypeId\n");

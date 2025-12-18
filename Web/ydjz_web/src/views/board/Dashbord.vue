@@ -3,6 +3,15 @@
     <!--    <van-nav-bar fixed placeholder title="总览" right-text="财务分析" @click-right=toAnalysis() />-->
     <van-nav-bar
         title="总览"/>
+    <van-floating-bubble 
+      magnetic="x" 
+      axis="xy" 
+      v-model:offset="aiOffset" 
+      @click="toAiPlus"
+      style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;"
+    >
+      AI+
+    </van-floating-bubble>
     <div
         style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: #fff; border-bottom: 1px solid #ececec;">
       <div>
@@ -137,11 +146,13 @@ export default {
       showNextYearButton: false,
       showAccountsDetail: false,
       homeInfo: {},
+      aiOffset: { x: 20, y: 100 },
     };
   },
   mounted() {
     this.getHomeInfo();
     this.prepareYearColum();
+    this.aiOffset = { x: window.innerWidth - 80, y: window.innerHeight - 200 };
   },
   methods: {
     prepareYearColum() {
@@ -195,6 +206,9 @@ export default {
 
     toAnalysis() {
       this.$router.push({path: "/analysis"});
+    },
+    toAiPlus() {
+      this.$router.push({path: "/ai-plus"});
     },
     toScreen(acid) {
       this.$router.push({path: "/screen", query: {acid: acid}});

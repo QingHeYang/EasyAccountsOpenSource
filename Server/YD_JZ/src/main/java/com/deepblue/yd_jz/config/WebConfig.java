@@ -38,7 +38,8 @@ public class WebConfig implements WebMvcConfigurer {
                             "/webjars/**",
                             "/auth/login",
                             "/auth/register",
-                            "/error" // 排除 /error 路径
+                            "/error", // 排除 /error 路径
+                            "/image/**" // 排除图片获取路径，允许无需鉴权访问
                     );
         }
     }
