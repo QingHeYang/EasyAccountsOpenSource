@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+
+  # 数据库服务
+  db:   
+    restart: always
+    container_name: easy_accounts_db
+    image: mysql:8.0.31
+    ports:
+      - "10668:3306"
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: easy_accounts
+      MYSQL_DATABASE: yd_jz
+    volumes:
+      - ./Database/data:/var/lib/mysql
+      - ./Database/init:/docker-entrypoint-initdb.d
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+    networks:
+      - easy_accounts_net
+
+  # Nginx 前端服务 - 不再需要 API_BASE_URL
+  nginx:
+    restart: always
+    container_name: easy_accounts_nginx
+    image: 775495797/easyaccounts-nginx:latest
+    ports:
+      - "10669:80"  # 只需要暴露这一个端口，所有请求都通过这里
+    volumes:
+      - ./Resource:/usr/share/nginx/html/resources
+    depends_on:
+      - server
+      - ai
+    networks:
+      - easy_accounts_net
+
+  # 后端服务 - 不需要对外暴露端口
+  server:
+    restart: always
+    container_name: easy_accounts_server
+    image: 775495797/easyaccounts-server:latest
+    environment:
+      - DB_PASSWORD=easy_accounts
+      - SQL_BACKUP_TIME=00 34 13 * * ?
+      - ENABLE_LOGIN=false
+      - EXPIRED_TIME=120
+    volumes:
+      - ./Resource/sql:/Ledger/backup
+      - ./Resource/excel/month:/Ledger/excel/month
+      - ./Resource/excel/screen:/Ledger/excel/screen
+      - ./Resource/excel/analysis:/Ledger/excel/analysis
+      - ./Resource/images:/Ledger/images
+      - ./Server/logs:/Ledger/logs
+      - ./Server/auth:/Ledger/auth
+    # 不再需要暴露端口，通过内部网络通信
+    # ports:
+    #   - 10670:8081
+    depends_on:
+      - db
+    networks:
+      - easy_accounts_net
+  
+  # WebHook 服务
+  webhook:
+    image: 775495797/easyaccounts-webhook:latest
+    container_name: easy_accounts_webhook
+    restart: always
+    ports:
+      - "10671:8083"
+    volumes:
+      - ./WebHook:/app/
+    environment:
+      - TZ=Asia/Shanghai
+      - SEND_SQL_BACKUP=False
+      - LOG_FILE=/app/hook.log
+      - SEND_EXCEL=True
+      - SMTP_SERVER=smtp.qq.com
+      - SMTP_PORT=587
+      - SMTP_MAIL=your-email@qq.com
+      - SMTP_PASSWORD=your-password
+      - SMTP_TO_LIST=receiver@example.com
+    networks:
+      - easy_accounts_net
+
+  # AI 服务 - 不需要对外暴露端口
+  ai:
+    image: 775495797/easyaccounts-ai:latest
+    container_name: easy_accounts_ai
+    restart: always
+    environment:
+      - EASYACCOUNTS_URL=http://server:8081  # 内部服务通信
+      
+      # LLM 配置
+      - LLM_EASY_ACCOUNTS_API_KEY=your-api-key
+      - LLM_EASY_ACCOUNTS_URL=https://api.moonshot.cn/v1
+      - LLM_EASY_ACCOUNTS_MODEL=kimi-k2-0711-preview
+      
+    volumes:
+      - ./AI/database:/app/koalaq_hub_python/resource/database
+      - ./AI/logs:/app/logs
+    # 不再需要暴露端口，通过 nginx 代理
+    # ports:
+    #   - "8001:8001"
+    depends_on:
+      - server
+    networks:
+      - easy_accounts_net
+
+networks:
+  easy_accounts_net:

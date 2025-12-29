@@ -1,28 +1,41 @@
 <template>
   <div class="ai-plus-container">
-    <van-nav-bar
-      :title="currentTitle"
-      left-text="返回"
-      left-arrow
-      @click-left="$router.go(-1)"
-    >
+    <van-sticky>
+      <van-nav-bar
+        title="AI+"
+        left-text="返回"
+        left-arrow
+        @click-left="$router.go(-1)"
+      >
       <template #right>
-        <div 
-          class="connection-status" 
-          :class="{ clickable: !wsConnected }"
-          @click="handleConnectionClick"
-        >
-          <van-icon 
-            :name="wsConnected ? 'success' : 'warning-o'" 
-            :color="wsConnected ? '#07c160' : '#ff976a'"
-            size="14"
-          />
-          <span :style="{color: wsConnected ? '#07c160' : '#ff976a'}" class="status-text">
-            {{ wsConnected ? '已连接' : (reconnecting ? '连接中...' : '未连接') }}
-          </span>
+        <div class="nav-right-container">
+          <div 
+            class="connection-status" 
+            :class="{ clickable: !wsConnected }"
+            @click="handleConnectionClick"
+          >
+            <van-icon 
+              :name="wsConnected ? 'success' : 'warning-o'" 
+              :color="wsConnected ? '#07c160' : '#ff976a'"
+              size="12"
+            />
+            <span :style="{color: wsConnected ? '#07c160' : '#ff976a'}" class="status-text">
+              {{ wsConnected ? '已连接' : (reconnecting ? '连接中...' : '未连接') }}
+            </span>
+          </div>
+          <van-button 
+            type="primary" 
+            size="mini"
+            plain
+            @click="startNewConversation"
+            icon="plus"
+          >
+            新对话
+          </van-button>
         </div>
       </template>
-    </van-nav-bar>
+      </van-nav-bar>
+    </van-sticky>
     
     <div class="content-area">
       <!-- 消息列表区域 -->
@@ -39,7 +52,7 @@
             <div class="message-time">{{ message.timestamp }}</div>
           </div>
           
-          <div v-else-if="message.type === 'ai'" class="ai-message">
+          <div v-else-if="message.type === 'ai'" class="ai-message" :class="{ 'error-message': message.isError }">
             <!-- 思维链区域 -->
             <div v-if="message.hasReasoning" class="reasoning-section">
               <div class="reasoning-header" @click="toggleReasoning(message.id)">
@@ -62,11 +75,12 @@
           </div>
           
           <div v-else-if="message.type === 'tool'" class="tool-message" @click="showToolDetail(message)">
-            <div class="tool-content" :class="{ success: message.status, failed: !message.status }">
+            <div class="tool-content" :class="{ success: message.status === true, failed: message.status === false, loading: message.status === null }">
               <van-tag type="primary" size="mini">🔧 {{ message.toolName }}</van-tag>
               <div class="tool-status">
-                <van-icon :name="message.status ? 'success' : 'cross'" size="12" />
-                {{ message.status ? '执行成功' : '执行失败' }}
+                <van-loading v-if="message.status === null" type="spinner" size="12" />
+                <van-icon v-else :name="message.status ? 'success' : 'cross'" size="12" />
+                {{ message.status === null ? '执行中...' : (message.status ? '执行成功' : '执行失败') }}
               </div>
               <van-icon name="arrow" size="14" color="#969799" />
             </div>
@@ -101,46 +115,7 @@
     </div>
 
     <!-- 底部输入区域 -->
-    <van-sticky position="bottom">
-      <!-- 设置面板 -->
-      <div class="settings-panel">
-        <van-collapse v-model="activeNames" :border="false">
-          <van-collapse-item name="settings" title="对话设置">
-            <div class="settings-content">
-              <div class="setting-item">
-                <van-button 
-                  type="primary" 
-                  size="small" 
-                  plain 
-                  @click="startNewConversation"
-                  class="new-conversation-btn"
-                  icon="plus"
-                >
-                  开启新对话
-                </van-button>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-label">
-                  <van-icon name="bulb-o" size="16" />
-                  <span>思考模式</span>
-                </div>
-                <van-switch 
-                  v-model="thinkMode" 
-                  @change="onThinkModeChange"
-                  size="20"
-                />
-              </div>
-              
-              <div class="setting-desc" v-if="thinkMode">
-                <van-icon name="info-o" size="12" />
-                <span>AI将展示思考过程，回复可能较慢但更详细</span>
-              </div>
-            </div>
-          </van-collapse-item>
-        </van-collapse>
-      </div>
-      
+    <div class="input-container-wrapper">
       <div class="input-container">
         <div class="input-wrapper">
           <textarea
@@ -166,7 +141,7 @@
           发送
         </van-button>
       </div>
-    </van-sticky>
+    </div>
     
     <!-- 工具详情弹窗 -->
     <van-popup
@@ -211,7 +186,6 @@
 <script>
 import aiHttpService from '@/utils/ai-request.js';
 import aiWebSocketManager from '@/utils/websocket.js';
-import axios from 'axios';
 import MarkdownIt from 'markdown-it';
 import markdownItMultimdTable from 'markdown-it-multimd-table';
 import { showToast } from 'vant';
@@ -230,16 +204,11 @@ export default {
       sending: false, // 发送消息状态
       wsConnected: false,
       reconnecting: false, // 重连状态
-      // 动态标题
-      currentTitle: 'AI+', // 当前显示的标题
-      // 设置面板
-      activeNames: [], // 折叠面板状态
-      thinkMode: false, // 思考模式开关
       // 消息相关
       messages: [], // 消息列表
       currentMessage: '', // 当前正在拼接的AI消息
       currentReasoning: '', // 当前正在拼接的思维链内容
-      currentToolCall: null, // 当前工具调用信息
+      pendingToolCalls: new Map(), // 待处理的工具调用队列，使用Map存储 toolCallId -> messageId
       // 工具详情弹窗
       showToolDetailPopup: false,
       currentToolDetail: {
@@ -303,13 +272,11 @@ export default {
       this.messages = [];
       this.currentMessage = '';
       this.currentReasoning = '';
+      this.pendingToolCalls.clear(); // 清理待处理队列
       
       // 重置状态
       this.loading = false;
       this.sending = false;
-      
-      // 重置标题
-      this.updateTitle('AI+');
       
       showToast({
         type: 'success',
@@ -332,12 +299,12 @@ export default {
         return;
       }
       
-      // 添加用户消息到消息列表
+      // 添加用户消息到消息列表，并滚动到底部
       this.addMessage({
         type: 'user',
         content: messageContent,
         timestamp: new Date().toLocaleTimeString()
-      });
+      }, true);
       
       // 构造发送消息格式
       const message = {
@@ -369,36 +336,41 @@ export default {
       const uiMessages = [];
       
       for (const msg of apiMessages) {
-        if (msg.type === 'user') {
+        if (msg.role === 'user') {
           // 用户消息
           uiMessages.push({
             id: `history_${msg.message_id}`,
             type: 'user',
-            content: msg.content,
+            content: msg.text.content,
             timestamp: this.formatTimestamp(msg.timestamp)
           });
-        } else if (msg.type === 'segment') {
-          // AI回复消息
-          uiMessages.push({
-            id: `history_${msg.message_id}`,
-            type: 'ai',
-            content: msg.content,
-            reasoning: msg.reasoning_content || '', // 思维链内容
-            hasReasoning: !!(msg.reasoning_content && msg.reasoning_content.trim()), // 是否包含思维链
-            timestamp: this.formatTimestamp(msg.timestamp)
-          });
-        } else if (msg.type === 'tool') {
+        } else if (msg.role === 'assistant') {
+          // AI回复消息 - 只处理包含content的消息，跳过纯工具调用前的预备消息
+          if (msg.text && msg.text.content && !msg.message_id.includes('_content')) {
+            uiMessages.push({
+              id: `history_${msg.message_id}`,
+              type: 'ai',
+              content: msg.text.content,
+              reasoning: msg.text.reasoning_content || '', // 思维链内容
+              hasReasoning: !!(msg.text.reasoning_content && msg.text.reasoning_content.trim()), // 是否包含思维链
+              timestamp: this.formatTimestamp(msg.timestamp)
+            });
+          }
+        } else if (msg.role === 'tool') {
           // 工具调用消息
-          uiMessages.push({
-            id: `history_${msg.message_id}`,
-            type: 'tool',
-            content: msg.content, // 工具响应内容
-            toolName: msg.tool_name,
-            status: msg.status === 1,
-            timestamp: this.formatTimestamp(msg.timestamp),
-            toolCall: msg.object?.tool_call || '',
-            toolResponse: msg.object?.tool_response || msg.content
-          });
+          if (msg.tool) {
+            uiMessages.push({
+              id: `history_${msg.message_id}`,
+              type: 'tool',
+              content: `执行${msg.tool.tool_name}${msg.tool.tool_status === 1 ? '成功' : '失败'}`, 
+              toolName: msg.tool.tool_name,
+              toolCallId: msg.tool.tool_call_id || '', // 添加tool_call_id
+              status: msg.tool.tool_status === 1,
+              timestamp: this.formatTimestamp(msg.timestamp),
+              toolCall: msg.tool.tool_arguments || '',
+              toolResponse: msg.tool.tool_result || ''
+            });
+          }
         }
       }
       
@@ -454,14 +426,16 @@ export default {
     },
     
     // 添加消息到列表
-    addMessage(message) {
+    addMessage(message, shouldScroll = false) {
       const newMessage = {
         id: Date.now() + Math.random(),
         ...message
       };
       this.messages.push(newMessage);
-      // 立即滚动到底部
-      this.scrollToBottom();
+      // 只在指定时滚动到底部
+      if (shouldScroll) {
+        this.scrollToBottom();
+      }
     },
     
     // 滚动到底部
@@ -511,30 +485,16 @@ export default {
         this.loading = true;
         
         const url = `/api/v1/conversations/${this.conversationId}/messages`;
-        const fullUrl = `/ai-api${url}`;
         
-        // 使用原生axios避免baseURL问题
-        const response = await axios({
-          url: fullUrl,
-          method: 'get',
-          baseURL: '', // 使用相对路径，确保走代理
-          headers: {
-            'user_id': this.userId,
-            'Accept': '*/*',
-            'Connection': 'keep-alive'
-          }
-        });
+        // 使用 aiHttpService，它已经配置了正确的 baseURL 和 headers
+        const response = await aiHttpService.get(url);
         
-        if (response.data && response.data.data && response.data.data.messages) {
+        if (response && response.data && response.data.messages) {
           // 将API消息转换为UI消息格式，并反转顺序（API返回的是倒序）
-          const apiMessages = response.data.data.messages.reverse();
+          const apiMessages = response.data.messages.reverse();
           this.messages = this.parseHistoryMessages(apiMessages);
           
-          // 更新标题
-          if (response.data.data.title) {
-            this.updateTitle(response.data.data.title);
-          }
-          
+          // 历史消息加载完成后滚动到底部
           this.$nextTick(() => {
             this.scrollToBottom();
           });
@@ -591,8 +551,8 @@ export default {
         cleanupMessage
       ];
       
-      // 开始连接，传递思考模式参数
-      aiWebSocketManager.connect(this.userId, 'easy-accounts-agent', this.thinkMode);
+      // 开始连接，use_think_llm 固定为 false
+      aiWebSocketManager.connect(this.userId, 'easy-accounts-agent', false);
     },
     
     // 清理WebSocket监听器
@@ -638,11 +598,11 @@ export default {
         case 'tool_response':
           this.handleToolResponseMessage(data);
           break;
-        case 'title':
-          this.handleTitleMessage(data);
-          break;
         case 'exit':
           this.handleExitMessage(data);
+          break;
+        case 'error':
+          this.handleErrorMessage(data);
           break;
       }
     },
@@ -662,8 +622,7 @@ export default {
         }
         
         this.loading = false; // 开始接收内容时停止loading
-        // 实时滚动到底部，方便查看正在输入的内容
-        this.scrollToBottom();
+        // 接收消息时不自动滚动
       }
     },
     
@@ -679,7 +638,7 @@ export default {
             uiMessage.reasoning = this.currentReasoning;
             uiMessage.hasReasoning = true;
           }
-          this.addMessage(uiMessage);
+          this.addMessage(uiMessage); // 接收AI消息时不滚动
         }
       }
       
@@ -691,59 +650,127 @@ export default {
     
     // 处理tool_call消息（工具调用）
     handleToolCallMessage(data) {
-      const toolName = data.text || data.object?.tool || '未知工具';
+      const toolName = data.object?.tool_name || data.text || '未知工具';
+      const toolCallId = data.object?.tool_call_id || `tool_${Date.now()}`;
+      const toolArguments = data.object?.tool_arguments || '';
       
-      // 保存当前工具调用信息，等待响应
-      this.currentToolCall = {
-        id: Date.now() + Math.random(),
-        name: toolName,
-        arguments: data.object?.arguments || {},
+      console.log('收到tool_call:', { toolName, toolCallId });
+      
+      // 检查是否已在待处理队列中
+      if (this.pendingToolCalls.has(toolCallId)) {
+        console.log('tool_call已在队列中，跳过:', toolCallId);
+        return;
+      }
+      
+      // 创建唯一的消息ID
+      const messageId = `tool_msg_${toolCallId}_${Date.now()}`;
+      
+      // 添加到待处理队列
+      this.pendingToolCalls.set(toolCallId, messageId);
+      
+      // 添加工具调用消息（loading状态）
+      this.addMessage({
+        id: messageId,
+        type: 'tool',
+        content: `执行${toolName}中...`,
+        toolName: toolName,
+        toolCallId: toolCallId, // 保存tool_call_id用于后续匹配
+        status: null, // null表示正在执行
         timestamp: new Date().toLocaleTimeString(),
-        status: null // 等待响应
-      };
+        toolCall: toolArguments,
+        toolResponse: ''
+      }); // 工具执行时不滚动
     },
     
     // 处理tool_response消息（工具响应）
     handleToolResponseMessage(data) {
-      const toolName = data.text || data.object?.tool_name || '未知工具';
+      const toolName = data.object?.tool_name || data.text || '未知工具';
+      const toolCallId = data.object?.tool_call_id || '';
+      const toolResponse = data.object?.tool_response || '';
       const isSuccess = data.status === true;
       
-      if (this.currentToolCall && this.currentToolCall.name === toolName) {
-        // 更新工具调用状态并添加到消息列表
-        this.currentToolCall.status = isSuccess;
-        this.currentToolCall.result = data.object?.result || '';
+      console.log('收到tool_response:', { toolName, toolCallId, isSuccess });
+      
+      // 首先检查待处理队列
+      if (this.pendingToolCalls.has(toolCallId)) {
+        const messageId = this.pendingToolCalls.get(toolCallId);
         
-        // 使用新的解析方法
-        const toolData = {
-          toolName: this.currentToolCall.name,
-          status: isSuccess,
-          toolCall: JSON.stringify(this.currentToolCall.arguments, null, 2),
-          toolResponse: this.currentToolCall.result
-        };
+        // 通过消息ID查找对应的工具消息
+        const toolMessage = this.messages.find(msg => msg.id === messageId);
         
-        const uiMessage = this.parseWebSocketMessage(toolData, 'tool_complete');
-        if (uiMessage) {
-          this.addMessage(uiMessage);
+        if (toolMessage) {
+          // 更新找到的工具消息
+          toolMessage.content = `执行${toolName}${isSuccess ? '成功' : '失败'}`;
+          toolMessage.status = isSuccess;
+          toolMessage.toolResponse = toolResponse;
+          
+          // 从待处理队列中移除
+          this.pendingToolCalls.delete(toolCallId);
+          console.log('成功匹配并更新tool_call:', toolCallId);
+          return;
         }
-        
-        this.currentToolCall = null;
+      }
+      
+      // 如果队列中没有，尝试通过toolCallId直接查找（兼容历史消息）
+      const toolMessage = this.messages.find(msg => 
+        msg.type === 'tool' && msg.toolCallId === toolCallId && msg.status === null
+      );
+      
+      if (toolMessage) {
+        // 更新找到的工具消息
+        toolMessage.content = `执行${toolName}${isSuccess ? '成功' : '失败'}`;
+        toolMessage.status = isSuccess;
+        toolMessage.toolResponse = toolResponse;
+        console.log('通过toolCallId匹配并更新:', toolCallId);
+      } else {
+        // 如果都没找到，创建新消息
+        console.warn(`未找到对应的tool_call消息，创建新响应消息:`, toolCallId);
+        this.addMessage({
+          id: `tool_response_${toolCallId}_${Date.now()}`,
+          type: 'tool',
+          content: `执行${toolName}${isSuccess ? '成功' : '失败'}`,
+          toolName: toolName,
+          toolCallId: toolCallId,
+          status: isSuccess,
+          timestamp: new Date().toLocaleTimeString(),
+          toolCall: '', // 没有原始调用参数
+          toolResponse: toolResponse
+        });
       }
     },
     
-    // 处理title消息（标题更新）
-    handleTitleMessage(data) {
-      if (data.text) {
-        this.updateTitle(data.text);
-        console.log('标题已更新:', data.text);
-      }
-    },
     
     // 处理exit消息（对话结束）
     handleExitMessage(data) {
       // 一轮对话结束，重置发送状态
       this.sending = false;
       this.loading = false;
+      // 清理未完成的工具调用（如果有）
+      if (this.pendingToolCalls.size > 0) {
+        console.log('清理未完成的工具调用:', Array.from(this.pendingToolCalls.keys()));
+        this.pendingToolCalls.clear();
+      }
       console.log('对话轮次结束:', data);
+    },
+    
+    // 处理error消息（错误处理）
+    handleErrorMessage(data) {
+      // 重置所有状态
+      this.sending = false;
+      this.loading = false;
+      this.currentMessage = '';
+      this.currentReasoning = '';
+      this.pendingToolCalls.clear(); // 清理待处理队列
+      
+      // 添加错误消息到聊天界面
+      this.addMessage({
+        type: 'ai',
+        content: `❌ 抱歉，处理您的请求时出现了错误：\n\n${data.object?.message || data.text || '未知错误'}\n\n请稍后重试或重新开始对话。`,
+        timestamp: new Date().toLocaleTimeString(),
+        isError: true // 标记为错误消息
+      });
+      
+      console.error('WebSocket错误消息:', data);
     },
     
     // 显示工具详情
@@ -825,19 +852,6 @@ export default {
       }
     },
     
-    // 思考模式开关变化
-    onThinkModeChange(value) {
-      console.log('思考模式:', value ? '开启' : '关闭');
-      
-      // 如果WebSocket已连接且模式发生变化，需要重新连接
-      if (this.wsConnected) {
-        this.disconnectWebSocket();
-        // 延迟重连，确保断开完成
-        setTimeout(() => {
-          this.initWebSocket();
-        }, 500);
-      }
-    },
     
     // 处理连接状态点击
     handleConnectionClick() {
@@ -875,13 +889,6 @@ export default {
       }, 1000);
     },
     
-    // 更新标题
-    updateTitle(title) {
-      if (title && title.trim()) {
-        this.currentTitle = title.trim();
-      }
-    },
-    
     // 切换思维链展开/折叠状态
     toggleReasoning(messageId) {
       const message = this.messages.find(msg => msg.id === messageId);
@@ -905,12 +912,13 @@ export default {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden; /* 强制隐藏水平滚动 */
+  height: calc(100vh - 54px); /* 只需减去顶部导航栏高度 */
 }
 
 .messages-container {
   padding: 16px;
-  padding-bottom: 80px;
-  min-height: calc(100vh - 120px);
+  padding-bottom: 100px; /* 增加底部padding，为固定输入框留出空间 */
+  min-height: calc(100vh - 54px);
   overflow-x: hidden; /* 强制隐藏水平滚动 */
 }
 
@@ -933,7 +941,8 @@ export default {
 .user-message .message-content {
   background: #1989fa;
   color: white;
-  padding: 12px 16px;
+  padding: 10px 12px;
+  font-size: 13px;
   border-radius: 18px 18px 4px 18px;
   display: inline-block;
   word-wrap: break-word;
@@ -942,7 +951,8 @@ export default {
 .ai-message .message-content {
   background: #f7f8fa;
   color: #323233;
-  padding: 12px 16px;
+  padding: 10px 12px;
+  font-size: 13px;
   border-radius: 18px 18px 18px 4px;
   display: block; /* 改为block，避免inline-block被内容撑开 */
   word-wrap: break-word;
@@ -956,8 +966,14 @@ export default {
   border: 1px dashed #1989fa;
 }
 
+.ai-message.error-message .message-content {
+  background: #fff2f0;
+  border: 1px solid #ffb3b3;
+  color: #ff4d4f;
+}
+
 .message-time {
-  font-size: 12px;
+  font-size: 11px;
   color: #969799;
   margin-top: 4px;
 }
@@ -967,7 +983,7 @@ export default {
 }
 
 .typing-indicator {
-  font-size: 12px;
+  font-size: 11px;
   color: #1989fa;
   margin-top: 4px;
   font-style: italic;
@@ -996,6 +1012,24 @@ export default {
 .tool-content.failed {
   background: #fff2f0;
   border-color: #ffb3b3;
+}
+
+.tool-content.loading {
+  background: #fff9e6;
+  border-color: #ffc107;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .tool-content:active {
@@ -1028,17 +1062,24 @@ export default {
   margin: 16px 0;
 }
 
+/* 导航栏右侧容器 */
+.nav-right-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .connection-status {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   transition: all 0.2s ease;
 }
 
 .connection-status.clickable {
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 12px;
+  padding: 2px 6px;
+  border-radius: 8px;
   background: rgba(255, 151, 106, 0.1);
 }
 
@@ -1202,13 +1243,27 @@ export default {
 }
 
 
+/* 输入容器包装器 */
+.input-container-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  border-top: 1px solid #ebedf0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  /* 确保在键盘弹起时紧贴键盘 */
+  padding-bottom: env(safe-area-inset-bottom);
+  /* 移动端视口单位，确保跟随键盘 */
+  bottom: env(keyboard-inset-height, 0);
+}
+
 .input-container {
   display: flex;
   align-items: flex-end;
   padding: 12px 16px;
   background-color: #fff;
-  border-top: 1px solid #ebedf0;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   gap: 12px;
 }
 

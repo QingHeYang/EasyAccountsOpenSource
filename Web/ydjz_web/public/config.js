@@ -1,16 +1,12 @@
 window.config = {
-  //apiBaseUrl: "http://192.168.50.226:10670",
-  apiBaseUrl: "${API_BASE_URL}",
-  // AI服务使用apiBaseUrl的主机，端口改为10680
-  get aiApiUrl() {
-    const url = new URL(this.apiBaseUrl);
-    url.port = '10680';
-    return url.toString();
-  },
+  // 使用相对路径，通过 nginx 代理
+  apiBaseUrl: "/api",
+  aiApiUrl: "/ai",
   get aiWebSocketUrl() {
-    const url = new URL(this.apiBaseUrl);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    url.port = '10680';
-    return url.toString();
+    // 根据当前页面协议自动选择 ws 或 wss
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    // 返回基础 WebSocket URL，不包含 /ws 路径
+    return `${protocol}//${host}`;
   }
 };

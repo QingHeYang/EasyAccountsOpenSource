@@ -11,14 +11,19 @@ class AIWebSocketManager {
     this.errorCallbacks = new Set();
   }
 
-  connect(userId = 'user_67ce21d6-a11c-4340-851b-7a8949906aa3', appId = 'easy-accounts-agent', useThinkLlm = false) {
+  connect(userId = 'user_67ce21d6-a11c-4340-851b-7a8949906aa3', agentId = 'easy-accounts-agent', useThinkLlm = false) {
     if (this.isConnected || this.websocket) {
       return;
     }
 
     try {
+      // 从localStorage获取token
+      const token = localStorage.getItem('token') || '';
+      // 格式化为 Authorization=xxx
+      const toolTokens = token ? `Authorization=${token}` : '';
+      
       const baseUrl = window.config?.aiWebSocketUrl || 'ws://localhost:8001';
-      const wsUrl = `${baseUrl}/ws/chat?user_id=${userId}&app_id=${appId}&use_think_llm=${useThinkLlm}`;
+      const wsUrl = `${baseUrl}/ws/chat?user_id=${userId}&agent_id=${agentId}&use_think_llm=${useThinkLlm}&tool_tokens=${encodeURIComponent(toolTokens)}`;
       console.log('连接WebSocket:', wsUrl);
       this.websocket = new WebSocket(wsUrl);
 
