@@ -1,7 +1,19 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onUnmounted } from 'vue'
-import { ChatLineSquare, Close, Loading } from '@element-plus/icons-vue'
-import { useChatService, useMessageStore } from '@shared/services/chat'
+import { ref, watch, nextTick, onUnmounted, computed } from 'vue'
+import {
+  ChatLineSquare,
+  Close,
+  Loading,
+  ArrowDown,
+  ArrowRight,
+  Refresh,
+  DocumentCopy,
+  CircleCheck,
+  CircleClose
+} from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import MarkdownIt from 'markdown-it'
+import { useChatService, useMessageStore, type UnifiedMessage } from '@shared/services/chat'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -13,28 +25,74 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
 
+// Markdown 渲染器
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  breaks: true
+})
+
 // Chat 服务
 const {
   connectionState,
   isStreaming,
+  title,
   connect,
   disconnect,
   sendMessage: sendChatMessage,
-  newConversation
+  newConversation,
+  loadConversation
 } = useChatService()
 
 // 消息存储
-const { mainMessages } = useMessageStore()
+const { mainMessages, clearMessages } = useMessageStore()
 
-// 输入框和消息容器引用
+// 本地状态
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const sending = ref(false)
 
-// 抽屉打开时连接 WebSocket
+// 思维链展开状态（记录每个消息ID是否展开）
+const reasoningExpanded = ref<Record<string, boolean>>({})
+
+// 工具详情弹窗
+const toolDetailVisible = ref(false)
+const currentToolDetail = ref<{
+  name: string
+  status: 'pending' | 'success' | 'error'
+  arguments: Record<string, unknown>
+  result: string
+}>({
+  name: '',
+  status: 'pending',
+  arguments: {},
+  result: ''
+})
+
+// 对话 ID 持久化
+const CONVERSATION_KEY = 'ai_conversation_id'
+
+function saveConversationId(id: string) {
+  if (id) {
+    localStorage.setItem(CONVERSATION_KEY, id)
+  }
+}
+
+function getSavedConversationId(): string | null {
+  return localStorage.getItem(CONVERSATION_KEY)
+}
+
+function clearSavedConversationId() {
+  localStorage.removeItem(CONVERSATION_KEY)
+}
+
+// 抽屉打开时连接 WebSocket 并加载历史
 watch(() => props.modelValue, async (isOpen) => {
   if (isOpen && connectionState.value !== 'connected') {
     try {
-      await connect()
+      const savedId = getSavedConversationId()
+      await connect(savedId || undefined)
       console.log('[AIDrawer] WebSocket 已连接')
     } catch (error) {
       console.error('[AIDrawer] WebSocket 连接失败', error)
@@ -44,11 +102,7 @@ watch(() => props.modelValue, async (isOpen) => {
 
 // 消息变化时滚动到底部
 watch(mainMessages, () => {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-    }
-  })
+  scrollToBottom()
 }, { deep: true })
 
 // 组件卸载时断开连接
@@ -56,16 +110,40 @@ onUnmounted(() => {
   disconnect()
 })
 
+// 滚动到底部
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  })
+}
+
+// 关闭抽屉
 function close() {
   emit('update:modelValue', false)
 }
 
-function handleSend() {
-  if (!inputText.value.trim() || isStreaming.value) return
-  sendChatMessage(inputText.value)
-  inputText.value = ''
+// 发送消息
+async function handleSend() {
+  if (!inputText.value.trim() || sending.value || isStreaming.value) return
+
+  const content = inputText.value.trim()
+  sending.value = true
+
+  try {
+    const success = sendChatMessage(content)
+    if (success) {
+      inputText.value = ''
+    } else {
+      ElMessage.error('发送失败，请检查连接状态')
+    }
+  } finally {
+    sending.value = false
+  }
 }
 
+// 键盘事件
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -73,162 +151,353 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+// 新建对话
 function handleNewConversation() {
+  clearSavedConversationId()
+  clearMessages()
   newConversation()
+  reasoningExpanded.value = {}
+  ElMessage.success('已开启新对话')
 }
 
-// 获取连接状态文本
-function getConnectionText() {
-  switch (connectionState.value) {
-    case 'connecting': return '连接中...'
-    case 'connected': return '已连接'
-    case 'error': return '连接失败'
-    default: return '未连接'
+// 重新连接
+async function handleReconnect() {
+  if (connectionState.value === 'connecting') return
+
+  try {
+    disconnect()
+    await connect()
+    ElMessage.success('重连成功')
+  } catch {
+    ElMessage.error('重连失败')
   }
 }
+
+// 切换思维链展开
+function toggleReasoning(msgId: string) {
+  reasoningExpanded.value[msgId] = !reasoningExpanded.value[msgId]
+}
+
+// 判断思维链是否展开
+function isReasoningExpanded(msgId: string): boolean {
+  return reasoningExpanded.value[msgId] || false
+}
+
+// 显示工具详情
+function showToolDetail(msg: UnifiedMessage) {
+  currentToolDetail.value = {
+    name: msg.tool.name,
+    status: msg.tool.status,
+    arguments: msg.tool.arguments,
+    result: msg.tool.result
+  }
+  toolDetailVisible.value = true
+}
+
+// 格式化 JSON
+function formatJson(data: unknown): string {
+  if (!data) return '暂无数据'
+  try {
+    if (typeof data === 'string') {
+      const parsed = JSON.parse(data)
+      return JSON.stringify(parsed, null, 2)
+    }
+    return JSON.stringify(data, null, 2)
+  } catch {
+    return String(data)
+  }
+}
+
+// 复制文本
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
+// 渲染 Markdown
+function renderMarkdown(text: string): string {
+  if (!text) return ''
+  let html = md.render(text)
+
+  // 为表格添加滚动容器
+  html = html.replace(/<table([^>]*)>/g, '<div class="table-wrapper"><table$1>')
+  html = html.replace(/<\/table>/g, '</table></div>')
+
+  return html
+}
+
+// 格式化时间
+function formatTime(timestamp: string): string {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+// 获取连接状态
+const connectionInfo = computed(() => {
+  switch (connectionState.value) {
+    case 'connecting':
+      return { text: '连接中...', class: 'connecting', clickable: false }
+    case 'connected':
+      return { text: '已连接', class: 'connected', clickable: false }
+    case 'error':
+      return { text: '连接失败', class: 'error', clickable: true }
+    default:
+      return { text: '未连接', class: 'disconnected', clickable: true }
+  }
+})
+
+// 判断是否可发送
+const canSend = computed(() => {
+  return inputText.value.trim() &&
+    connectionState.value === 'connected' &&
+    !sending.value &&
+    !isStreaming.value
+})
 </script>
 
 <template>
   <aside class="ai-drawer" :class="{ open: modelValue }">
+    <!-- 头部 -->
     <div class="drawer-header">
       <div class="drawer-title">
         <el-icon :size="20"><ChatLineSquare /></el-icon>
         <span>AI 助手</span>
-        <span class="connection-status" :class="connectionState">
-          {{ getConnectionText() }}
+        <span
+          class="connection-status"
+          :class="connectionInfo.class"
+          @click="connectionInfo.clickable && handleReconnect()"
+        >
+          {{ connectionInfo.text }}
         </span>
       </div>
       <div class="header-actions">
-        <el-button text size="small" @click="handleNewConversation">新对话</el-button>
+        <el-button text size="small" @click="handleNewConversation">
+          <el-icon><Refresh /></el-icon>
+          新对话
+        </el-button>
         <el-button :icon="Close" circle size="small" @click="close" />
       </div>
     </div>
 
+    <!-- 对话标题 -->
+    <div v-if="title" class="conversation-title">
+      {{ title }}
+    </div>
+
+    <!-- 消息列表 -->
     <div class="drawer-body" ref="messagesContainer">
-      <!-- 消息列表 -->
       <div class="messages-list">
-        <div
-          v-for="msg in mainMessages"
-          :key="msg.id"
-          class="message-item"
-          :class="msg.role"
-        >
+        <template v-for="msg in mainMessages" :key="msg.id">
           <!-- 用户消息 -->
-          <template v-if="msg.role === 'user'">
+          <div v-if="msg.role === 'user'" class="message-item user">
             <div class="message-bubble user-bubble">
-              {{ msg.content.text }}
+              <div class="message-text">{{ msg.content.text }}</div>
             </div>
-          </template>
+            <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+          </div>
 
           <!-- AI 消息 -->
-          <template v-else-if="msg.role === 'assistant'">
+          <div v-else-if="msg.role === 'assistant'" class="message-item assistant">
             <div class="message-bubble assistant-bubble">
-              <div v-if="msg.content.reasoning" class="reasoning-text">
-                <span class="reasoning-label">思考：</span>
-                {{ msg.content.reasoning }}
+              <!-- 思维链（可折叠） -->
+              <div v-if="msg.content.reasoning" class="reasoning-section">
+                <div class="reasoning-header" @click="toggleReasoning(msg.id)">
+                  <el-icon :size="14">
+                    <component :is="isReasoningExpanded(msg.id) ? ArrowDown : ArrowRight" />
+                  </el-icon>
+                  <span class="reasoning-label">思考过程</span>
+                </div>
+                <div v-show="isReasoningExpanded(msg.id)" class="reasoning-content">
+                  {{ msg.content.reasoning }}
+                </div>
               </div>
-              <div class="content-text">
-                {{ msg.content.text }}
-                <span v-if="msg.content.isStreaming" class="typing-cursor">|</span>
+
+              <!-- 正文内容 -->
+              <div
+                class="message-content markdown-body"
+                v-html="renderMarkdown(msg.content.text)"
+              ></div>
+
+              <!-- 流式光标 -->
+              <span v-if="msg.content.isStreaming" class="typing-cursor">|</span>
+
+              <!-- 复制按钮 -->
+              <div v-if="msg.content.text && !msg.content.isStreaming" class="message-actions">
+                <el-button
+                  text
+                  size="small"
+                  @click="copyText(msg.content.text)"
+                >
+                  <el-icon><DocumentCopy /></el-icon>
+                </el-button>
               </div>
             </div>
-          </template>
+            <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+          </div>
 
           <!-- 工具调用 -->
-          <template v-else-if="msg.role === 'tool'">
-            <div class="message-bubble tool-bubble">
+          <div v-else-if="msg.role === 'tool'" class="message-item tool">
+            <div
+              class="message-bubble tool-bubble"
+              :class="msg.tool.status"
+              @click="showToolDetail(msg)"
+            >
               <div class="tool-header">
-                <el-icon v-if="msg.tool.status === 'pending'" class="spin">
+                <el-icon v-if="msg.tool.status === 'pending'" class="spin" :size="14">
                   <Loading />
+                </el-icon>
+                <el-icon v-else-if="msg.tool.status === 'success'" :size="14" class="tool-icon success">
+                  <CircleCheck />
+                </el-icon>
+                <el-icon v-else :size="14" class="tool-icon error">
+                  <CircleClose />
                 </el-icon>
                 <span class="tool-name">{{ msg.tool.name }}</span>
-                <span class="tool-status" :class="msg.tool.status">
-                  {{ msg.tool.status === 'pending' ? '执行中' : msg.tool.status === 'success' ? '成功' : '失败' }}
+                <span class="tool-status-text">
+                  {{ msg.tool.status === 'pending' ? '执行中...' : msg.tool.status === 'success' ? '执行成功' : '执行失败' }}
                 </span>
-              </div>
-              <div v-if="msg.tool.result" class="tool-result">
-                {{ msg.tool.result }}
+                <el-icon class="tool-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
-          </template>
+          </div>
 
-          <!-- 智能体调用 -->
-          <template v-else-if="msg.role === 'agent'">
-            <div class="message-bubble agent-bubble">
+          <!-- 子智能体 -->
+          <div v-else-if="msg.role === 'agent'" class="message-item agent">
+            <div class="message-bubble agent-bubble" :class="msg.agent.status">
               <div class="agent-header">
-                <el-icon v-if="msg.agent.status === 'pending'" class="spin">
+                <el-icon v-if="msg.agent.status === 'pending'" class="spin" :size="14">
                   <Loading />
                 </el-icon>
-                <span class="agent-name">子智能体: {{ msg.agent.agentId }}</span>
+                <span class="agent-label">子智能体</span>
+                <span class="agent-id">{{ msg.agent.agentId }}</span>
               </div>
               <div v-if="msg.agent.input" class="agent-input">
-                输入: {{ msg.agent.input }}
+                <span class="label">输入：</span>{{ msg.agent.input }}
               </div>
               <div v-if="msg.agent.output" class="agent-output">
                 {{ msg.agent.output }}
               </div>
             </div>
-          </template>
-        </div>
+          </div>
+        </template>
       </div>
 
       <!-- 空状态 -->
-      <div v-if="mainMessages.length === 0" class="empty-hint">
-        <p>开始和 AI 助手对话吧</p>
+      <div v-if="mainMessages.length === 0" class="empty-state">
+        <div class="empty-icon">💬</div>
+        <p class="empty-text">有什么可以帮你的吗？</p>
+        <p class="empty-hint">输入问题开始对话</p>
       </div>
     </div>
 
+    <!-- 底部输入区 -->
     <div class="drawer-footer">
-      <el-input
-        v-model="inputText"
-        type="textarea"
-        placeholder="输入消息..."
-        :disabled="connectionState !== 'connected'"
-        :autosize="{ minRows: 1, maxRows: 6 }"
-        :maxlength="500"
-        show-word-limit
-        resize="none"
-        @keydown="handleKeydown"
-      />
+      <div class="input-wrapper">
+        <el-input
+          v-model="inputText"
+          type="textarea"
+          placeholder="输入消息，Shift+Enter 换行"
+          :disabled="connectionState !== 'connected'"
+          :autosize="{ minRows: 1, maxRows: 6 }"
+          :maxlength="500"
+          show-word-limit
+          resize="none"
+          @keydown="handleKeydown"
+        />
+      </div>
       <el-button
         type="primary"
-        :disabled="!inputText.trim() || connectionState !== 'connected'"
-        :loading="isStreaming"
+        :disabled="!canSend"
+        :loading="sending || isStreaming"
         @click="handleSend"
       >
-        发送
+        {{ isStreaming ? '生成中' : '发送' }}
       </el-button>
     </div>
+
+    <!-- 工具详情弹窗 -->
+    <el-dialog
+      v-model="toolDetailVisible"
+      :title="`🔧 ${currentToolDetail.name}`"
+      width="600px"
+      class="tool-detail-dialog"
+      append-to-body
+    >
+      <div class="tool-detail-content">
+        <!-- 状态 -->
+        <div class="detail-status" :class="currentToolDetail.status">
+          <el-icon v-if="currentToolDetail.status === 'success'"><CircleCheck /></el-icon>
+          <el-icon v-else-if="currentToolDetail.status === 'error'"><CircleClose /></el-icon>
+          <el-icon v-else class="spin"><Loading /></el-icon>
+          <span>
+            {{ currentToolDetail.status === 'success' ? '执行成功' : currentToolDetail.status === 'error' ? '执行失败' : '执行中...' }}
+          </span>
+        </div>
+
+        <!-- 调用参数 -->
+        <div class="detail-section">
+          <div class="section-title">
+            <span>📥 调用参数</span>
+            <el-button text size="small" @click="copyText(formatJson(currentToolDetail.arguments))">
+              <el-icon><DocumentCopy /></el-icon>
+            </el-button>
+          </div>
+          <div class="console-box">
+            <pre class="console-text">{{ formatJson(currentToolDetail.arguments) }}</pre>
+          </div>
+        </div>
+
+        <!-- 返回结果 -->
+        <div class="detail-section">
+          <div class="section-title">
+            <span>📤 返回结果</span>
+            <el-button text size="small" @click="copyText(currentToolDetail.result)">
+              <el-icon><DocumentCopy /></el-icon>
+            </el-button>
+          </div>
+          <div class="console-box">
+            <pre class="console-text">{{ formatJson(currentToolDetail.result) }}</pre>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </aside>
 </template>
 
 <style scoped>
+/* ==================== 抽屉容器 ==================== */
 .ai-drawer {
   position: fixed;
   top: 0;
-  right: -460px;
-  width: 460px;
+  right: -480px;
+  width: 480px;
   height: 100vh;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--color-bg-card);
+  border-left: 1px solid var(--color-border);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   z-index: 200;
-  transition: right 0.3s ease;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ai-drawer.open {
   right: 0;
 }
 
+/* ==================== 头部 ==================== */
 .drawer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-card);
 }
 
 .drawer-title {
@@ -250,44 +519,67 @@ function getConnectionText() {
 .connection-status {
   font-size: 11px;
   font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin-left: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  transition: all 0.2s;
 }
 
 .connection-status.disconnected {
   background: rgba(150, 150, 150, 0.15);
-  color: #888;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.connection-status.disconnected:hover {
+  background: rgba(150, 150, 150, 0.25);
 }
 
 .connection-status.connecting {
-  background: rgba(250, 173, 20, 0.15);
-  color: #d48806;
+  background: var(--color-note-bg, rgba(250, 173, 20, 0.15));
+  color: var(--color-note);
   animation: pulse 1.5s infinite;
 }
 
 .connection-status.connected {
-  background: rgba(82, 196, 26, 0.15);
-  color: #389e0d;
+  background: var(--color-income-bg);
+  color: var(--color-income);
 }
 
 .connection-status.error {
-  background: rgba(255, 77, 79, 0.15);
-  color: #cf1322;
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
+  cursor: pointer;
+}
+
+.connection-status.error:hover {
+  background: rgba(245, 34, 45, 0.25);
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.6; }
 }
 
+/* 对话标题 */
+.conversation-title {
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-page);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==================== 消息列表 ==================== */
 .drawer-body {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
 }
 
-/* 消息列表 */
 .messages-list {
   display: flex;
   flex-direction: column;
@@ -296,53 +588,176 @@ function getConnectionText() {
 
 .message-item {
   display: flex;
+  flex-direction: column;
+  max-width: 90%;
 }
 
 .message-item.user {
-  justify-content: flex-end;
+  align-self: flex-end;
+  align-items: flex-end;
 }
 
 .message-item.assistant,
 .message-item.tool,
 .message-item.agent {
-  justify-content: flex-start;
+  align-self: flex-start;
+  align-items: flex-start;
 }
 
+/* 消息气泡 */
 .message-bubble {
-  max-width: 85%;
   padding: 12px 16px;
   border-radius: 16px;
   font-size: 14px;
   line-height: 1.6;
   word-break: break-word;
+  position: relative;
 }
 
+/* 用户气泡 */
 .user-bubble {
   background: var(--color-transfer);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
 
+/* AI 气泡 */
 .assistant-bubble {
   background: var(--color-bg-page);
   color: var(--color-text-primary);
   border-bottom-left-radius: 4px;
 }
 
-.reasoning-text {
-  font-size: 12px;
+/* 消息时间 */
+.message-time {
+  font-size: 11px;
   color: var(--color-text-tertiary);
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+/* ==================== 思维链 ==================== */
+.reasoning-section {
+  margin-bottom: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(24, 144, 255, 0.05);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.reasoning-header:hover {
+  background: rgba(24, 144, 255, 0.1);
 }
 
 .reasoning-label {
+  font-size: 12px;
+  color: var(--color-transfer);
   font-weight: 500;
 }
 
+.reasoning-content {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  border-top: 1px solid var(--color-border);
+  background: rgba(24, 144, 255, 0.02);
+}
+
+/* ==================== Markdown 内容 ==================== */
+.message-content {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.message-content :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.message-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-content :deep(code) {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+.message-content :deep(pre) {
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-content :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.message-content :deep(ul),
+.message-content :deep(ol) {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.message-content :deep(li) {
+  margin: 4px 0;
+}
+
+.message-content :deep(blockquote) {
+  border-left: 4px solid var(--color-transfer);
+  background: rgba(24, 144, 255, 0.05);
+  padding: 8px 12px;
+  margin: 8px 0;
+  color: var(--color-text-secondary);
+}
+
+.message-content :deep(.table-wrapper) {
+  overflow-x: auto;
+  margin: 8px 0;
+  border-radius: 8px;
+}
+
+.message-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 300px;
+}
+
+.message-content :deep(th),
+.message-content :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.message-content :deep(th) {
+  background: var(--color-bg-page);
+  font-weight: 600;
+}
+
+/* 光标 */
 .typing-cursor {
   animation: blink 1s infinite;
+  color: var(--color-transfer);
+  font-weight: bold;
 }
 
 @keyframes blink {
@@ -350,58 +765,153 @@ function getConnectionText() {
   50% { opacity: 0; }
 }
 
-.tool-bubble,
-.agent-bubble {
+/* 消息操作 */
+.message-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.assistant-bubble:hover .message-actions {
+  opacity: 1;
+}
+
+/* ==================== 工具调用 ==================== */
+.tool-bubble {
   background: var(--color-transfer-bg);
   border: 1px solid rgba(24, 144, 255, 0.2);
   border-bottom-left-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.tool-header,
+.tool-bubble:hover {
+  background: rgba(24, 144, 255, 0.15);
+}
+
+.tool-bubble.success {
+  border-color: rgba(82, 196, 26, 0.3);
+}
+
+.tool-bubble.error {
+  border-color: rgba(245, 34, 45, 0.3);
+}
+
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-name {
+  font-weight: 500;
+  color: var(--color-transfer);
+}
+
+.tool-status-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+
+.tool-icon.success {
+  color: var(--color-income);
+}
+
+.tool-icon.error {
+  color: var(--color-expense);
+}
+
+.tool-arrow {
+  color: var(--color-text-tertiary);
+}
+
+/* ==================== 子智能体 ==================== */
+.agent-bubble {
+  background: rgba(250, 173, 20, 0.1);
+  border: 1px solid rgba(250, 173, 20, 0.2);
+  border-bottom-left-radius: 4px;
+}
+
 .agent-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.agent-label {
+  font-size: 12px;
+  color: var(--color-note);
   font-weight: 500;
-  color: var(--color-text-secondary);
 }
 
-.tool-name,
-.agent-name {
-  color: var(--color-transfer);
+.agent-id {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 
-.tool-status {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 8px;
-}
-
-.tool-status.pending {
-  background: rgba(250, 173, 20, 0.15);
-  color: #d48806;
-}
-
-.tool-status.success {
-  background: rgba(82, 196, 26, 0.15);
-  color: #389e0d;
-}
-
-.tool-status.error {
-  background: rgba(255, 77, 79, 0.15);
-  color: #cf1322;
-}
-
-.tool-result,
 .agent-input,
 .agent-output {
-  margin-top: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-secondary);
-  white-space: pre-wrap;
+  margin-top: 6px;
 }
 
+.agent-input .label {
+  color: var(--color-text-tertiary);
+}
+
+/* ==================== 空状态 ==================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-text {
+  font-size: 16px;
+  color: var(--color-text-primary);
+  margin: 0 0 8px 0;
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+/* ==================== 底部输入区 ==================== */
+.drawer-footer {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+}
+
+.input-wrapper {
+  flex: 1;
+}
+
+.drawer-footer .el-button {
+  flex-shrink: 0;
+  height: 36px;
+  min-width: 72px;
+}
+
+/* ==================== 旋转动画 ==================== */
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -411,46 +921,165 @@ function getConnectionText() {
   to { transform: rotate(360deg); }
 }
 
-/* 空状态 */
-.empty-hint {
+/* ==================== 工具详情弹窗 ==================== */
+.tool-detail-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  color: var(--color-text-tertiary);
-  text-align: center;
-  font-size: 14px;
+  gap: 20px;
 }
 
-.drawer-footer {
+.detail-status {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 16px;
+  border-radius: 8px;
 }
 
-.drawer-footer .el-textarea {
-  flex: 1;
+.detail-status.success {
+  background: var(--color-income-bg);
+  color: var(--color-income);
 }
 
-.drawer-footer .el-button {
-  flex-shrink: 0;
-  height: 32px;
+.detail-status.error {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
+}
+
+.detail-status.pending {
+  background: rgba(250, 173, 20, 0.1);
+  color: var(--color-note);
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.console-box {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 0;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.console-text {
+  color: #00ff88;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>
 
+<!-- 暗色模式全局样式 -->
 <style>
-/* 暗色模式 */
+/* 抽屉暗色模式 */
 html.dark .ai-drawer {
-  background: rgba(30, 30, 30, 0.95);
-  border-left-color: rgba(255, 255, 255, 0.1);
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-card);
+  border-left-color: var(--color-border);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
 }
 
-html.dark .ai-drawer .drawer-header,
-html.dark .ai-drawer .drawer-footer {
-  border-color: rgba(255, 255, 255, 0.08);
+html.dark .drawer-header,
+html.dark .drawer-footer {
+  background: var(--color-bg-card);
+  border-color: var(--color-border);
+}
+
+html.dark .conversation-title {
+  background: var(--color-bg-container);
+  border-color: var(--color-border);
+}
+
+/* 气泡暗色模式 */
+html.dark .user-bubble {
+  background: var(--color-transfer);
+}
+
+html.dark .assistant-bubble {
+  background: var(--color-bg-container);
+}
+
+html.dark .tool-bubble {
+  background: var(--color-transfer-bg);
+}
+
+html.dark .agent-bubble {
+  background: rgba(255, 212, 59, 0.1);
+}
+
+/* 思维链暗色模式 */
+html.dark .reasoning-section {
+  border-color: var(--color-border);
+}
+
+html.dark .reasoning-header {
+  background: rgba(116, 192, 252, 0.1);
+}
+
+html.dark .reasoning-header:hover {
+  background: rgba(116, 192, 252, 0.15);
+}
+
+html.dark .reasoning-content {
+  background: rgba(116, 192, 252, 0.05);
+  border-color: var(--color-border);
+}
+
+/* Markdown 暗色模式 */
+html.dark .message-content :deep(code) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .message-content :deep(pre) {
+  background: var(--color-bg-container);
+  border-color: var(--color-border);
+}
+
+html.dark .message-content :deep(blockquote) {
+  background: rgba(116, 192, 252, 0.1);
+}
+
+html.dark .message-content :deep(th) {
+  background: var(--color-bg-container);
+}
+
+html.dark .message-content :deep(th),
+html.dark .message-content :deep(td) {
+  border-color: var(--color-border);
+}
+
+/* 工具详情弹窗暗色模式 */
+html.dark .tool-detail-dialog .el-dialog {
+  background: var(--color-bg-card);
+}
+
+html.dark .tool-detail-dialog .el-dialog__header {
+  border-bottom-color: var(--color-border);
+}
+
+html.dark .tool-detail-dialog .el-dialog__title {
+  color: var(--color-text-primary);
+}
+
+html.dark .console-box {
+  background: #0d0d0d;
 }
 </style>
