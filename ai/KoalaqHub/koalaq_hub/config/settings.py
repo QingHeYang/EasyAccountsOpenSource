@@ -76,7 +76,8 @@ class Configuration:
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "120.0"))  # LLM API 调用超时时间（秒）
 
         # EasyAccounts API 配置
-        self.easyaccounts_url = os.getenv("EASYACCOUNTS_URL", "http://localhost:10670")  # EasyAccounts 后端地址
+        # Docker 内部网络使用容器名:内部端口，外部访问使用映射端口
+        self.easyaccounts_url = os.getenv("EASYACCOUNTS_URL", "http://easy_accounts_server:8081")
 
     @staticmethod
     def load_env() -> None:
