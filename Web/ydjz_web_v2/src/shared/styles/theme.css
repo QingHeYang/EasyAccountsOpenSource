@@ -1,0 +1,105 @@
+/**
+ * 主题变量定义
+ * 业务语义色 - 亮色/暗色模式
+ */
+
+:root {
+  /* ========== 语义色 - 亮色模式 ========== */
+
+  /* 收入 - 绿色 */
+  --color-income: #52C41A;
+  --color-income-bg: rgba(82, 196, 26, 0.1);
+
+  /* 支出 - 红色 */
+  --color-expense: #F5222D;
+  --color-expense-bg: rgba(245, 34, 45, 0.1);
+
+  /* 转账 - 蓝色（主色调） */
+  --color-transfer: #1890FF;
+  --color-transfer-bg: rgba(24, 144, 255, 0.1);
+
+  /* 备注 - 金色 */
+  --color-note: #FAAD14;
+  --color-note-secondary: #8C8C8C;
+
+  /* 文字色 */
+  --color-text-primary: #262626;
+  --color-text-secondary: #595959;
+  --color-text-tertiary: #8C8C8C;
+  --color-text-placeholder: #BFBFBF;
+
+  /* 背景色 */
+  --color-bg-page: #F5F5F5;
+  --color-bg-card: #FFFFFF;
+  --color-bg-container: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+
+  /* 边框色 */
+  --color-border: #E8E8E8;
+  --color-border-light: #F0F0F0;
+
+  /* 金额显示 */
+  --color-amount-positive: var(--color-income);
+  --color-amount-negative: var(--color-expense);
+  --color-amount-neutral: var(--color-transfer);
+}
+
+/* ========== 暗色模式 ========== */
+html.dark,
+html.van-theme-dark {
+  /* 语义色 - 降低饱和度 */
+
+  /* 收入 - 柔和绿 */
+  --color-income: #69DB7C;
+  --color-income-bg: rgba(105, 219, 124, 0.15);
+
+  /* 支出 - 柔和红 */
+  --color-expense: #FF6B6B;
+  --color-expense-bg: rgba(255, 107, 107, 0.15);
+
+  /* 转账 - 柔和蓝 */
+  --color-transfer: #74C0FC;
+  --color-transfer-bg: rgba(116, 192, 252, 0.15);
+
+  /* 备注 - 柔和金 */
+  --color-note: #FFD43B;
+  --color-note-secondary: #909399;
+
+  /* 文字色 */
+  --color-text-primary: #E5EAF3;
+  --color-text-secondary: #A3A6AD;
+  --color-text-tertiary: #6C6E72;
+  --color-text-placeholder: #4C4D4F;
+
+  /* 背景色 */
+  --color-bg-page: #0A0A0A;
+  --color-bg-card: #1A1A1A;
+  --color-bg-container: #141414;
+  --color-bg-elevated: #1D1E1F;
+
+  /* 边框色 */
+  --color-border: #303030;
+  --color-border-light: #262626;
+
+  /* 金额显示 */
+  --color-amount-positive: var(--color-income);
+  --color-amount-negative: var(--color-expense);
+  --color-amount-neutral: var(--color-transfer);
+}
+
+/* ========== 工具类 ========== */
+
+/* 金额颜色 */
+.amount-income { color: var(--color-income); }
+.amount-expense { color: var(--color-expense); }
+.amount-transfer { color: var(--color-transfer); }
+
+/* 背景色 */
+.bg-income { background-color: var(--color-income-bg); }
+.bg-expense { background-color: var(--color-expense-bg); }
+.bg-transfer { background-color: var(--color-transfer-bg); }
+
+/* 文字色 */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-tertiary { color: var(--color-text-tertiary); }

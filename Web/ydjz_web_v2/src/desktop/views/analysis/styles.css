@@ -1,0 +1,75 @@
+/* Analysis 页面共享样式 */
+
+/* 通用卡片样式 */
+.analysis-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.analysis-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* 通用标题样式 */
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 12px 4px;
+}
+
+/* 收入支出颜色 */
+.text-income {
+  color: var(--color-income);
+}
+
+.text-expense {
+  color: var(--color-expense);
+}
+
+.text-transfer {
+  color: var(--color-transfer);
+}
+
+/* 背景色 */
+.bg-income {
+  background: var(--color-income);
+}
+
+.bg-expense {
+  background: var(--color-expense);
+}
+
+.bg-transfer {
+  background: var(--color-transfer);
+}
+
+/* 加载状态 */
+.loading-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  z-index: 10;
+}
+
+/* 暗色模式通用覆盖 */
+html.dark .analysis-card {
+  background: rgba(40, 40, 40, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .loading-mask {
+  background: rgba(30, 30, 30, 0.8);
+}

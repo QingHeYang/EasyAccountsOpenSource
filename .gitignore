@@ -107,3 +107,6 @@ Desktop.ini
 # AI前端测试目录（不提交）
 ai/koalaq_hub_webui/
 ai/koalaq_hub_webui_full.tar.gz
+
+# Claude配置目录
+.claude/

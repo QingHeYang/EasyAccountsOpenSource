@@ -1,0 +1,67 @@
+/* Desktop 基础样式 */
+
+/* 720p 最小分辨率限制 */
+html, body {
+  min-width: 1280px;
+  min-height: 720px;
+}
+
+#app {
+  min-width: 1280px;
+  min-height: 720px;
+}
+
+/* ==================== ElMessage 自定义样式 ==================== */
+/* 调整位置到右上角，避免遮挡顶部胶囊导航 */
+.el-message {
+  top: 80px !important;
+  left: auto !important;
+  right: 24px !important;
+  transform: none !important;
+  border-radius: 10px !important;
+  padding: 12px 18px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.el-message .el-message__content {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 暗色模式 */
+html.dark .el-message {
+  background: #2a2a2a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .el-message .el-message__content {
+  color: #e5e5e5;
+}
+
+/* ==================== Element Plus 暗色模式修复 ==================== */
+/* Textarea / Input 暗色模式 */
+html.dark .el-textarea__inner,
+html.dark .el-input__inner {
+  background-color: var(--color-bg-elevated, #1d1e1f) !important;
+  color: var(--color-text-primary, #e5e5e5) !important;
+  border-color: var(--color-border, #303030) !important;
+}
+
+html.dark .el-textarea__inner::placeholder,
+html.dark .el-input__inner::placeholder {
+  color: var(--color-text-placeholder, #4c4d4f) !important;
+}
+
+html.dark .el-textarea__inner:focus,
+html.dark .el-input__inner:focus {
+  border-color: var(--color-transfer) !important;
+}
+
+html.dark .el-input__count {
+  background: transparent !important;
+  color: var(--color-text-tertiary) !important;
+}
+
+html.dark .el-input__count-inner {
+  background: transparent !important;
+}

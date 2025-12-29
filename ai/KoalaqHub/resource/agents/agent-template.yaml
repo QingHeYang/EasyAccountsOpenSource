@@ -1,0 +1,46 @@
+# {agent-name} 能力定义模板
+agent_id: {agent-id}
+name: {agent-display-name}
+
+# 工具列表
+tools:
+  - name: {tool-name-1}
+    description: {tool-description}
+    required: {true/false}  # 可选：标记是否为某些操作的前置条件
+    
+  - name: {tool-name-2}
+    description: {tool-description}
+
+# 核心能力
+capabilities:
+  - {能力类别1}: {具体描述}
+  - {能力类别2}: {具体描述}
+  - {能力类别3}: {具体描述}
+
+# 调用模式
+required_patterns:
+  - name: {模式名称1}
+    condition: {触发条件}
+    主agent指导: "{给主agent的指导说明}"
+    sequence: [{tool1}, {tool2}]
+    
+  - name: {模式名称2}
+    condition: {触发条件}
+    主agent指导: "{给主agent的指导说明}"
+    sequence: [{tool}]
+
+# 典型用例
+examples:
+  - user_input: "{用户原始输入}"
+    agent_input: "@{agent-id} {主agent转述后的指令}"
+    pattern: {对应的模式名}
+    
+  - user_input: "{用户原始输入}"
+    agent_input: "@{agent-id} {主agent转述后的指令}"
+    pattern: {对应的模式名}
+
+# 约束和限制
+constraints:
+  - {限制条件1}
+  - {限制条件2}
+  - {限制条件3}

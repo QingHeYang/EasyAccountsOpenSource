@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+logs/
+log/
+test/log/*.log
+
+# Local development settings
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+config/.env
+
+# 服务器配置文件（正式配置不上传）
+config/servers_config.json
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Project specific
+resource/database/*.db
+resource/database/*.db-journal
+resource/database/*.db-wal
+resource/database/*.db-shm
+*.bak
+*.orig
+temp/
+resource/md/*.md
+nohup.out
+
+# Runtime debug files
+runtime/
+
+# Test outputs
+test/log/*.json
+
+# MCP server configs (sensitive)
+config/mcp_servers_config.json
+
+# uv lock file
+uv.lock
+
+resource/mcp/*
+!resource/mcp/.gitkeep
+!resource/mcp/*.example.json
+config/*.ini

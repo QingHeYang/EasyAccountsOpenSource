@@ -1,0 +1,285 @@
+/* ============ 共享抽屉样式 ============ */
+
+/* 基础抽屉样式 */
+.setting-drawer .el-drawer__header {
+  margin-bottom: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.setting-drawer .el-drawer__body {
+  padding: 20px;
+}
+
+/* 分栏抽屉样式（用于收支、账户、分类等管理页面） */
+.setting-drawer.split-layout .el-drawer__body {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* 模板抽屉特殊样式（无 padding） */
+.template-drawer .el-drawer__body {
+  padding: 0 !important;
+}
+
+/* 分栏视图通用样式 */
+.drawer-split-view {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.drawer-split-view .split-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.drawer-split-view .split-list.has-detail {
+  flex: none;
+}
+
+.drawer-split-view .split-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 选择器对话框样式 */
+.picker-dialog .el-dialog {
+  border-radius: 16px;
+}
+
+.picker-dialog .el-dialog__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.picker-dialog .el-dialog__body {
+  padding: 16px 20px;
+}
+
+.picker-dialog .el-dialog__footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+/* 高层级 MessageBox */
+.el-overlay:has(.high-zindex-msgbox) {
+  z-index: 5000 !important;
+}
+
+.el-overlay.is-message-box {
+  z-index: 4000 !important;
+}
+
+/* ElMessage 提示框 z-index */
+.el-message {
+  z-index: 5000 !important;
+}
+
+/* ============ 暗色模式 - 通用 ============ */
+
+html.dark .capsule-tabs {
+  background: rgba(40, 40, 40, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .slider {
+  background: rgba(116, 192, 252, 0.25);
+}
+
+html.dark .capsule-tab.active {
+  color: var(--color-transfer);
+}
+
+html.dark .split-list {
+  background: var(--color-bg-card);
+}
+
+html.dark .split-detail {
+  background: linear-gradient(180deg, var(--color-bg-page) 0%, var(--color-bg-card) 100%);
+}
+
+html.dark .detail-footer {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+html.dark .panel-footer {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+html.dark .form-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .form-select {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .form-select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .switch-item {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .radio-item {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .radio-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .radio-income.active .radio-dot,
+html.dark .radio-expense.active .radio-dot,
+html.dark .radio-transfer.active .radio-dot {
+  box-shadow: inset 0 0 0 3px var(--color-bg-card), 0 0 0 2px currentColor;
+}
+
+/* ============ 暗色模式 - 列表项 ============ */
+
+html.dark .action-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .action-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .action-item.active {
+  background: linear-gradient(135deg, rgba(116, 192, 252, 0.15) 0%, rgba(116, 192, 252, 0.08) 100%);
+  border-color: var(--color-transfer);
+}
+
+html.dark .account-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .account-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .account-item.active {
+  background: linear-gradient(135deg, rgba(116, 192, 252, 0.15) 0%, rgba(116, 192, 252, 0.08) 100%);
+  border-color: var(--color-transfer);
+}
+
+html.dark .type-group {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .type-parent:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html.dark .type-parent.active {
+  background: linear-gradient(135deg, rgba(116, 192, 252, 0.15) 0%, rgba(116, 192, 252, 0.08) 100%);
+}
+
+html.dark .type-children {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+html.dark .type-child {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .type-child:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .type-child.active {
+  background: linear-gradient(135deg, rgba(116, 192, 252, 0.15) 0%, rgba(116, 192, 252, 0.08) 100%);
+  border-color: var(--color-transfer);
+}
+
+/* 暗色模式 - 底部按钮区 */
+html.dark .footer-danger {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .footer-divider {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ============ 暗色模式 - 选择器 ============ */
+
+html.dark .picker-item {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .picker-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .picker-item.active {
+  background: rgba(116, 192, 252, 0.1);
+}
+
+html.dark .picker-dialog .el-dialog {
+  background: var(--color-bg-card);
+}
+
+html.dark .type-picker-parent {
+  background: rgba(40, 40, 40, 0.6);
+}
+
+html.dark .type-picker-parent:hover {
+  background: rgba(50, 50, 50, 0.8);
+}
+
+html.dark .type-picker-child {
+  background: rgba(40, 40, 40, 0.6);
+}
+
+html.dark .type-picker-child:hover {
+  background: rgba(50, 50, 50, 0.8);
+}
+
+/* ============ 暗色模式 - 模板 ============ */
+
+html.dark .template-card {
+  background: rgba(40, 40, 40, 0.6);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .template-main:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html.dark .template-toggle:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html.dark .template-edit-panel {
+  background: linear-gradient(180deg, var(--color-bg-page) 0%, var(--color-bg-card) 100%);
+}
+
+html.dark .date-type-item {
+  background: rgba(40, 40, 40, 0.6);
+}
+
+html.dark .date-type-item:hover {
+  background: rgba(50, 50, 50, 0.8);
+}
+
+html.dark .color-item.selected {
+  box-shadow: 0 0 0 2px var(--color-bg-page), 0 0 0 4px var(--color-text-primary);
+}

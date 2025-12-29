@@ -1,0 +1,1 @@
+export { useSmartBack } from './useSmartBack'

@@ -1,0 +1,273 @@
+/**
+ * Mobile 端基础样式
+ * 覆盖 Vant 默认样式，确保主题变量生效
+ */
+
+/* 重置 body 背景 */
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+}
+
+/* 应用容器 */
+#app {
+  min-height: 100vh;
+  background: transparent;
+}
+
+/* 覆盖 Vant 的 body 背景色 */
+body {
+  background-color: var(--color-bg-page) !important;
+}
+
+/* Vant ConfigProvider 可能添加的背景 */
+.van-config-provider {
+  background: transparent !important;
+}
+
+/* Vant NavBar 使用毛玻璃效果 */
+.van-nav-bar {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Vant CellGroup 圆角卡片使用正确背景 */
+.van-cell-group--inset {
+  background: var(--color-bg-card);
+}
+
+/* 暗色模式 */
+html.dark body,
+html.van-theme-dark body {
+  background-color: var(--color-bg-page) !important;
+}
+
+html.dark .van-nav-bar,
+html.van-theme-dark .van-nav-bar {
+  background: rgba(40, 40, 40, 0.72) !important;
+}
+
+html.dark .van-cell-group--inset,
+html.van-theme-dark .van-cell-group--inset {
+  background: var(--color-bg-card);
+}
+
+/* 确保 Vant 弹窗组件在 tabbar 之上 */
+/* backdrop-filter 会创建 GPU 合成层，可能导致渲染顺序异常 */
+/* 使用较高的 z-index 值来确保弹窗始终在最上层 */
+.van-overlay {
+  z-index: 9998 !important;
+}
+
+.van-popup {
+  z-index: 9999 !important;
+}
+
+.van-action-sheet {
+  z-index: 9999 !important;
+}
+
+.van-picker {
+  z-index: 9999 !important;
+}
+
+.van-dialog {
+  z-index: 9999 !important;
+}
+
+.van-toast {
+  z-index: 10000 !important;
+}
+
+/* tabbar 层级 - 保持较低值 */
+.tabbar-wrapper {
+  z-index: 99 !important;
+}
+
+/* ===== Toast 样式 ===== */
+.van-toast {
+  border-radius: 12px !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.van-toast--loading {
+  background: rgba(0, 0, 0, 0.8) !important;
+}
+
+.van-toast--text,
+.van-toast--html {
+  background: rgba(0, 0, 0, 0.75) !important;
+  padding: 10px 16px !important;
+  font-size: 14px !important;
+}
+
+/* ===== ActionSheet 样式 ===== */
+.van-action-sheet {
+  border-radius: 16px 16px 0 0 !important;
+}
+
+.van-action-sheet__header {
+  font-weight: 600 !important;
+  font-size: 15px !important;
+}
+
+.van-action-sheet__item {
+  font-size: 15px !important;
+}
+
+.van-action-sheet__cancel {
+  margin-top: 8px !important;
+  background: var(--color-bg-page) !important;
+}
+
+/* 暗黑模式 - ActionSheet */
+html.dark .van-action-sheet,
+html.van-theme-dark .van-action-sheet {
+  background: var(--color-bg-card) !important;
+}
+
+html.dark .van-action-sheet__header,
+html.van-theme-dark .van-action-sheet__header {
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .van-action-sheet__item,
+html.van-theme-dark .van-action-sheet__item {
+  background: var(--color-bg-card) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .van-action-sheet__cancel,
+html.van-theme-dark .van-action-sheet__cancel {
+  background: var(--color-bg-page) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .van-action-sheet__gap,
+html.van-theme-dark .van-action-sheet__gap {
+  background: var(--color-bg-page) !important;
+}
+
+/* 暗黑模式 - Dialog */
+html.dark .van-dialog,
+html.van-theme-dark .van-dialog {
+  background: var(--color-bg-card) !important;
+}
+
+html.dark .van-dialog__header,
+html.van-theme-dark .van-dialog__header {
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .van-dialog__message,
+html.van-theme-dark .van-dialog__message {
+  color: var(--color-text-secondary) !important;
+}
+
+html.dark .van-dialog__cancel,
+html.dark .van-dialog__confirm,
+html.van-theme-dark .van-dialog__cancel,
+html.van-theme-dark .van-dialog__confirm {
+  background: var(--color-bg-card) !important;
+}
+
+/* 暗黑模式 - Empty */
+html.dark .van-empty__description,
+html.van-theme-dark .van-empty__description {
+  color: var(--color-text-tertiary) !important;
+}
+
+/* 暗黑模式 - 覆盖 Vant 基础变量 */
+html.dark,
+.van-theme-dark {
+  --van-text-color: #f5f5f5;
+  --van-text-color-2: #d0d0d0;
+  --van-text-color-3: #b0b0b0;
+  --van-background: #1a1a1a;
+  --van-background-2: #2c2c2c;
+  --van-border-color: #3a3a3a;
+
+  /* Picker 专用变量 */
+  --van-picker-background: var(--color-bg-card);
+  --van-picker-toolbar-height: 44px;
+  --van-picker-title-font-size: 16px;
+  --van-picker-confirm-action-color: var(--color-transfer);
+  --van-picker-cancel-action-color: #d0d0d0;
+  --van-picker-option-text-color: #f5f5f5;
+  --van-picker-mask-color: linear-gradient(180deg, rgba(30, 30, 30, 0.9), rgba(30, 30, 30, 0.4)),
+                           linear-gradient(0deg, rgba(30, 30, 30, 0.9), rgba(30, 30, 30, 0.4));
+
+  /* Cascader 专用变量 */
+  --van-cascader-header-background: var(--color-bg-card);
+  --van-cascader-tab-color: #f5f5f5;
+  --van-cascader-unselected-tab-color: #b0b0b0;
+  --van-cascader-option-disabled-color: #666;
+  --van-cascader-active-color: var(--color-transfer);
+}
+
+/* 暗黑模式 - Popup */
+html.dark .van-popup,
+.van-theme-dark .van-popup {
+  background: var(--color-bg-card) !important;
+}
+
+/* 暗黑模式 - Picker */
+html.dark .van-picker,
+.van-theme-dark .van-picker {
+  background: var(--color-bg-card) !important;
+}
+
+html.dark .van-picker__toolbar,
+.van-theme-dark .van-picker__toolbar {
+  background: var(--color-bg-card) !important;
+}
+
+/* 暗黑模式 - Cascader */
+html.dark .van-cascader,
+.van-theme-dark .van-cascader {
+  background: var(--color-bg-card) !important;
+}
+
+html.dark .van-cascader__header,
+.van-theme-dark .van-cascader__header {
+  background: var(--color-bg-card) !important;
+}
+
+html.dark .van-cascader__title,
+.van-theme-dark .van-cascader__title {
+  color: #f5f5f5 !important;
+}
+
+html.dark .van-cascader__tab,
+.van-theme-dark .van-cascader__tab {
+  color: #f5f5f5 !important;
+}
+
+html.dark .van-cascader__tab--unselected,
+.van-theme-dark .van-cascader__tab--unselected {
+  color: #b0b0b0 !important;
+}
+
+html.dark .van-cascader__options,
+.van-theme-dark .van-cascader__options {
+  background: var(--color-bg-card) !important;
+}
+
+html.dark .van-cascader__option,
+.van-theme-dark .van-cascader__option {
+  color: #f5f5f5 !important;
+}
+
+html.dark .van-cascader__option--selected,
+.van-theme-dark .van-cascader__option--selected {
+  color: var(--color-transfer) !important;
+}
+
+html.dark .van-cascader__option--disabled,
+.van-theme-dark .van-cascader__option--disabled {
+  color: #666 !important;
+}
