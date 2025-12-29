@@ -1,5 +1,6 @@
 .DS_Store
 .vscode
+.claude/
 upload-image.sh
 CLAUDE.md
 *.log
