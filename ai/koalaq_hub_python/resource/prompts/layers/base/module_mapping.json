@@ -1,0 +1,15 @@
+{
+  "模块映射": {
+    "format_rules": "format/format_rules.prompt",
+    "format_rules_mini": "format/format_rules_mini.prompt",
+    "communication_style": "communication/communication_style.prompt", 
+    "communication_style_mini": "communication/communication_style_mini.prompt",
+    "friendly_style": "communication/friendly_style.prompt",
+    "professional_style": "communication/professional_style.prompt",
+    "safety_rules": "safety/safety_rules.prompt",
+    "react_mode": "react/react_mode.prompt",
+    "react_mode_concise": "react/react_mode_concise.prompt",
+    "react_mode_hidden": "react/react_mode_hidden.prompt"
+  },
+  "说明": "这个文件定义了模块名称到实际文件路径的映射，便于代码中使用简短名称"
+}
