@@ -17,6 +17,5 @@ RUN mkdir -p /usr/share/nginx/html/resources
 # 暴露80端口
 EXPOSE 80
 
-# 启动Nginx
-# 替换模板中的环境变量并启动Nginx
-CMD /bin/sh -c "envsubst '\$API_BASE_URL' < /usr/share/nginx/html/config.js > /usr/share/nginx/html/config.tmp && cp /usr/share/nginx/html/config.tmp /usr/share/nginx/html/config.js && nginx -g 'daemon off;'"
+# 启动Nginx（不再需要环境变量替换）
+CMD ["nginx", "-g", "daemon off;"]

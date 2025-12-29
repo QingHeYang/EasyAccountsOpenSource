@@ -34,7 +34,7 @@ ENV API_PORT=8001
 ENV API_HOST=0.0.0.0
 
 # EasyAccounts配置（通过Docker网络访问）
-ENV EASYACCOUNTS_URL=http://easy_accounts_server:8081
+ENV EASYACCOUNTS_URL=http://server:8081
 
 # 健康检查 - 使用Python内置的urllib
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

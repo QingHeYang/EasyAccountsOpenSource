@@ -21,7 +21,8 @@ class AIHttpService {
     // 请求拦截器
     this.client.interceptors.request.use(
       (config) => {
-        console.log('AI HTTP请求:', config.method?.toUpperCase(), config.url, config.data);
+        // 添加 user_id 到 headers 作为认证
+        config.headers['user_id'] = 'user_67ce21d6-a11c-4340-851b-7a8949906aa3';
         return config;
       },
       (error) => {
@@ -33,7 +34,6 @@ class AIHttpService {
     // 响应拦截器
     this.client.interceptors.response.use(
       (response) => {
-        console.log('AI HTTP响应:', response.status, response.data);
         return response;
       },
       (error) => {

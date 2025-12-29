@@ -4,6 +4,7 @@
     <van-nav-bar
         title="总览"/>
     <van-floating-bubble 
+      v-if="aiServiceAvailable"
       magnetic="x" 
       axis="xy" 
       v-model:offset="aiOffset" 
@@ -147,14 +148,46 @@ export default {
       showAccountsDetail: false,
       homeInfo: {},
       aiOffset: { x: 20, y: 100 },
+      aiServiceAvailable: false, // AI服务是否可用
     };
   },
   mounted() {
     this.getHomeInfo();
     this.prepareYearColum();
     this.aiOffset = { x: window.innerWidth - 80, y: window.innerHeight - 200 };
+    this.checkAiService(); // 检测AI服务可用性
   },
   methods: {
+    // 检测AI服务可用性
+    async checkAiService() {
+      try {
+        // 使用fetch进行静默检测，避免axios的全局错误处理
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+        
+        const response = await fetch('/ai/health', {
+          method: 'GET',
+          headers: {
+            'user_id': 'user_67ce21d6-a11c-4340-851b-7a8949906aa3',
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          // 请求成功，AI服务可用
+          this.aiServiceAvailable = true;
+        } else {
+          // 请求失败，AI服务不可用
+          this.aiServiceAvailable = false;
+        }
+      } catch (error) {
+        // 请求失败或超时，AI服务不可用（静默处理，不显示任何提示）
+        this.aiServiceAvailable = false;
+      }
+    },
     prepareYearColum() {
       var year = new Date().getFullYear();
       for (var i = year; i >= this.minYear; i--) {
