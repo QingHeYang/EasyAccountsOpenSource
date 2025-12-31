@@ -436,3 +436,7 @@ class RepositoryAdapter:
     def get_platform_statistics(self) -> List[Dict]:
         """获取平台统计"""
         return self.factory.get_token_repository().get_platform_statistics()
+
+    def get_user_tool_call_count(self, user_id: str) -> int:
+        """获取用户的工具调用总数"""
+        return self.factory.get_message_repository().get_user_tool_call_count(user_id)

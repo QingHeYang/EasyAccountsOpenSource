@@ -85,6 +85,7 @@ function onDelete(e: Event) {
           <el-icon><Picture /></el-icon>
         </el-tag>
         <el-tag v-if="flow.from === 'ai'" size="small" class="ai-tag">AI</el-tag>
+        <el-tag v-if="flow.from === 'mcp'" size="small" class="mcp-tag">MCP</el-tag>
         <el-tag v-if="flow.exempt" size="small" type="info">不计入</el-tag>
       </div>
     </div>
@@ -152,7 +153,7 @@ function onDelete(e: Event) {
 <style scoped>
 .flow-item {
   display: grid;
-  grid-template-columns: 60px 180px 240px 1fr 120px 80px;
+  grid-template-columns: 60px 220px 200px 1fr 120px 80px;
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
@@ -195,7 +196,13 @@ function onDelete(e: Event) {
 }
 
 .ai-tag {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-transfer);
+  border: none;
+  color: #fff;
+}
+
+.mcp-tag {
+  background: var(--color-income);
   border: none;
   color: #fff;
 }

@@ -3,8 +3,8 @@
  * 管理 WebSocket 连接和消息通信
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
-import { nanoid } from 'nanoid'
-import { messageStore, type WSMessage } from './messageStore'
+import { messageStore, type WSMessage, type HTTPMessage } from './messageStore'
+import { aiApi } from '../../api/ai'
 
 // 连接状态
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -94,13 +94,18 @@ class ChatService {
 
       this._connectionState.value = 'connecting'
 
-      // 生成或使用现有会话 ID
-      this._conversationId.value = conversationId || nanoid()
+      // 使用现有会话 ID（新对话时不设置，等服务端返回）
+      this._conversationId.value = conversationId || ''
       messageStore.setConversationId(this._conversationId.value)
 
       // 构建 WebSocket URL（直接连接后端）
-      const baseUrl = 'ws://www.lllama.cn:10676'
-      const wsUrl = `${baseUrl}/ws/chat?user_id=${this.config.userId}&agent_id=${this.config.appId}`
+      const baseUrl = 'ws://localhost:8001'
+
+      // 从 localStorage 获取 token，用于工具调用认证
+      const token = localStorage.getItem('token') || ''
+      const toolTokens = token ? `Authorization=${token}` : ''
+
+      const wsUrl = `${baseUrl}/ws/chat?user_id=${this.config.userId}&agent_id=${this.config.appId}&use_think_llm=${this.config.useThinkLlm}&tool_tokens=${encodeURIComponent(toolTokens)}`
 
       try {
         this.ws = new WebSocket(wsUrl)
@@ -186,17 +191,59 @@ class ChatService {
   // 新建对话
   newConversation(): void {
     messageStore.clearMessages()
-    this._conversationId.value = nanoid()
+    this._conversationId.value = ''  // 新对话不设置 ID，等服务端返回
     this._title.value = ''
     this._questions.value = []
     messageStore.setConversationId(this._conversationId.value)
+    // 清除本地存储的会话 ID
+    localStorage.removeItem('ai_conversation_id')
+  }
+
+  // 保存会话 ID 到本地
+  private saveConversationId(conversationId: string): void {
+    if (conversationId) {
+      localStorage.setItem('ai_conversation_id', conversationId)
+    }
+  }
+
+  // 获取本地保存的会话 ID
+  getSavedConversationId(): string | null {
+    return localStorage.getItem('ai_conversation_id')
   }
 
   // 加载历史对话
-  loadConversation(conversationId: string): void {
+  async loadConversation(conversationId: string): Promise<void> {
     this._conversationId.value = conversationId
     messageStore.setConversationId(conversationId)
-    // 可以在这里添加 HTTP 请求加载历史消息
+    this.saveConversationId(conversationId)
+
+    // 加载历史消息
+    await this.loadHistoryMessages(conversationId)
+  }
+
+  // 加载历史消息
+  async loadHistoryMessages(conversationId: string): Promise<void> {
+    if (!conversationId) return
+
+    try {
+      const response = await aiApi.getMessages(conversationId)
+
+      if (response.data?.success && response.data.data?.messages) {
+        // 转换消息类型（AiMessage -> HTTPMessage）
+        messageStore.loadHTTPMessages(response.data.data.messages as unknown as HTTPMessage[])
+        // 更新标题（忽略"未命名会话"）
+        if (response.data.data.title && response.data.data.title !== '未命名会话') {
+          this._title.value = response.data.data.title
+        }
+      }
+    } catch (error) {
+      console.error('[ChatService] 加载历史消息失败', error)
+      // 如果是 404，说明会话不存在，清除本地存储
+      if ((error as { response?: { status?: number } }).response?.status === 404) {
+        localStorage.removeItem('ai_conversation_id')
+        this._conversationId.value = ''
+      }
+    }
   }
 
   // 处理接收到的消息
@@ -208,6 +255,13 @@ class ChatService {
       if (message.type === 'ping') {
         this.ws?.send(JSON.stringify({ type: 'pong' }))
         return
+      }
+
+      // 更新并保存会话 ID（服务端可能返回新的会话 ID）
+      if (message.conversation_id && message.conversation_id !== this._conversationId.value) {
+        this._conversationId.value = message.conversation_id
+        messageStore.setConversationId(message.conversation_id)
+        this.saveConversationId(message.conversation_id)
       }
 
       // 交给 messageStore 处理
@@ -289,6 +343,8 @@ export function useChatService() {
     sendMessage: (content: string) => chatService.sendMessage(content),
     stopGeneration: () => chatService.stopGeneration(),
     newConversation: () => chatService.newConversation(),
-    loadConversation: (id: string) => chatService.loadConversation(id)
+    loadConversation: (id: string) => chatService.loadConversation(id),
+    loadHistoryMessages: (id: string) => chatService.loadHistoryMessages(id),
+    getSavedConversationId: () => chatService.getSavedConversationId()
   }
 }

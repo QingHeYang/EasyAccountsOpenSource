@@ -24,10 +24,13 @@
   },
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",
+    "@types/http-proxy": "^1.17.17",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
+    "http-proxy": "^1.18.1",
+    "http-proxy-middleware": "^3.0.5",
     "png-to-ico": "^3.0.1",
     "sharp": "^0.34.5",
     "typescript": "~5.9.3",

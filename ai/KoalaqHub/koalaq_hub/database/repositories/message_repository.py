@@ -596,3 +596,30 @@ class MessageRepository(BaseRepository):
         except Exception as e:
             self.logger.error(f"获取对话消息分页失败 (conversation_id: {conversation_id}): {e}")
             raise e
+
+    def get_user_tool_call_count(self, user_id: str) -> int:
+        """获取用户的工具调用总数
+
+        Args:
+            user_id: 用户ID
+
+        Returns:
+            int: 工具调用数量（type='tool_result'）
+        """
+        try:
+            sql = """
+                SELECT COUNT(*) as count
+                FROM messages m
+                JOIN rounds r ON m.round_id = r.round_id
+                JOIN conversations c ON r.conversation_id = c.conversation_id
+                WHERE c.user_id = ? AND m.type = 'tool_result'
+            """
+            row = self._fetch_one(sql, (user_id,))
+            count = row["count"] if row else 0
+
+            self.logger.debug(f"获取用户工具调用数: user_id={user_id}, count={count}")
+            return count
+
+        except Exception as e:
+            self.logger.error(f"获取用户工具调用数失败 (user_id: {user_id}): {e}")
+            raise e

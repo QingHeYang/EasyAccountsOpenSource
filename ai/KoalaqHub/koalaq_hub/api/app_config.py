@@ -82,7 +82,7 @@ def configure_exception_handlers(app: FastAPI):
         """
         request_id = getattr(request.state, "request_id", "unknown")
 
-        return JSONResponse(status_code=exc.status_code, content=ResponseBuilder.custom_error(code=exc.status_code, message=exc.detail, request_id=request_id).dict())
+        return JSONResponse(status_code=exc.status_code, content=ResponseBuilder.custom_error(code=exc.status_code, message=exc.detail, request_id=request_id).model_dump())
 
     @app.exception_handler(StarletteHTTPException)
     async def starlette_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -98,7 +98,7 @@ def configure_exception_handlers(app: FastAPI):
         """
         request_id = getattr(request.state, "request_id", "unknown")
 
-        return JSONResponse(status_code=exc.status_code, content=ResponseBuilder.custom_error(code=exc.status_code, message=exc.detail, request_id=request_id).dict())
+        return JSONResponse(status_code=exc.status_code, content=ResponseBuilder.custom_error(code=exc.status_code, message=exc.detail, request_id=request_id).model_dump())
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -121,7 +121,7 @@ def configure_exception_handlers(app: FastAPI):
             message = error["msg"]
             error_details.append(f"{field}: {message}")
 
-        return JSONResponse(status_code=422, content=ResponseBuilder.bad_request(message="请求参数验证失败", data={"errors": error_details}, request_id=request_id).dict())
+        return JSONResponse(status_code=422, content=ResponseBuilder.bad_request(message="请求参数验证失败", data={"errors": error_details}, request_id=request_id).model_dump())
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
@@ -139,7 +139,7 @@ def configure_exception_handlers(app: FastAPI):
 
         logger.error(f"未处理的异常 [RequestID: {request_id}]: {str(exc)}", exc_info=True)
 
-        return JSONResponse(status_code=500, content=ResponseBuilder.internal_error(message="服务器内部错误", request_id=request_id).dict())
+        return JSONResponse(status_code=500, content=ResponseBuilder.internal_error(message="服务器内部错误", request_id=request_id).model_dump())
 
     logger.info("异常处理器配置完成")
 

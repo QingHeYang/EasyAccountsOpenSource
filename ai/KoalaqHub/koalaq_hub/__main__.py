@@ -282,7 +282,7 @@ async def main() -> None:
         ) = await initialize_services()
 
         # 创建简化的FastAPI服务器，直接注入依赖
-        fastapi_server = create_fastapi_server(user_manager, conversation_manager, agent_registry, agent_executor)
+        fastapi_server = create_fastapi_server(user_manager, conversation_manager, agent_registry, agent_executor, db_storage)
 
         main_logger.info("启动FastAPI服务器...")
         await fastapi_server.start()

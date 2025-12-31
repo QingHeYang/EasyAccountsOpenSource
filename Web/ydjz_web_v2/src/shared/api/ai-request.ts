@@ -38,6 +38,9 @@ function createAiAxiosInstance(timeout: number): AxiosInstance {
       // 动态更新 baseURL（支持运行时配置变化）
       config.baseURL = getAiApiUrl()
 
+      // 添加 user_id 请求头（固定值）
+      config.headers['user_id'] = 'user_67ce21d6-a11c-4340-851b-7a8949906aa3'
+
       const token = localStorage.getItem('token')
       if (token) {
         config.headers.Authorization = token

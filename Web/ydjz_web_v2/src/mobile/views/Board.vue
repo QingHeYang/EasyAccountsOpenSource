@@ -3,10 +3,14 @@ import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } fro
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { homeApi, type HomeInfo } from '@shared/api/home'
+import { aiApi } from '@shared/api/ai'
 import logoUrl from '@shared/assets/logo.png'
 import ChartOverlay from '@mobile/components/ChartOverlay.vue'
 
 const router = useRouter()
+
+// AI 服务可用状态
+const aiServiceAvailable = ref(false)
 
 // 数据
 const loading = ref(false)
@@ -38,8 +42,15 @@ function handleScroll() {
   }
 }
 
+// 检测 AI 服务
+async function checkAiService() {
+  const health = await aiApi.checkHealth()
+  aiServiceAvailable.value = health !== null
+}
+
 onMounted(() => {
   fetchHomeInfo()
+  checkAiService()
 })
 
 onActivated(() => {
@@ -234,8 +245,8 @@ function toAI() {
           <span class="title-text">EasyAccounts</span>
         </template>
       </div>
-      <div class="header-action" @click="toAI">
-        <van-icon name="chat-o" size="22" />
+      <div v-if="aiServiceAvailable" class="header-action ai-btn" @click="toAI">
+        <span class="ai-text">AI+</span>
       </div>
     </div>
 
@@ -510,6 +521,23 @@ function toAI() {
   border-radius: 12px;
   background: var(--color-bg-card);
   color: var(--color-text-secondary);
+}
+
+.header-action.ai-btn {
+  width: auto;
+  padding: 0 14px;
+  background: var(--color-transfer);
+  color: #fff;
+}
+
+.header-action.ai-btn:active {
+  opacity: 0.8;
+}
+
+.ai-text {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 /* 页面内容区 */

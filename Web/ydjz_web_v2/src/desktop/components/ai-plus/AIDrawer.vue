@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   ChatLineSquare,
   Close,
@@ -13,7 +14,20 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
-import { useChatService, useMessageStore, type UnifiedMessage } from '@shared/services/chat'
+import {
+  useChatService,
+  useMessageStore,
+  type UnifiedMessage,
+  // 工具助手
+  getToolDisplayName,
+  getToolExtraInfo,
+  isToolClickable,
+  isToolNavigable,
+  getToolNavigationParams,
+  formatToolJson,
+  parseToolData
+} from '@shared/services/chat'
+import { setScreenParams } from '@shared/services/screenParams'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -42,11 +56,16 @@ const {
   disconnect,
   sendMessage: sendChatMessage,
   newConversation,
-  loadConversation
+  loadConversation,
+  loadHistoryMessages,
+  getSavedConversationId
 } = useChatService()
 
 // 消息存储
-const { mainMessages, clearMessages } = useMessageStore()
+const { mainMessages } = useMessageStore()
+
+// 路由
+const router = useRouter()
 
 // 本地状态
 const inputText = ref('')
@@ -70,23 +89,6 @@ const currentToolDetail = ref<{
   result: ''
 })
 
-// 对话 ID 持久化
-const CONVERSATION_KEY = 'ai_conversation_id'
-
-function saveConversationId(id: string) {
-  if (id) {
-    localStorage.setItem(CONVERSATION_KEY, id)
-  }
-}
-
-function getSavedConversationId(): string | null {
-  return localStorage.getItem(CONVERSATION_KEY)
-}
-
-function clearSavedConversationId() {
-  localStorage.removeItem(CONVERSATION_KEY)
-}
-
 // 抽屉打开时连接 WebSocket 并加载历史
 watch(() => props.modelValue, async (isOpen) => {
   if (isOpen && connectionState.value !== 'connected') {
@@ -94,6 +96,12 @@ watch(() => props.modelValue, async (isOpen) => {
       const savedId = getSavedConversationId()
       await connect(savedId || undefined)
       console.log('[AIDrawer] WebSocket 已连接')
+
+      // 如果有保存的会话 ID，加载历史消息
+      if (savedId) {
+        await loadHistoryMessages(savedId)
+        console.log('[AIDrawer] 历史消息已加载')
+      }
     } catch (error) {
       console.error('[AIDrawer] WebSocket 连接失败', error)
     }
@@ -153,9 +161,7 @@ function handleKeydown(e: KeyboardEvent) {
 
 // 新建对话
 function handleNewConversation() {
-  clearSavedConversationId()
-  clearMessages()
-  newConversation()
+  newConversation()  // 会自动清除 localStorage 和消息
   reasoningExpanded.value = {}
   ElMessage.success('已开启新对话')
 }
@@ -183,6 +189,38 @@ function isReasoningExpanded(msgId: string): boolean {
   return reasoningExpanded.value[msgId] || false
 }
 
+
+// 处理工具点击
+function handleToolClick(msg: UnifiedMessage) {
+  const toolName = msg.tool.name
+
+  // 不可点击的工具（且不可跳转）直接返回
+  if (!isToolClickable(toolName)) return
+
+  // 可跳转的工具
+  if (isToolNavigable(toolName)) {
+    navigateFromTool(msg)
+    return
+  }
+
+  // 其他工具显示详情弹窗
+  showToolDetail(msg)
+}
+
+// 从工具跳转到对应页面
+function navigateFromTool(msg: UnifiedMessage) {
+  const navResult = getToolNavigationParams(msg)
+
+  if (!navResult) return
+
+  if (navResult.type === 'flows' && navResult.params) {
+    // 设置筛选参数
+    setScreenParams(navResult.params)
+    // 跳转到筛选页面（添加时间戳确保路由变化被检测）
+    router.push(`${navResult.route}&_t=${Date.now()}`)
+  }
+}
+
 // 显示工具详情
 function showToolDetail(msg: UnifiedMessage) {
   currentToolDetail.value = {
@@ -194,19 +232,6 @@ function showToolDetail(msg: UnifiedMessage) {
   toolDetailVisible.value = true
 }
 
-// 格式化 JSON
-function formatJson(data: unknown): string {
-  if (!data) return '暂无数据'
-  try {
-    if (typeof data === 'string') {
-      const parsed = JSON.parse(data)
-      return JSON.stringify(parsed, null, 2)
-    }
-    return JSON.stringify(data, null, 2)
-  } catch {
-    return String(data)
-  }
-}
 
 // 复制文本
 async function copyText(text: string) {
@@ -344,8 +369,8 @@ const canSend = computed(() => {
           <div v-else-if="msg.role === 'tool'" class="message-item tool">
             <div
               class="message-bubble tool-bubble"
-              :class="msg.tool.status"
-              @click="showToolDetail(msg)"
+              :class="[msg.tool.status, { clickable: isToolClickable(msg.tool.name) }]"
+              @click="handleToolClick(msg)"
             >
               <div class="tool-header">
                 <el-icon v-if="msg.tool.status === 'pending'" class="spin" :size="14">
@@ -357,11 +382,12 @@ const canSend = computed(() => {
                 <el-icon v-else :size="14" class="tool-icon error">
                   <CircleClose />
                 </el-icon>
-                <span class="tool-name">{{ msg.tool.name }}</span>
+                <span class="tool-name">{{ getToolDisplayName(msg) }}</span>
+                <span v-if="getToolExtraInfo(msg)" class="tool-extra-info">{{ getToolExtraInfo(msg) }}</span>
                 <span class="tool-status-text">
-                  {{ msg.tool.status === 'pending' ? '执行中...' : msg.tool.status === 'success' ? '执行成功' : '执行失败' }}
+                  {{ msg.tool.status === 'pending' ? '执行中...' : msg.tool.status === 'success' ? '成功' : '失败' }}
                 </span>
-                <el-icon class="tool-arrow"><ArrowRight /></el-icon>
+                <el-icon v-if="isToolClickable(msg.tool.name)" class="tool-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
           </div>
@@ -443,12 +469,12 @@ const canSend = computed(() => {
         <div class="detail-section">
           <div class="section-title">
             <span>📥 调用参数</span>
-            <el-button text size="small" @click="copyText(formatJson(currentToolDetail.arguments))">
+            <el-button text size="small" @click="copyText(formatToolJson(currentToolDetail.arguments))">
               <el-icon><DocumentCopy /></el-icon>
             </el-button>
           </div>
           <div class="console-box">
-            <pre class="console-text">{{ formatJson(currentToolDetail.arguments) }}</pre>
+            <pre class="console-text">{{ formatToolJson(currentToolDetail.arguments) }}</pre>
           </div>
         </div>
 
@@ -461,7 +487,7 @@ const canSend = computed(() => {
             </el-button>
           </div>
           <div class="console-box">
-            <pre class="console-text">{{ formatJson(currentToolDetail.result) }}</pre>
+            <pre class="console-text">{{ formatToolJson(currentToolDetail.result) }}</pre>
           </div>
         </div>
       </div>
@@ -810,10 +836,27 @@ const canSend = computed(() => {
   color: var(--color-transfer);
 }
 
+.tool-extra-info {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-transfer-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
 .tool-status-text {
   font-size: 12px;
   color: var(--color-text-secondary);
   flex: 1;
+}
+
+.tool-bubble:not(.clickable) {
+  cursor: default;
+}
+
+.tool-bubble:not(.clickable):hover {
+  transform: none;
 }
 
 .tool-icon.success {

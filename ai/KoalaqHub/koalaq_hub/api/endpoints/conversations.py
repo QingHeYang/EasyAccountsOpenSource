@@ -61,7 +61,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
                     # 验证agent_builder是否存在
                     if not agent_builder:
                         logger.error("获取会话列表失败：AgentBuilder未初始化")
-                        return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("AgentBuilder未初始化").dict())
+                        return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("AgentBuilder未初始化").model_dump())
                     
                     for app_name in application_names:
                         agent_config = agent_builder.get_agent(app_name)
@@ -76,11 +76,11 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
 
         except ValueError as e:
             logger.warning("获取会话列表参数错误", {"error": str(e), "page": page, "page_size": page_size, "search": search})
-            return JSONResponse(status_code=400, content=ResponseBuilder.bad_request(str(e)).dict())
+            return JSONResponse(status_code=400, content=ResponseBuilder.bad_request(str(e)).model_dump())
         # 移除HTTPException重新抛出，中间件已处理认证
         except Exception as e:
             logger.error("获取会话列表失败", exception=e, extra_data={"page": page, "page_size": page_size, "search": search})
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取会话列表失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取会话列表失败").model_dump())
 
     @router.get("/{conversation_id}")
     async def get_conversation_detail(conversation_id: str, request: Request):
@@ -96,7 +96,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
 
             if not conversation:
                 logger.warning("会话不存在或无权限访问", {"user_id": user_id, "conversation_id": conversation_id})
-                return JSONResponse(status_code=404, content=ResponseBuilder.not_found("会话不存在或无权限访问").dict())
+                return JSONResponse(status_code=404, content=ResponseBuilder.not_found("会话不存在或无权限访问").model_dump())
 
             logger.info("获取会话详情成功", {"user_id": user_id, "conversation_id": conversation_id})
 
@@ -105,7 +105,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
         # 移除HTTPException重新抛出，中间件已处理认证
         except Exception as e:
             logger.error("获取会话详情失败", exception=e, extra_data={"conversation_id": conversation_id})
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取会话详情失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取会话详情失败").model_dump())
 
     @router.get("/statistics/overview")
     async def get_user_conversation_statistics(request: Request):
@@ -126,7 +126,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
         # 移除HTTPException重新抛出，中间件已处理认证
         except Exception as e:
             logger.error("获取会话统计失败", exception=e)
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取会话统计失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取会话统计失败").model_dump())
 
     # 开发和调试用的端点（生产环境可能需要权限控制）
     @router.get("/debug/all")
@@ -147,7 +147,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
 
         except Exception as e:
             logger.error("调试接口调用失败", exception=e)
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("调试接口调用失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("调试接口调用失败").model_dump())
 
     @router.get("/{conversation_id}/messages")
     async def get_conversation_messages(conversation_id: str, request: Request, before_round_id: Optional[str] = Query(None, description="获取此轮次ID之前的消息（分页）"), limit: int = Query(20, ge=1, le=100, description="每页消息数量，1-100")):
@@ -167,10 +167,10 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
 
         except ValueError as e:
             logger.warning("获取消息列表参数错误", {"error": str(e), "conversation_id": conversation_id, "before_round_id": before_round_id, "limit": limit})
-            return JSONResponse(status_code=400, content=ResponseBuilder.bad_request(str(e)).dict())
+            return JSONResponse(status_code=400, content=ResponseBuilder.bad_request(str(e)).model_dump())
         except Exception as e:
             logger.error("获取消息列表失败", exception=e, extra_data={"conversation_id": conversation_id, "before_round_id": before_round_id, "limit": limit})
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取消息列表失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("获取消息列表失败").model_dump())
 
     @router.delete("/{conversation_id}")
     async def delete_conversation(conversation_id: str, request: Request):
@@ -189,11 +189,11 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
                 return ResponseBuilder.success(data={"conversation_id": conversation_id}, message="对话删除成功")
             else:
                 logger.warning("对话不存在或无权限删除", {"user_id": user_id, "conversation_id": conversation_id})
-                return JSONResponse(status_code=404, content=ResponseBuilder.not_found("对话不存在或无权限删除").dict())
+                return JSONResponse(status_code=404, content=ResponseBuilder.not_found("对话不存在或无权限删除").model_dump())
 
         except Exception as e:
             logger.error("删除对话失败", exception=e, extra_data={"conversation_id": conversation_id})
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("删除对话失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("删除对话失败").model_dump())
     
     @router.put("/{conversation_id}/title")
     async def update_conversation_title(conversation_id: str, request: Request, title_request: UpdateTitleRequest):
@@ -212,14 +212,14 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
                 return ResponseBuilder.success(data={"conversation_id": conversation_id, "title": title_request.title}, message="对话标题更新成功")
             else:
                 logger.warning("对话不存在或无权限修改", {"user_id": user_id, "conversation_id": conversation_id})
-                return JSONResponse(status_code=404, content=ResponseBuilder.not_found("对话不存在或无权限修改").dict())
+                return JSONResponse(status_code=404, content=ResponseBuilder.not_found("对话不存在或无权限修改").model_dump())
 
         except ValueError as e:
             logger.warning("更新对话标题参数错误", {"error": str(e), "conversation_id": conversation_id, "title": title_request.title})
-            return JSONResponse(status_code=400, content=ResponseBuilder.bad_request(str(e)).dict())
+            return JSONResponse(status_code=400, content=ResponseBuilder.bad_request(str(e)).model_dump())
         except Exception as e:
             logger.error("更新对话标题失败", exception=e, extra_data={"conversation_id": conversation_id, "title": title_request.title})
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("更新对话标题失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("更新对话标题失败").model_dump())
 
     @router.post("/apply_id")
     async def apply_conversation_id():
@@ -239,7 +239,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
 
         except Exception as e:
             logger.error("申请对话ID失败", exception=e)
-            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("申请对话ID失败").dict())
+            return JSONResponse(status_code=500, content=ResponseBuilder.internal_error("申请对话ID失败").model_dump())
 
     @router.post("/stop/{conversation_id}")
     async def stop_conversation(
@@ -264,7 +264,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
                 logger.error("停止会话失败：AgentExecutor未初始化")
                 return JSONResponse(
                     status_code=500,
-                    content=ResponseBuilder.internal_error("停止功能未启用").dict()
+                    content=ResponseBuilder.internal_error("停止功能未启用").model_dump()
                 )
 
             # 调用 agent_executor 的 stop 方法
@@ -294,7 +294,7 @@ def create_conversations_router(conversation_manager: ConversationManager, agent
             logger.error("停止会话失败", exception=e, extra_data={"conversation_id": conversation_id})
             return JSONResponse(
                 status_code=500,
-                content=ResponseBuilder.internal_error("停止会话失败").dict()
+                content=ResponseBuilder.internal_error("停止会话失败").model_dump()
             )
 
     logger.info("会话管理路由初始化完成")

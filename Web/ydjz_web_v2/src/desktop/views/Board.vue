@@ -479,6 +479,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 420px;
 }
 
 /* 总资产卡片 */

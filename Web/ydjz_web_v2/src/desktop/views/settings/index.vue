@@ -13,10 +13,12 @@ import {
   DocumentCopy,
   InfoFilled,
   ArrowRight,
-  Close
+  Close,
+  MagicStick
 } from '@element-plus/icons-vue'
 import { useThemeStore } from '@shared/stores/theme'
 import { homeApi, type VersionInfo } from '@shared/api/home'
+import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import logoUrl from '@shared/assets/logo.png'
 import './styles.css'
 
@@ -25,9 +27,15 @@ import ActionManager from './ActionManager.vue'
 import AccountManager from './AccountManager.vue'
 import TypeManager from './TypeManager.vue'
 import TemplateManager from './TemplateManager.vue'
+import AiSettings from './AiSettings.vue'
 
 const router = useRouter()
 const themeStore = useThemeStore()
+
+// AI 服务状态
+const aiHealth = ref<AiHealthResponse | null>(null)
+const aiServiceAvailable = computed(() => aiHealth.value !== null)
+const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === true)
 
 // 主题相关
 const themeOptions = [
@@ -79,7 +87,7 @@ function onLogout() {
   }).catch(() => {})
 }
 
-// 数据管理项
+// 数据管理项（不含 AI，AI 单独处理）
 const dataItems = [
   { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: CreditCard },
   { key: 'account', title: '账户管理', desc: '管理银行卡、现金等账户', icon: Wallet },
@@ -87,11 +95,20 @@ const dataItems = [
   { key: 'template', title: '快记模板', desc: '快速记账模板', icon: DocumentCopy },
 ]
 
+// AI 设置项
+const aiItem = { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick }
+
+// 检测 AI 服务
+async function checkAiService() {
+  aiHealth.value = await aiApi.checkHealth()
+}
+
 // 子组件抽屉状态
 const showActionDrawer = ref(false)
 const showAccountDrawer = ref(false)
 const showTypeDrawer = ref(false)
 const showTemplateDrawer = ref(false)
+const showAiDrawer = ref(false)
 
 function openDrawer(key: string) {
   if (key === 'action') {
@@ -102,11 +119,61 @@ function openDrawer(key: string) {
     showTypeDrawer.value = true
   } else if (key === 'template') {
     showTemplateDrawer.value = true
+  } else if (key === 'ai') {
+    // AI 配置未完成时显示提示
+    if (!aiConfigured.value) {
+      const missing = aiHealth.value?.data?.llm?.missing || []
+      ElMessageBox.alert(
+        `<div class="ai-config-dialog">
+          <div class="dialog-icon">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <p class="dialog-title">AI 服务未完成配置</p>
+          <p class="dialog-desc">请在 <code>docker-compose.yml</code> 的 AI 容器中配置以下环境变量：</p>
+          <div class="missing-list">
+            ${missing.map(m => `<div class="missing-item"><code>${m}</code></div>`).join('')}
+          </div>
+          <div class="config-example">
+            <div class="example-title">配置说明</div>
+            <div class="config-fields">
+              <div class="config-field">
+                <code>LLM_EASY_ACCOUNTS_API_KEY</code>
+                <span>LLM 服务的 API 密钥</span>
+              </div>
+              <div class="config-field">
+                <code>LLM_EASY_ACCOUNTS_URL</code>
+                <span>LLM 服务的 API 地址（OpenAI 兼容格式）</span>
+              </div>
+              <div class="config-field">
+                <code>LLM_EASY_ACCOUNTS_MODEL</code>
+                <span>使用的模型名称</span>
+              </div>
+            </div>
+            <div class="example-title" style="margin-top: 12px;">配置示例</div>
+            <pre>- LLM_EASY_ACCOUNTS_API_KEY=sk-your-key
+- LLM_EASY_ACCOUNTS_URL=https://api.openai.com/v1
+- LLM_EASY_ACCOUNTS_MODEL=gpt-3.5-turbo</pre>
+          </div>
+        </div>`,
+        '',
+        {
+          dangerouslyUseHTMLString: true,
+          confirmButtonText: '知道了',
+          customClass: 'ai-config-message-box',
+          showClose: false,
+        }
+      )
+      return
+    }
+    showAiDrawer.value = true
   }
 }
 
 onMounted(() => {
   loadVersion()
+  checkAiService()
 })
 </script>
 
@@ -131,6 +198,25 @@ onMounted(() => {
             <div class="card-info">
               <div class="card-title">{{ item.title }}</div>
               <div class="card-desc">{{ item.desc }}</div>
+            </div>
+            <el-icon class="card-arrow"><ArrowRight /></el-icon>
+          </div>
+          <!-- AI 设置卡片 (仅在 AI 服务可用时显示) -->
+          <div
+            v-if="aiServiceAvailable"
+            class="data-card"
+            :class="{ 'ai-unconfigured': !aiConfigured }"
+            @click="openDrawer('ai')"
+          >
+            <div class="card-icon ai-icon">
+              <el-icon :size="24"><component :is="aiItem.icon" /></el-icon>
+            </div>
+            <div class="card-info">
+              <div class="card-title">
+                {{ aiItem.title }}
+                <el-tag v-if="!aiConfigured" size="small" type="warning" style="margin-left: 8px;">未配置</el-tag>
+              </div>
+              <div class="card-desc">{{ aiItem.desc }}</div>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
@@ -242,6 +328,7 @@ onMounted(() => {
     <AccountManager v-model:visible="showAccountDrawer" />
     <TypeManager v-model:visible="showTypeDrawer" />
     <TemplateManager v-model:visible="showTemplateDrawer" />
+    <AiSettings v-model:visible="showAiDrawer" />
   </div>
 </template>
 
@@ -334,6 +421,19 @@ onMounted(() => {
 
 .card-arrow {
   color: var(--color-text-tertiary);
+}
+
+/* AI 卡片特殊样式 */
+.card-icon.ai-icon {
+  background: var(--color-transfer);
+}
+
+.data-card.ai-unconfigured {
+  opacity: 0.7;
+}
+
+.data-card.ai-unconfigured .card-icon.ai-icon {
+  background: var(--color-text-tertiary);
 }
 
 /* 外观设置 */
@@ -592,5 +692,159 @@ html.dark .about-close {
 html.dark .about-close:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--color-text-secondary);
+}
+
+/* 暗色模式下的卡片图标 */
+html.dark .card-icon {
+  background: var(--color-transfer);
+}
+
+html.dark .data-card.ai-unconfigured .card-icon.ai-icon {
+  background: var(--color-text-quaternary);
+}
+
+/* AI 配置对话框样式 */
+.ai-config-message-box .el-message-box__header {
+  display: none;
+}
+
+.ai-config-message-box .el-message-box__content {
+  padding: 0;
+}
+
+.ai-config-message-box .el-message-box__btns {
+  padding: 16px 24px 24px;
+}
+
+.ai-config-message-box .el-message-box {
+  border-radius: 16px;
+  overflow: hidden;
+  width: 480px;
+  max-width: 90vw;
+}
+
+.ai-config-dialog {
+  text-align: center;
+  padding: 32px 24px 16px;
+}
+
+.ai-config-dialog .dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, rgba(250, 173, 20, 0.15) 0%, rgba(250, 140, 22, 0.15) 100%);
+  border-radius: 50%;
+  margin-bottom: 20px;
+  color: #faad14;
+}
+
+.ai-config-dialog .dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 8px 0;
+}
+
+.ai-config-dialog .dialog-desc {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 16px 0;
+}
+
+.ai-config-dialog .dialog-desc code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.ai-config-dialog .missing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.ai-config-dialog .missing-item {
+  background: rgba(245, 34, 45, 0.08);
+  border: 1px solid rgba(245, 34, 45, 0.2);
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+.ai-config-dialog .missing-item code {
+  color: #f5222d;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ai-config-dialog .config-example {
+  background: var(--color-bg-page, #f5f5f5);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: left;
+}
+
+.ai-config-dialog .example-title {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-config-dialog .config-example pre {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-config-dialog .config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ai-config-dialog .config-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.ai-config-dialog .config-field code {
+  flex-shrink: 0;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ai-config-dialog .config-field span {
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+/* 暗色模式 */
+html.dark .ai-config-dialog .dialog-desc code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .ai-config-dialog .missing-item {
+  background: rgba(245, 34, 45, 0.15);
+  border-color: rgba(245, 34, 45, 0.3);
+}
+
+html.dark .ai-config-dialog .config-example {
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>

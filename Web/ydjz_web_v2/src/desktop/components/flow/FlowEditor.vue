@@ -666,6 +666,7 @@ async function onSubmit() {
         confirmButtonText: '确认',
         cancelButtonText: '取消',
         type: 'info',
+        customClass: 'flow-editor-message-box',
       }
     )
   } catch {
@@ -726,6 +727,7 @@ async function onDelete() {
         confirmButtonText: '确定删除',
         cancelButtonText: '取消',
         type: 'warning',
+        customClass: 'flow-editor-message-box',
       }
     )
 
@@ -2231,6 +2233,15 @@ function onClose() {
 .flow-editor-drawer .el-drawer__body {
   padding: 0;
   overflow: hidden;
+}
+
+/* MessageBox 层级：确保在抽屉(z-index:3000)之上 */
+.flow-editor-message-box {
+  z-index: 3100 !important;
+}
+
+.el-overlay:has(.flow-editor-message-box) {
+  z-index: 3050 !important;
 }
 
 /* 暗色模式 */

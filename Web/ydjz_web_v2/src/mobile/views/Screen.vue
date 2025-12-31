@@ -8,6 +8,7 @@ import { accountApi, type Account } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { flowApi, type Flow } from '@shared/api/flow'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import { consumeScreenParams, type ScreenParams } from '@shared/services/screenParams'
 import FlowItem from '@mobile/components/FlowItem.vue'
 
 const router = useRouter()
@@ -353,15 +354,50 @@ async function onMakeExcel() {
   }
 }
 
+// 应用 AI 传递的筛选参数
+function applyExternalParams(params: ScreenParams) {
+  // 先重置所有筛选条件
+  startDate.value = ''
+  endDate.value = ''
+  singleMonth.value = false  // 默认不限月份
+  accountId.value = -1
+  accountName.value = '全部账户'
+  handleType.value = 3
+  collectOnly.value = false
+  chooseActions.value = []
+  chooseTypes.value = []
+  searchNote.value = ''
+  fastChoose.value = -1
+
+  // 应用新参数
+  if (params.startDate) startDate.value = params.startDate
+  if (params.endDate) endDate.value = params.endDate
+  if (params.singleMonth !== undefined) singleMonth.value = params.singleMonth
+  if (params.accountId !== undefined && params.accountId !== -1) accountId.value = params.accountId
+  if (params.chooseHandle !== undefined) handleType.value = params.chooseHandle
+  if (params.collect) collectOnly.value = params.collect === true || params.collect === 'true'
+  if (params.actions?.length) chooseActions.value = [...params.actions]
+  if (params.types?.length) chooseTypes.value = [...params.types]
+  if (params.note) searchNote.value = params.note
+}
+
 // ==================== 生命周期 ====================
 onMounted(() => {
-  // 初始化日期为当月
-  const now = new Date()
-  startDate.value = formatDate(new Date(now.getFullYear(), now.getMonth(), 1))
+  // 检查是否有 AI 传递的参数
+  const externalParams = consumeScreenParams()
 
-  // 检查路由参数
-  if (route.query.acid) {
-    accountId.value = Number(route.query.acid)
+  if (externalParams) {
+    // 应用 AI 传递的参数
+    applyExternalParams(externalParams)
+  } else {
+    // 初始化日期为当月
+    const now = new Date()
+    startDate.value = formatDate(new Date(now.getFullYear(), now.getMonth(), 1))
+
+    // 检查路由参数
+    if (route.query.acid) {
+      accountId.value = Number(route.query.acid)
+    }
   }
 
   fetchActions()

@@ -13,9 +13,14 @@ function switchTab(tab: TabType) {
   activeTab.value = tab
 }
 
-// 监听路由参数变化，如果带 month 参数则自动切回明细
-watch(() => route.query.month, (newMonth) => {
-  if (newMonth) {
+// 监听路由参数变化
+watch(() => route.query, (query) => {
+  // 如果带 tab=screen 参数则切换到筛选
+  if (query.tab === 'screen') {
+    activeTab.value = 'screen'
+  }
+  // 如果带 month 参数则切回明细
+  else if (query.month) {
     activeTab.value = 'list'
   }
 }, { immediate: true })

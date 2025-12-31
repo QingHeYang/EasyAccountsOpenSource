@@ -719,7 +719,7 @@ onMounted(() => {
 /* 列表头 */
 .list-header {
   display: grid;
-  grid-template-columns: 60px 180px 240px 1fr 120px 80px;
+  grid-template-columns: 60px 220px 200px 1fr 120px 80px;
   gap: 16px;
   padding: 12px 16px;
   font-size: 13px;

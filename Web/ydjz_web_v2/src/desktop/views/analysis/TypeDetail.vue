@@ -1278,7 +1278,7 @@ function formatFlowTime(dateStr: string): string {
 /* 列表头 - 与 FlowList.vue 一致 */
 .list-header {
   display: grid;
-  grid-template-columns: 60px 180px 240px 1fr 120px;
+  grid-template-columns: 60px 220px 200px 1fr 120px;
   gap: 16px;
   padding: 12px 16px;
   font-size: 13px;
@@ -1335,7 +1335,7 @@ function formatFlowTime(dateStr: string): string {
 
 /* 覆盖 FlowItem 的 grid 布局（无操作列） */
 :deep(.group-items .flow-item) {
-  grid-template-columns: 60px 180px 240px 1fr 120px;
+  grid-template-columns: 60px 220px 200px 1fr 120px;
 }
 
 /* 暗色模式 */

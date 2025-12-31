@@ -129,6 +129,13 @@ const routes = [
     component: () => import('./views/setting/template/TemplateTag.vue'),
     meta: { title: '标签管理' },
   },
+  // AI 设置
+  {
+    path: '/setting/ai',
+    name: 'SettingAi',
+    component: () => import('./views/setting/AiSettings.vue'),
+    meta: { title: 'AI+ 设置' },
+  },
   // 流水记账
   {
     path: '/flow/add',
@@ -155,6 +162,13 @@ const routes = [
     name: 'AnalysisType',
     component: () => import('./views/analysis/AnalysisType.vue'),
     meta: { title: '分类统计' },
+  },
+  // AI 助手
+  {
+    path: '/ai',
+    name: 'AI',
+    component: () => import('./views/AI.vue'),
+    meta: { title: 'AI 助手' },
   },
 ]
 

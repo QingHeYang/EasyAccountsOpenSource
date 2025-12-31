@@ -4,11 +4,15 @@ import { useRoute } from 'vue-router'
 import { House, List, TrendCharts, Setting } from '@element-plus/icons-vue'
 import logoUrl from '@shared/assets/logo.png'
 import { AIDrawer, AITriggerButton } from '@desktop/components/ai-plus'
+import { aiApi } from '@shared/api/ai'
 
 const route = useRoute()
 
 // AI 抽屉状态
 const aiDrawerOpen = ref(false)
+
+// AI 服务可用状态
+const aiServiceAvailable = ref(false)
 
 // 滚动状态
 const isScrolled = ref(false)
@@ -17,9 +21,17 @@ function handleScroll() {
   isScrolled.value = window.scrollY > 20
 }
 
+// 检测 AI 服务可用性
+async function checkAiService() {
+  const health = await aiApi.checkHealth()
+  // 服务可用且 LLM 已配置
+  aiServiceAvailable.value = health !== null && health.data?.llm?.configured === true
+}
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
   handleScroll()
+  checkAiService()
 })
 
 onUnmounted(() => {
@@ -109,8 +121,8 @@ const sliderStyle = computed(() => ({
       <AIDrawer v-model="aiDrawerOpen" />
     </div>
 
-    <!-- AI 触发按钮 -->
-    <AITriggerButton :visible="!aiDrawerOpen" @click="aiDrawerOpen = true" />
+    <!-- AI 触发按钮 (仅在 AI 服务可用时显示) -->
+    <AITriggerButton v-if="aiServiceAvailable" :visible="!aiDrawerOpen" @click="aiDrawerOpen = true" />
   </div>
 </template>
 

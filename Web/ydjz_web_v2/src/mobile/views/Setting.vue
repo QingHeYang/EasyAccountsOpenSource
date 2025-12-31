@@ -3,11 +3,17 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useThemeStore } from '@shared/stores/theme'
 import { homeApi, type VersionInfo } from '@shared/api/home'
+import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import { showConfirmDialog } from 'vant'
 import logoUrl from '@shared/assets/logo.png'
 
 const router = useRouter()
 const themeStore = useThemeStore()
+
+// AI 服务状态
+const aiHealth = ref<AiHealthResponse | null>(null)
+const aiServiceAvailable = computed(() => aiHealth.value !== null)
+const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === true)
 
 // 主题相关
 const themeText = computed(() => {
@@ -58,9 +64,32 @@ function onLogout() {
   }).catch(() => {})
 }
 
+// 检测 AI 服务
+async function checkAiService() {
+  aiHealth.value = await aiApi.checkHealth()
+}
+
+// 点击 AI 设置
+function onAiClick() {
+  if (!aiConfigured.value) {
+    // AI 未配置时显示提示
+    const missing = aiHealth.value?.data?.llm?.missing || []
+    showConfirmDialog({
+      title: 'AI 服务未配置',
+      message: `请在 docker-compose.yml 中配置以下环境变量：\n\n${missing.join('\n')}`,
+      showCancelButton: false,
+      confirmButtonText: '知道了',
+    }).catch(() => {})
+    return
+  }
+  router.push('/setting/ai')
+}
+
 onMounted(() => {
   // 预加载版本信息
   loadVersion()
+  // 检测 AI 服务
+  checkAiService()
 })
 </script>
 
@@ -98,6 +127,19 @@ onMounted(() => {
           is-link
           to="/setting/template"
         />
+        <!-- AI+ 设置（仅在 AI 服务可用时显示） -->
+        <van-cell
+          v-if="aiServiceAvailable"
+          title="AI+ 设置"
+          icon="fire-o"
+          is-link
+          :class="{ 'ai-unconfigured': !aiConfigured }"
+          @click="onAiClick"
+        >
+          <template #value>
+            <van-tag v-if="!aiConfigured" type="warning" size="small">未配置</van-tag>
+          </template>
+        </van-cell>
       </van-cell-group>
 
       <!-- 外观设置 -->
@@ -360,6 +402,11 @@ onMounted(() => {
   margin-top: 20px;
   font-size: 12px;
   color: var(--color-text-tertiary);
+}
+
+/* AI 未配置状态 */
+.ai-unconfigured {
+  opacity: 0.7;
 }
 </style>
 

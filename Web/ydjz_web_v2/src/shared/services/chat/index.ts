@@ -24,3 +24,19 @@ export type {
 
 export { chatService, useChatService } from './chatService'
 export type { ConnectionState, ChatConfig } from './chatService'
+
+// 工具解析助手
+export {
+  toolNameMap,
+  toolPrefixMap,
+  nonClickableTools,
+  navigableTools,
+  parseToolData,
+  getToolDisplayName,
+  getToolExtraInfo,
+  isToolClickable,
+  isToolNavigable,
+  getToolNavigationParams,
+  formatToolJson
+} from './toolHelper'
+export type { FlowsNavigationParams, ToolNavigationResult } from './toolHelper'

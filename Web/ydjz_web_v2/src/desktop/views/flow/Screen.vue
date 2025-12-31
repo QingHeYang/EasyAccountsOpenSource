@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, RefreshRight, Download, Filter, Close, Top } from '@element-plus/icons-vue'
 import { screenApi, type ScreenFlowParams } from '@shared/api/screen'
@@ -7,8 +8,12 @@ import { actionApi, type Action } from '@shared/api/action'
 import { accountApi, type Account } from '@shared/api/account'
 import { typeApi } from '@shared/api/type'
 import { flowApi, type Flow } from '@shared/api/flow'
+import { consumeScreenParams, hasScreenParams, type ScreenParams } from '@shared/services/screenParams'
 import FlowItem from '@desktop/components/FlowItem.vue'
 import FlowEditor from '@desktop/components/flow/FlowEditor.vue'
+
+// 路由
+const route = useRoute()
 
 // ==================== 筛选条件 ====================
 const searchNote = ref('')
@@ -242,6 +247,28 @@ function applyFilter() {
   fetchFlows()
 }
 
+// 清除单个筛选条件并刷新
+function clearFilterAndRefresh(type: 'account' | 'handle' | 'actions' | 'types' | 'collect') {
+  switch (type) {
+    case 'account':
+      accountId.value = -1
+      break
+    case 'handle':
+      handleType.value = 3
+      break
+    case 'actions':
+      chooseActions.value = []
+      break
+    case 'types':
+      chooseTypes.value = []
+      break
+    case 'collect':
+      collectOnly.value = false
+      break
+  }
+  fetchFlows()
+}
+
 function toggleAction(actionId: number) {
   const idx = chooseActions.value.indexOf(actionId)
   if (idx > -1) {
@@ -367,11 +394,76 @@ function onMakeExcel() {
   }).catch(() => {})
 }
 
+// 应用外部传入的筛选参数
+function applyExternalParams(params: ScreenParams) {
+  // 先重置所有筛选条件到默认值（避免残留）
+  startDate.value = ''
+  endDate.value = ''
+  singleMonth.value = false  // 默认不限月份，避免没有日期时报错
+  accountId.value = -1
+  handleType.value = 3
+  collectOnly.value = false
+  chooseActions.value = []
+  chooseTypes.value = []
+  searchNote.value = ''
+  fastChoose.value = -1
+
+  // 再设置新的参数
+  if (params.startDate) {
+    startDate.value = params.startDate
+  }
+  if (params.endDate) {
+    endDate.value = params.endDate
+  }
+  if (params.singleMonth !== undefined) {
+    singleMonth.value = params.singleMonth
+  }
+  if (params.chooseHandle !== undefined) {
+    handleType.value = Number(params.chooseHandle)
+  }
+  if (params.actions && params.actions.length > 0) {
+    chooseActions.value = params.actions.map(a => Number(a))
+  }
+  if (params.types && params.types.length > 0) {
+    chooseTypes.value = params.types.map(t => Number(t))
+  }
+  if (params.accountId !== undefined) {
+    accountId.value = Number(params.accountId)
+  }
+  if (params.collect !== undefined) {
+    collectOnly.value = params.collect === true || params.collect === 'true'
+  }
+  if (params.note) {
+    searchNote.value = params.note
+  }
+}
+
 // ==================== 生命周期 ====================
+
+// 监听路由变化（处理已在筛选页时从 AI 再次跳转的情况）
+watch(() => route.fullPath, () => {
+  // 只在有外部参数时处理（避免其他路由变化触发）
+  if (hasScreenParams()) {
+    const externalParams = consumeScreenParams()
+    if (externalParams) {
+      applyExternalParams(externalParams)
+      fetchFlows()
+    }
+  }
+})
+
 onMounted(() => {
-  // 初始化日期为当月
-  const now = new Date()
-  startDate.value = formatDate(new Date(now.getFullYear(), now.getMonth(), 1))
+  // 检查是否有外部传入的筛选参数（如从 AI 工具跳转）
+  const externalParams = consumeScreenParams()
+
+  if (externalParams) {
+    // 应用外部参数
+    applyExternalParams(externalParams)
+  } else {
+    // 默认初始化日期为当月
+    const now = new Date()
+    startDate.value = formatDate(new Date(now.getFullYear(), now.getMonth(), 1))
+  }
 
   fetchActions()
   fetchAccounts()
@@ -485,19 +577,19 @@ onMounted(() => {
           <div class="filter-summary" v-if="hasActiveFilters">
             <span class="summary-label">已筛选：</span>
             <span class="summary-tags">
-              <el-tag v-if="accountId !== -1" size="small" closable @close="accountId = -1">
+              <el-tag v-if="accountId !== -1" size="small" closable @close="clearFilterAndRefresh('account')">
                 {{ allAccounts.find(a => a.id === accountId)?.name }}
               </el-tag>
-              <el-tag v-if="handleType !== 3" size="small" closable @close="handleType = 3">
+              <el-tag v-if="handleType !== 3" size="small" closable @close="clearFilterAndRefresh('handle')">
                 {{ handleOptions.find(h => h.value === handleType)?.label }}
               </el-tag>
-              <el-tag v-if="chooseActions.length" size="small" closable @close="chooseActions = []">
+              <el-tag v-if="chooseActions.length" size="small" closable @close="clearFilterAndRefresh('actions')">
                 {{ chooseActions.length }}个类型
               </el-tag>
-              <el-tag v-if="chooseTypes.length" size="small" closable @close="chooseTypes = []">
+              <el-tag v-if="chooseTypes.length" size="small" closable @close="clearFilterAndRefresh('types')">
                 {{ chooseTypes.length }}个分类
               </el-tag>
-              <el-tag v-if="collectOnly" size="small" closable @close="collectOnly = false">
+              <el-tag v-if="collectOnly" size="small" closable @close="clearFilterAndRefresh('collect')">
                 仅收藏
               </el-tag>
             </span>
@@ -714,7 +806,7 @@ onMounted(() => {
 /* 列表头 */
 .list-header {
   display: grid;
-  grid-template-columns: 60px 180px 240px 1fr 120px 80px;
+  grid-template-columns: 60px 220px 200px 1fr 120px 80px;
   gap: 16px;
   padding: 12px 16px;
   font-size: 13px;

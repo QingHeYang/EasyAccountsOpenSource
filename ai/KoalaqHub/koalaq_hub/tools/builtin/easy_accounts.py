@@ -31,6 +31,12 @@ YEAR_STATISTICS_PARAMS = [
 # 流水查询参数
 FLOWS_PARAMS = [
     ToolParam(
+        name="title",
+        param_type="string",
+        description="操作标题，用于前端显示，如'查询12月支出'、'本月餐饮消费'",
+        required=True
+    ),
+    ToolParam(
         name="handle",
         param_type="integer",
         description="收支类型：0=收入，1=支出，2=内部转账，3=全部。必填",
@@ -89,6 +95,12 @@ FLOWS_PARAMS = [
 # 添加流水参数
 ADD_FLOW_PARAMS = [
     ToolParam(
+        name="title",
+        param_type="string",
+        description="操作标题，用于前端显示，如'记录午餐支出'、'添加工资收入'",
+        required=True
+    ),
+    ToolParam(
         name="accountId",
         param_type="integer",
         description="账户ID，必填。使用accounts工具获取",
@@ -121,8 +133,8 @@ ADD_FLOW_PARAMS = [
     ToolParam(
         name="note",
         param_type="string",
-        description="备注，可选",
-        required=False
+        description="备注，必填。简要描述这笔流水的用途或来源，如'公司午餐'、'12月工资'",
+        required=True
     ),
     ToolParam(
         name="accountToId",
@@ -141,16 +153,29 @@ ADD_FLOW_PARAMS = [
 # 更新流水参数
 UPDATE_FLOW_PARAMS = [
     ToolParam(
+        name="title",
+        param_type="string",
+        description="操作标题，用于前端显示，如'修改午餐金额'、'更新备注信息'",
+        required=True
+    ),
+    ToolParam(
         name="flowId",
         param_type="integer",
         description="流水ID，必填。通过flows工具查询获取",
         required=True
     ),
-    *ADD_FLOW_PARAMS  # 复用添加流水的参数
+    # 复用添加流水的参数（跳过title，因为已经定义了）
+    *[p for p in ADD_FLOW_PARAMS if p.name != "title"]
 ]
 
 # 生成Excel参数
 MAKE_EXCEL_PARAMS = [
+    ToolParam(
+        name="title",
+        param_type="string",
+        description="操作标题，用于前端显示，如'导出12月账单'、'生成年度报表'",
+        required=True
+    ),
     ToolParam(
         name="excelName",
         param_type="string",
@@ -475,12 +500,28 @@ class FlowsTool(BaseTool):
                         parts.append(f"备注:{flow.get('note')}")
                     flows_list.append(";".join(parts))
 
+                # 构建前端可直接使用的查询参数（与前端调用接口一致）
+                query_params = {
+                    "accountId": arguments.get("accountId"),
+                    "actions": [],
+                    "chooseHandle": handle,
+                    "collect": "false",
+                    "endDate": arguments.get("endDate"),
+                    "note": arguments.get("note"),
+                    "singleMonth": arguments.get("singleMonth"),
+                    "startDate": arguments.get("startDate"),
+                    "types": arguments.get("types"),
+                }
+                # 移除 None 值
+                query_params = {k: v for k, v in query_params.items() if v is not None}
+
                 result = {
                     "summary": f"收入={totalIn},支出={totalOut},盈余={totalEarn}",
                     "flows": flows_list,
                     "total_count": total_count,
                     "returned_count": len(flows_list),
-                    "is_truncated": is_truncated
+                    "is_truncated": is_truncated,
+                    "queryParams": query_params  # 前端可直接用于调用筛选接口
                 }
                 if is_truncated:
                     result["notice"] = f"共{total_count}条，仅返回前{MAX_FLOWS}条，建议使用make_excel导出完整报表"
@@ -505,18 +546,24 @@ class AddFlowTool(BaseTool):
             client = _get_client(context)
             url = f"{client.base_url}/flow/addFlow"
 
+            # 处理备注，自动追加 #AI记账 标记
+            note = arguments.get("note", "")
+            if note and "#AI记账" not in note:
+                note = f"{note} #AI记账"
+            elif not note:
+                note = "#AI记账"
+
             payload = {
                 "accountId": arguments["accountId"],
                 "typeId": arguments["typeId"],
                 "actionId": arguments["actionId"],
                 "money": arguments["money"],
                 "fDate": arguments["fDate"],
+                "note": note,
                 "collect": arguments.get("collect", False),
                 "createDate": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "from": "ai"
             }
-            if arguments.get("note"):
-                payload["note"] = arguments["note"]
             if arguments.get("accountToId") is not None:
                 payload["accountToId"] = arguments["accountToId"]
 
@@ -528,7 +575,21 @@ class AddFlowTool(BaseTool):
                 )
 
                 if response.status_code == 200:
-                    return self._success(result=json.dumps({"success": True, "message": "流水添加成功", "data": response.json()}, ensure_ascii=False))
+                    resp_data = response.json()
+                    # 从响应中提取 flowId（可能在 data.id 或直接 id）
+                    flow_id = None
+                    if isinstance(resp_data, dict):
+                        if "data" in resp_data and isinstance(resp_data["data"], dict):
+                            flow_id = resp_data["data"].get("id") or resp_data["data"].get("flowId")
+                        else:
+                            flow_id = resp_data.get("id") or resp_data.get("flowId")
+
+                    return self._success(result=json.dumps({
+                        "success": True,
+                        "message": "流水添加成功",
+                        "flowId": flow_id,  # 前端可直接用于查看详情
+                        "data": resp_data
+                    }, ensure_ascii=False))
                 elif response.status_code == 401:
                     return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
                 else:
@@ -554,18 +615,24 @@ class UpdateFlowTool(BaseTool):
             client = _get_client(context)
             url = f"{client.base_url}/flow/updateFlow/{flow_id}"
 
+            # 处理备注，自动追加 #AI更新 标记
+            note = arguments.get("note", "")
+            if note and "#AI更新" not in note:
+                note = f"{note} #AI更新"
+            elif not note:
+                note = "#AI更新"
+
             payload = {
                 "accountId": arguments["accountId"],
                 "typeId": arguments["typeId"],
                 "actionId": arguments["actionId"],
                 "money": arguments["money"],
                 "fDate": arguments["fDate"],
+                "note": note,
                 "collect": arguments.get("collect", False),
                 "createDate": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "from": "ai"
             }
-            if arguments.get("note"):
-                payload["note"] = arguments["note"]
             if arguments.get("accountToId") is not None:
                 payload["accountToId"] = arguments["accountToId"]
 
@@ -577,7 +644,12 @@ class UpdateFlowTool(BaseTool):
                 )
 
                 if response.status_code == 200:
-                    return self._success(result=json.dumps({"success": True, "message": f"流水ID={flow_id}更新成功", "data": response.json()}, ensure_ascii=False))
+                    return self._success(result=json.dumps({
+                        "success": True,
+                        "message": f"流水ID={flow_id}更新成功",
+                        "flowId": flow_id,  # 前端可直接用于查看详情
+                        "data": response.json()
+                    }, ensure_ascii=False))
                 elif response.status_code == 401:
                     return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
                 else:
