@@ -99,7 +99,7 @@ class ChatService {
       messageStore.setConversationId(this._conversationId.value)
 
       // 构建 WebSocket URL（直接连接后端）
-      const baseUrl = 'ws://localhost:8001'
+      const baseUrl = 'ws://192.168.50.231:8001'
 
       // 从 localStorage 获取 token，用于工具调用认证
       const token = localStorage.getItem('token') || ''

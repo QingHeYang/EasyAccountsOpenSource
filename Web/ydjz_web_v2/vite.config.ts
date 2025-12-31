@@ -11,7 +11,7 @@ export default defineConfig({
       configureServer(server) {
         // 创建原生 http-proxy 实例（SSE需要特殊配置）
         const proxy = httpProxy.createProxyServer({
-          target: 'http://localhost:8001',
+          target: 'http://192.168.50.231:8001',
           changeOrigin: true,
           // SSE 关键配置
           selfHandleResponse: false,
@@ -107,7 +107,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/ai-api': {
-        target: 'http://localhost:8001',
+        target: 'http://192.168.50.231:8001',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ai-api/, ''),
       },

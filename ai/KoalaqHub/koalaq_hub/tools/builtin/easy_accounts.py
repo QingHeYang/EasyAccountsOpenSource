@@ -12,7 +12,6 @@ import httpx
 from ..base import BaseTool, ToolParam, tool
 from ..registry import register_tool
 from ...config.settings import config
-from ...database.repository_adapter import RepositoryAdapter
 
 
 # ==============================================================================
@@ -148,12 +147,6 @@ ADD_FLOW_PARAMS = [
         param_type="boolean",
         description="是否收藏，可选，默认false",
         required=False
-    ),
-    ToolParam(
-        name="images",
-        param_type="array",
-        description="图片序号列表，可选。用户上传图片按顺序编号（从1开始），如 [1] 表示第1张图片，[1,2] 表示第1和第2张图片",
-        required=False
     )
 ]
 
@@ -260,11 +253,10 @@ FLOWS_DESC = (
 
 ADD_FLOW_DESC = (
     "添加一条流水记录。可以记录收入、支出或内部转账。"
-    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId 3.用current_date获取日期。"
-    "如果用户上传了图片，可通过images参数指定图片序号（从1开始）作为流水附件。"
+    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId 3.用current_date获取日期"
 )
 
-UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。如果用户上传了图片，可通过images参数指定图片序号作为附件。"
+UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。"
 
 MAKE_EXCEL_DESC = (
     "根据流水查询条件生成Excel报表。参数与flows工具类似，输出为Excel文件下载链接。"
@@ -575,21 +567,6 @@ class AddFlowTool(BaseTool):
             if arguments.get("accountToId") is not None:
                 payload["accountToId"] = arguments["accountToId"]
 
-            # 处理图片附件（索引转文件名）
-            image_indices = arguments.get("images")
-            if image_indices:
-                round_id = context.get("round_id")
-                if round_id:
-                    repo = RepositoryAdapter()
-                    user_attachments = repo.get_user_attachments_by_round(round_id)
-                    # 根据索引获取文件名（索引从1开始）
-                    filenames = []
-                    for idx in image_indices:
-                        if isinstance(idx, int) and 1 <= idx <= len(user_attachments):
-                            filenames.append(user_attachments[idx - 1])
-                    if filenames:
-                        payload["images"] = filenames
-
             async with httpx.AsyncClient() as http_client:
                 response = await http_client.post(
                     url,
@@ -658,21 +635,6 @@ class UpdateFlowTool(BaseTool):
             }
             if arguments.get("accountToId") is not None:
                 payload["accountToId"] = arguments["accountToId"]
-
-            # 处理图片附件（索引转文件名）
-            image_indices = arguments.get("images")
-            if image_indices:
-                round_id = context.get("round_id")
-                if round_id:
-                    repo = RepositoryAdapter()
-                    user_attachments = repo.get_user_attachments_by_round(round_id)
-                    # 根据索引获取文件名（索引从1开始）
-                    filenames = []
-                    for idx in image_indices:
-                        if isinstance(idx, int) and 1 <= idx <= len(user_attachments):
-                            filenames.append(user_attachments[idx - 1])
-                    if filenames:
-                        payload["images"] = filenames
 
             async with httpx.AsyncClient() as http_client:
                 response = await http_client.put(
