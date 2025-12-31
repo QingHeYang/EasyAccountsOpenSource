@@ -34,7 +34,7 @@
 1. `current_date` → 获取日期（用户未指定时）
 2. `accounts` → 获取账户ID
 3. `types` → 获取分类ID和actionId
-4. `add_flow` → 添加记录
+4. `add_flow` → 添加记录（如有图片，用images参数指定序号）
 
 ### 更新流水
 1. `flows` → 查询获取流水ID
@@ -64,3 +64,4 @@
 - actionId 不是 handle，必须从 types 工具获取
 - 内部转账需要 accountToId（转入账户）
 - 日期格式统一 yyyy-MM-dd
+- 图片附件：用户上传图片时，用 images 参数指定图片序号（从1开始），如 [1] 或 [1,2]

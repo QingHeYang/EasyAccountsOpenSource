@@ -260,10 +260,11 @@ FLOWS_DESC = (
 
 ADD_FLOW_DESC = (
     "添加一条流水记录。可以记录收入、支出或内部转账。"
-    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId 3.用current_date获取日期"
+    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId 3.用current_date获取日期。"
+    "如果用户上传了图片，可通过images参数指定图片序号（从1开始）作为流水附件。"
 )
 
-UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。"
+UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。如果用户上传了图片，可通过images参数指定图片序号作为附件。"
 
 MAKE_EXCEL_DESC = (
     "根据流水查询条件生成Excel报表。参数与flows工具类似，输出为Excel文件下载链接。"
