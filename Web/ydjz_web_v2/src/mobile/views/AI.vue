@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, showLoadingToast, closeToast } from 'vant'
+import { showToast, showLoadingToast, closeToast, showImagePreview } from 'vant'
 import MarkdownIt from 'markdown-it'
 import {
   useChatService,
@@ -14,6 +14,8 @@ import {
   getToolNavigationParams
 } from '@shared/services/chat'
 import { setScreenParams } from '@shared/services/screenParams'
+import { imageApi } from '@shared/api/image'
+import { compressImageForAI } from '@shared/utils/image-compress'
 
 const router = useRouter()
 
@@ -45,6 +47,13 @@ const { mainMessages } = useMessageStore()
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const sending = ref(false)
+
+// 图片附件状态
+const pendingAttachments = ref<Array<{ filename: string; previewUrl: string }>>([])
+const isUploading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const MAX_ATTACHMENTS = 3
+const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg']
 
 // 思维链展开状态
 const reasoningExpanded = ref<Record<string, boolean>>({})
@@ -99,9 +108,11 @@ async function handleSend() {
   sending.value = true
 
   try {
-    const success = sendChatMessage(content)
+    const attachments = pendingAttachments.value.map(a => a.filename)
+    const success = sendChatMessage(content, attachments.length > 0 ? attachments : undefined)
     if (success) {
       inputText.value = ''
+      pendingAttachments.value = []
     } else {
       showToast('发送失败，请检查连接')
     }
@@ -114,7 +125,87 @@ async function handleSend() {
 function handleNewConversation() {
   newConversation()
   reasoningExpanded.value = {}
+  pendingAttachments.value = []
   showToast('已开启新对话')
+}
+
+// ==================== 图片附件处理 ====================
+
+// 点击添加图片
+function handleClickAddImage() {
+  fileInputRef.value?.click()
+}
+
+// 文件选择变化
+async function handleFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    await processFiles(Array.from(input.files))
+    input.value = ''
+  }
+}
+
+// 处理文件列表
+async function processFiles(files: File[]) {
+  const imageFiles = files.filter(f => ALLOWED_TYPES.includes(f.type))
+
+  if (imageFiles.length === 0) {
+    showToast('仅支持 PNG 和 JPG')
+    return
+  }
+
+  const remaining = MAX_ATTACHMENTS - pendingAttachments.value.length
+  if (remaining <= 0) {
+    showToast(`最多 ${MAX_ATTACHMENTS} 张图片`)
+    return
+  }
+
+  const filesToProcess = imageFiles.slice(0, remaining)
+  if (imageFiles.length > remaining) {
+    showToast(`已选择前 ${remaining} 张`)
+  }
+
+  isUploading.value = true
+  showLoadingToast({ message: '上传中...', forbidClick: true, duration: 0 })
+
+  for (const file of filesToProcess) {
+    try {
+      const compressed = await compressImageForAI(file)
+      const res = await imageApi.upload(compressed)
+      const fileName = res.data.data?.fileName
+      if (fileName) {
+        pendingAttachments.value.push({
+          filename: fileName,
+          previewUrl: imageApi.getUrl(fileName)
+        })
+      } else {
+        showToast('上传失败')
+      }
+    } catch (err) {
+      console.error('图片处理失败:', err)
+      showToast('处理失败')
+    }
+  }
+
+  closeToast()
+  isUploading.value = false
+}
+
+// 移除附件
+function removeAttachment(index: number) {
+  pendingAttachments.value.splice(index, 1)
+}
+
+// 预览图片
+function previewImage(url: string, urls?: string[]) {
+  if (urls && urls.length > 0) {
+    showImagePreview({
+      images: urls,
+      startPosition: urls.indexOf(url)
+    })
+  } else {
+    showImagePreview([url])
+  }
 }
 
 // 重新连接
@@ -242,6 +333,16 @@ function handleToolClick(msg: UnifiedMessage) {
           <!-- 用户消息 -->
           <div v-if="msg.role === 'user'" class="message-item user">
             <div class="message-bubble user-bubble">
+              <!-- 附件图片 -->
+              <div v-if="msg.content.attachments?.length" class="message-images">
+                <img
+                  v-for="filename in msg.content.attachments"
+                  :key="filename"
+                  :src="imageApi.getUrl(filename)"
+                  class="message-image"
+                  @click="previewImage(imageApi.getUrl(filename), msg.content.attachments!.map(f => imageApi.getUrl(f)))"
+                />
+              </div>
               <div class="message-text">{{ msg.content.text }}</div>
             </div>
             <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
@@ -327,25 +428,70 @@ function handleToolClick(msg: UnifiedMessage) {
 
     <!-- 底部输入区 -->
     <div class="input-bar">
-      <div class="input-wrapper">
-        <van-field
-          v-model="inputText"
-          type="textarea"
-          placeholder="输入消息..."
-          :disabled="connectionState !== 'connected'"
-          :autosize="{ minHeight: 24, maxHeight: 100 }"
-          maxlength="500"
-          @keypress.enter.prevent="handleSend"
-        />
+      <!-- 图片预览区 -->
+      <div v-if="pendingAttachments.length > 0" class="attachments-preview">
+        <div
+          v-for="(att, index) in pendingAttachments"
+          :key="att.filename"
+          class="attachment-item"
+        >
+          <img :src="att.previewUrl" :alt="att.filename" class="attachment-thumb" />
+          <div class="attachment-remove" @click="removeAttachment(index)">
+            <van-icon name="cross" size="10" />
+          </div>
+        </div>
+        <div
+          v-if="pendingAttachments.length < MAX_ATTACHMENTS"
+          class="attachment-add"
+          @click="handleClickAddImage"
+        >
+          <van-icon name="plus" size="16" />
+        </div>
       </div>
-      <div
-        class="send-btn"
-        :class="{ disabled: !canSend, loading: sending || isStreaming }"
-        @click="handleSend"
-      >
-        <van-loading v-if="sending || isStreaming" size="18" color="#fff" />
-        <van-icon v-else name="guide-o" size="20" />
+
+      <!-- 输入行 -->
+      <div class="input-row">
+        <!-- 添加图片按钮 -->
+        <div
+          v-if="pendingAttachments.length === 0"
+          class="add-image-btn"
+          :class="{ disabled: isUploading }"
+          @click="handleClickAddImage"
+        >
+          <van-icon name="photo-o" size="22" />
+        </div>
+
+        <div class="input-wrapper">
+          <van-field
+            v-model="inputText"
+            type="textarea"
+            placeholder="输入消息..."
+            :disabled="connectionState !== 'connected'"
+            :autosize="{ minHeight: 24, maxHeight: 100 }"
+            maxlength="500"
+            @keypress.enter.prevent="handleSend"
+          />
+        </div>
+
+        <div
+          class="send-btn"
+          :class="{ disabled: !canSend, loading: sending || isStreaming || isUploading }"
+          @click="handleSend"
+        >
+          <van-loading v-if="sending || isStreaming || isUploading" size="18" color="#fff" />
+          <van-icon v-else name="guide-o" size="20" />
+        </div>
       </div>
+
+      <!-- 隐藏的文件选择器 -->
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/png,image/jpeg,image/jpg"
+        multiple
+        style="display: none"
+        @change="handleFileChange"
+      />
     </div>
   </div>
 </template>
@@ -755,12 +901,90 @@ function handleToolClick(msg: UnifiedMessage) {
   left: 0;
   right: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   padding: 12px 16px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
   background: var(--color-bg-card);
   border-top: 1px solid var(--color-border);
+}
+
+/* 图片预览区 */
+.attachments-preview {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.attachment-item {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.attachment-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-remove {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-expense);
+  border-radius: 50%;
+  color: #fff;
+}
+
+.attachment-add {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-tertiary);
+}
+
+.attachment-add:active {
+  border-color: var(--color-transfer);
+  color: var(--color-transfer);
+}
+
+/* 输入行 */
+.input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.add-image-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.add-image-btn:active {
+  color: var(--color-transfer);
+}
+
+.add-image-btn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .input-wrapper {
@@ -805,6 +1029,20 @@ function handleToolClick(msg: UnifiedMessage) {
 
 .send-btn.loading {
   pointer-events: none;
+}
+
+/* 消息中的图片 */
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.message-image {
+  max-width: 160px;
+  max-height: 120px;
+  border-radius: 8px;
 }
 </style>
 

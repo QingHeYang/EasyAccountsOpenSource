@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import json
 from dataclasses import dataclass, field
 from enum import Enum
@@ -5,6 +7,24 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
+
+
+async def safe_close_stream(stream) -> None:
+    """安全关闭 stream，兼容协程和非协程的 close 方法"""
+    if stream is None:
+        return
+
+    close_method = getattr(stream, 'close', None) or getattr(stream, 'aclose', None)
+    if close_method is None:
+        return
+
+    try:
+        result = close_method()
+        # 如果返回的是协程，await 它
+        if asyncio.iscoroutine(result):
+            await result
+    except Exception:
+        pass
 
 from ...models.agent import Agent
 from ...models.llm import LLM
@@ -317,7 +337,22 @@ class EnhancedLLMClient:
         
         # 超时重试配置
         max_attempts = 10  # 最大重试次数
-        initial_timeout = 4  # 初始超时时间（秒）
+
+        # 检测是否包含图片（VL 请求），VL 请求需要更长的超时时间
+        has_images = False
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "image_url":
+                        has_images = True
+                        break
+            if has_images:
+                break
+
+        initial_timeout = 15 if has_images else 4  # VL 请求 15 秒，普通请求 4 秒
+        if has_images:
+            self.logger.info("检测到 VL 请求，使用较长超时", {"timeout": initial_timeout})
         
         for attempt in range(max_attempts):
             try:
@@ -368,7 +403,18 @@ class EnhancedLLMClient:
                         raise Exception(f"LLM请求超时，已重试{max_attempts}次")
                         
             except Exception as e:
-                if "timeout" not in str(e).lower() and attempt < max_attempts - 1:
+                error_str = str(e).lower()
+
+                # VL 模型不支持检测：检测 image_url 相关错误
+                if "image_url" in error_str or ("unknown variant" in error_str and "image" in error_str):
+                    self.logger.error("当前模型不支持图片(VL)功能", {
+                        "conversation_id": conversation_id,
+                        "model": self.model,
+                        "error": str(e)
+                    })
+                    raise Exception(f"当前模型 [{self.model}] 不支持图片功能，请开启新对话并切换到支持图片的模型")
+
+                if "timeout" not in error_str and attempt < max_attempts - 1:
                     # 非超时错误，也可以重试
                     self.logger.error(f"LLM请求失败: {e}", {
                         "conversation_id": conversation_id,
@@ -392,10 +438,7 @@ class EnhancedLLMClient:
                         "current_tokens": total_tokens,
                         "content_length": len(full_content)
                     })
-                    try:
-                        await stream.aclose()
-                    except Exception:
-                        pass
+                    await safe_close_stream(stream)
                     break
 
                 # 检查WebSocket连接状态，如果断开则中止流式调用
@@ -407,10 +450,7 @@ class EnhancedLLMClient:
                         "content_length": len(full_content)
                     })
                     # 主动关闭stream连接，真正停止服务器端生成
-                    try:
-                        await stream.aclose()
-                    except Exception as close_error:
-                        self.logger.debug("关闭stream时出错", extra_data={"error": str(close_error)})
+                    await safe_close_stream(stream)
                     break  # 中断循环，停止token消耗
             
 
@@ -513,12 +553,8 @@ class EnhancedLLMClient:
             self.should_stop = False  # 重置，避免影响下次请求
 
             # 确保stream被正确关闭，避免资源泄漏
-            if stream is not None:
-                try:
-                    await stream.aclose()
-                    self.logger.debug("Stream已正确关闭", {"conversation_id": conversation_id})
-                except Exception as close_error:
-                    self.logger.debug("关闭stream时出错", extra_data={"error": str(close_error), "conversation_id": conversation_id})
+            await safe_close_stream(stream)
+            self.logger.debug("Stream已正确关闭", {"conversation_id": conversation_id})
 
     async def _stream_sse(self, messages: List[Dict[str, str]], conversation_id: str,
                           tools: Optional[List[Dict[str, Any]]] = None,
@@ -678,10 +714,7 @@ class EnhancedLLMClient:
 
         # 尝试关闭当前活跃的 stream
         if self.current_stream:
-            try:
-                await self.current_stream.aclose()
-                self.logger.info("成功关闭LLM流，已停止生成")
-            except Exception as e:
-                self.logger.warning(f"关闭stream时出错: {e}")
+            await safe_close_stream(self.current_stream)
+            self.logger.info("成功关闭LLM流，已停止生成")
         else:
             self.logger.warning("没有活跃的stream可以停止")

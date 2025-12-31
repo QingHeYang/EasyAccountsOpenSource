@@ -1,7 +1,7 @@
 # 数据库架构文档
 
-> 版本: 1.0
-> 更新时间: 2025-12-08
+> 版本: 1.1
+> 更新时间: 2025-12-31
 > 状态: 正式版
 
 ## 一、概述
@@ -169,6 +169,9 @@ KoalaQ Hub 采用 **Repository 模式** 的分层数据库架构，基于 SQLite
 | completion_tokens | INTEGER | DEFAULT 0 | 完成 Token |
 | reasoning_tokens | INTEGER | DEFAULT 0 | 推理 Token |
 | reasoning_content | TEXT | | 推理内容 (思维链) |
+| attachments | TEXT | | VL 附件 (JSON数组) |
+
+> **VL 支持**: `attachments` 存储 JSON 格式的附件列表，详见 [VL 运行流程](./VL_运行流程.md)
 
 **消息类型 (MessageType)**:
 

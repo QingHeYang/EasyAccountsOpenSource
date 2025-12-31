@@ -4,7 +4,7 @@
 """
 
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -60,7 +60,10 @@ class FrontendMessage(BaseModel):
     
     # 文本内容（可选）
     text: Optional[TextContent] = Field(default=None, description="文本内容")
-    
+
+    # VL 附件（可选，只返回文件名列表供前端显示图片）
+    attachments: Optional[List[str]] = Field(default=None, description="附件文件名列表")
+
     # Token和模型信息（可选）
     token: Optional[int] = Field(default=None, description="Token数量")
     model: Optional[str] = Field(default=None, description="模型名称")
@@ -83,6 +86,7 @@ class FrontendMessage(BaseModel):
                     "content": "你好",
                     "reasoning_content": ""
                 },
+                "attachments": ["image_001.png", "image_002.jpg"],
                 "token": 10,
                 "model": "deepseek-chat"
             }

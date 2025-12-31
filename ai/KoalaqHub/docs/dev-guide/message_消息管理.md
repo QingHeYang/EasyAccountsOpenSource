@@ -1,7 +1,7 @@
 # 消息管理文档
 
-> 版本: 1.0
-> 更新时间: 2025-12-08
+> 版本: 1.1
+> 更新时间: 2025-12-31
 > 状态: 正式版
 
 ## 一、概述
@@ -17,6 +17,7 @@
 > - [WebSocket 运行流程](./websocket_运行流程.md) - 实时消息推送
 > - [Agent 运行流程](./agent_运行流程.md) - Agent 执行流程
 > - [数据库架构](./database_数据库架构.md) - 消息表结构
+> - [VL 运行流程](./VL_运行流程.md) - 图片附件处理
 
 ---
 
@@ -100,17 +101,22 @@ class Message:
     agent_id: str = None         # 子Agent ID
     sub_conversation_id: str = None  # 子会话ID (AGENT_END 用)
 
+    # VL 附件 (图片等)
+    attachments: List[Attachment] = None  # 附件列表 [{filename, data, media_type}]
+
     # 数据库相关
     message_id: int = None       # 数据库自增ID
     total_tokens: int = None     # Token数
     model: str = None            # 模型名称
 ```
 
+> **VL 支持**: 详见 [VL 运行流程](./VL_运行流程.md)
+
 ### 3.3 消息创建工厂方法
 
 | 方法 | 用途 | 返回类型 |
 |------|------|----------|
-| `create_user_message(content, round_id)` | 用户输入 | CONTENT |
+| `create_user_message(content, round_id, attachments)` | 用户输入 | CONTENT |
 | `create_assistant_message(content, round_id, tool_calls)` | AI回复/工具调用 | CONTENT / TOOL_CALL / AGENT_START |
 | `create_tool_message(tool_call_id, result, round_id, success, tool_name)` | 工具结果 | TOOL_RESULT |
 | `create_error_message(error_message, round_id)` | 错误信息 | ERROR |
@@ -456,6 +462,7 @@ class FrontendMessage:
     timestamp: str          # 时间戳
     role: FrontendMessageRole  # USER / ASSISTANT / TOOL / AGENT
     text: TextContent = None   # 文本内容
+    attachments: List[str] = None  # VL 附件文件名列表
     tool: ToolInfo = None      # 工具调用信息
     sub_agent: SubAgentInfo = None  # 子Agent信息
     token: int = None          # Token数

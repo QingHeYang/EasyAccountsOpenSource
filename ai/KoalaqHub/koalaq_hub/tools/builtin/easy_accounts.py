@@ -147,6 +147,12 @@ ADD_FLOW_PARAMS = [
         param_type="boolean",
         description="是否收藏，可选，默认false",
         required=False
+    ),
+    ToolParam(
+        name="images",
+        param_type="array",
+        description="附件图片文件名列表，可选。用户上传的图片文件名，如['1767172174107_5872.jpg']",
+        required=False
     )
 ]
 

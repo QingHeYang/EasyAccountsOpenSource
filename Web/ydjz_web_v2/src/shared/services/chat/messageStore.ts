@@ -38,6 +38,7 @@ export interface HTTPMessage {
     content?: string
     reasoning_content?: string
   }
+  attachments?: string[] | null  // 图片附件文件名列表
   tool?: {
     tool_name?: string
     tool_call_id?: string
@@ -129,7 +130,8 @@ class MessageStore {
       msgData.messageType = 'text'
       msgData.content = {
         text: httpMessage.text?.content || '',
-        reasoning: httpMessage.text?.reasoning_content || ''
+        reasoning: httpMessage.text?.reasoning_content || '',
+        attachments: httpMessage.attachments || []
       }
     } else if (httpMessage.role === 'assistant') {
       msgData.role = 'assistant'
@@ -310,14 +312,24 @@ class MessageStore {
   }
 
   // 添加用户消息
-  addUserMessage(text: string): UnifiedMessage {
+  addUserMessage(text: string, attachments?: string[]): UnifiedMessage {
+    // 清除之前的流式状态，确保新回复不会拼接到旧消息上
+    if (this.state.streamingMessageId) {
+      const oldStreamingMsg = this.streamingMessage
+      if (oldStreamingMsg && oldStreamingMsg.content) {
+        oldStreamingMsg.content.isStreaming = false
+        oldStreamingMsg.content.streamType = ''
+      }
+      this.state.streamingMessageId = null
+    }
+
     const msgData: UnifiedMessageData = {
       id: nanoid(),
       conversationId: this.state.currentConversationId,
       timestamp: new Date().toISOString(),
       role: 'user',
       messageType: 'text',
-      content: { text },
+      content: { text, attachments: attachments || [] },
       meta: { source: 'user' }
     }
 
@@ -328,6 +340,16 @@ class MessageStore {
 
   // 处理工具调用
   private handleToolCall(wsMessage: WSMessage): MessageResult {
+    // 工具调用意味着之前的文本流结束，清除流式状态
+    if (this.state.streamingMessageId) {
+      const oldStreamingMsg = this.streamingMessage
+      if (oldStreamingMsg && oldStreamingMsg.content) {
+        oldStreamingMsg.content.isStreaming = false
+        oldStreamingMsg.content.streamType = ''
+      }
+      this.state.streamingMessageId = null
+    }
+
     const msgData: UnifiedMessageData = {
       id: nanoid(),
       conversationId: wsMessage.conversation_id,
@@ -501,6 +523,16 @@ class MessageStore {
 
   // 处理错误消息
   private handleError(wsMessage: WSMessage): MessageResult {
+    // 错误发生时清除流式状态
+    if (this.state.streamingMessageId) {
+      const oldStreamingMsg = this.streamingMessage
+      if (oldStreamingMsg && oldStreamingMsg.content) {
+        oldStreamingMsg.content.isStreaming = false
+        oldStreamingMsg.content.streamType = ''
+      }
+      this.state.streamingMessageId = null
+    }
+
     const msgData: UnifiedMessageData = {
       id: nanoid(),
       conversationId: wsMessage.conversation_id,
@@ -590,7 +622,7 @@ export function useMessageStore() {
     // 方法
     setConversationId: (id: string) => messageStore.setConversationId(id),
     loadHTTPMessages: (messages: HTTPMessage[]) => messageStore.loadHTTPMessages(messages),
-    addUserMessage: (text: string) => messageStore.addUserMessage(text),
+    addUserMessage: (text: string, attachments?: string[]) => messageStore.addUserMessage(text, attachments),
     handleWebSocketMessage: (msg: WSMessage) => messageStore.handleWebSocketMessage(msg),
     clearMessages: () => messageStore.clearMessages(),
     stopStreaming: () => messageStore.stopStreaming(),

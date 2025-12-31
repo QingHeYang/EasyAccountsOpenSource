@@ -159,6 +159,19 @@ export const aiApi = {
     })
   },
 
+  /**
+   * 停止对话生成
+   * @param conversationId 会话ID
+   * @param cascade 是否级联停止子Agent（默认true）
+   */
+  stopConversation(conversationId: string, cascade = true) {
+    return getAiRequest().post<AiApiResponse<{ conversation_id: string; stopped: boolean; cascade: boolean }>>(
+      `/api/v1/conversations/stop/${conversationId}`,
+      null,
+      { params: { cascade } }
+    )
+  },
+
   // ==================== 消息相关 ====================
 
   /**

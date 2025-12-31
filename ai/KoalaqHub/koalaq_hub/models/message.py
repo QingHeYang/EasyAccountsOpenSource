@@ -17,6 +17,48 @@ class MessageType(Enum):
 
 
 @dataclass
+class Attachment:
+    """VL 附件数据类（图片等）
+
+    用于存储消息中的附件信息，支持图片等多模态内容。
+
+    Attributes:
+        filename: 文件名（用于前端展示和从文件服务获取）
+        data: base64 编码的文件数据（用于 LLM 调用）
+        media_type: MIME 类型，如 "image/png", "image/jpeg"
+    """
+    filename: str
+    data: str  # base64 编码
+    media_type: str = "image/png"
+
+    def to_dict(self) -> Dict[str, str]:
+        """转换为字典"""
+        return {
+            "filename": self.filename,
+            "data": self.data,
+            "media_type": self.media_type
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, str]) -> "Attachment":
+        """从字典创建"""
+        return cls(
+            filename=data.get("filename", ""),
+            data=data.get("data", ""),
+            media_type=data.get("media_type", "image/png")
+        )
+
+    def to_llm_format(self) -> Dict[str, Any]:
+        """转换为 LLM VL API 格式"""
+        return {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{self.media_type};base64,{self.data}"
+            }
+        }
+
+
+@dataclass
 class Message:
     """对话消息数据类
 
@@ -59,6 +101,8 @@ class Message:
     # Token 和模型信息
     total_tokens: Optional[int] = None  # 总 Token 数
     model: Optional[str] = None  # 模型名称
+    # VL 附件（图片等）
+    attachments: Optional[List[Attachment]] = None
 
     @property
     def tool_calls(self) -> Optional[List[Dict[str, Any]]]:
@@ -80,13 +124,16 @@ class Message:
         return None
 
     @classmethod
-    def create_user_message(cls, content: str, round_id: str, timestamp: Optional[str] = None) -> "Message":
+    def create_user_message(cls, content: str, round_id: str,
+                           timestamp: Optional[str] = None,
+                           attachments: Optional[List[Dict[str, Any]]] = None) -> "Message":
         """创建用户消息
 
         Args:
             content: 消息内容
             round_id: 轮次ID
             timestamp: 时间戳，如果为None则使用当前时间
+            attachments: VL 附件列表（可选）
 
         Returns:
             Message实例
@@ -94,11 +141,12 @@ class Message:
         if timestamp is None:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return cls(
-            role="user", 
-            content=content, 
-            timestamp=timestamp, 
-            round_id=round_id, 
-            type=MessageType.CONTENT
+            role="user",
+            content=content,
+            timestamp=timestamp,
+            round_id=round_id,
+            type=MessageType.CONTENT,
+            attachments=attachments
         )
 
     @classmethod
@@ -236,7 +284,29 @@ class Message:
             sub_conversation_id=sub_conversation_id
         )
 
+    def to_llm_content(self):
+        """转换为 LLM API 需要的 content 格式
 
+        如果有附件，返回 VL 格式的数组；否则返回纯文本字符串。
+
+        Returns:
+            str 或 List[Dict]: LLM content 格式
+        """
+        if not self.attachments:
+            return self.content
+
+        # VL 格式：content 是数组
+        result = []
+
+        # 先添加图片
+        for att in self.attachments:
+            result.append(att.to_llm_format())
+
+        # 再添加文本
+        if self.content:
+            result.append({"type": "text", "text": self.content})
+
+        return result
 
     def to_dict(self) -> dict:
         """转换为字典格式（用于LLM交互或存储）"""
@@ -263,11 +333,19 @@ class Message:
             result["total_tokens"] = self.total_tokens
         if self.model:
             result["model"] = self.model
+        if self.attachments:
+            result["attachments"] = [att.to_dict() for att in self.attachments]
         return result
 
     @classmethod
     def from_dict(cls, data: dict) -> "Message":
         """从字典创建消息实例"""
+        # 处理 attachments 反序列化
+        attachments_data = data.get("attachments")
+        attachments = None
+        if attachments_data:
+            attachments = [Attachment.from_dict(att) for att in attachments_data]
+
         return cls(
             role=data["role"],
             content=data["content"],
@@ -284,5 +362,6 @@ class Message:
             message_id=data.get("message_id"),
             total_tokens=data.get("total_tokens"),
             model=data.get("model"),
+            attachments=attachments,
         )
     

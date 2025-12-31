@@ -10,10 +10,14 @@ import {
   Refresh,
   DocumentCopy,
   CircleCheck,
-  CircleClose
+  CircleClose,
+  Picture,
+  CloseBold
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
+import { imageApi } from '@shared/api/image'
+import { compressImageForAI } from '@shared/utils/image-compress'
 import {
   useChatService,
   useMessageStore,
@@ -55,6 +59,7 @@ const {
   connect,
   disconnect,
   sendMessage: sendChatMessage,
+  stopConversation,
   newConversation,
   loadConversation,
   loadHistoryMessages,
@@ -71,6 +76,15 @@ const router = useRouter()
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const sending = ref(false)
+const stopping = ref(false)
+
+// 图片附件状态
+const pendingAttachments = ref<Array<{ filename: string; previewUrl: string }>>([])
+const isUploading = ref(false)
+const isDragOver = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const MAX_ATTACHMENTS = 3
+const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg']
 
 // 思维链展开状态（记录每个消息ID是否展开）
 const reasoningExpanded = ref<Record<string, boolean>>({})
@@ -140,9 +154,12 @@ async function handleSend() {
   sending.value = true
 
   try {
-    const success = sendChatMessage(content)
+    // 提取附件文件名
+    const attachments = pendingAttachments.value.map(a => a.filename)
+    const success = sendChatMessage(content, attachments.length > 0 ? attachments : undefined)
     if (success) {
       inputText.value = ''
+      pendingAttachments.value = [] // 清空附件
     } else {
       ElMessage.error('发送失败，请检查连接状态')
     }
@@ -159,11 +176,175 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+// 停止生成
+async function handleStop() {
+  if (stopping.value) return
+
+  stopping.value = true
+  try {
+    const success = await stopConversation()
+    if (success) {
+      ElMessage.success('已停止生成')
+    }
+  } catch (error) {
+    console.error('停止失败:', error)
+    ElMessage.error('停止失败')
+  } finally {
+    stopping.value = false
+  }
+}
+
 // 新建对话
 function handleNewConversation() {
   newConversation()  // 会自动清除 localStorage 和消息
   reasoningExpanded.value = {}
+  pendingAttachments.value = []
   ElMessage.success('已开启新对话')
+}
+
+// ==================== 图片附件处理 ====================
+
+// 点击添加图片
+function handleClickAddImage() {
+  fileInputRef.value?.click()
+}
+
+// 文件选择变化
+async function handleFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    await processFiles(Array.from(input.files))
+    input.value = '' // 清空以便重复选择同一文件
+  }
+}
+
+// 拖拽进入
+function handleDragEnter(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = true
+}
+
+// 拖拽离开
+function handleDragLeave(e: DragEvent) {
+  e.preventDefault()
+  // 确保是离开整个区域，而不是进入子元素
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  if (
+    e.clientX < rect.left ||
+    e.clientX > rect.right ||
+    e.clientY < rect.top ||
+    e.clientY > rect.bottom
+  ) {
+    isDragOver.value = false
+  }
+}
+
+// 拖拽悬停
+function handleDragOver(e: DragEvent) {
+  e.preventDefault()
+}
+
+// 拖拽放下
+async function handleDrop(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = false
+
+  const files = e.dataTransfer?.files
+  if (files) {
+    await processFiles(Array.from(files))
+  }
+}
+
+// 粘贴图片
+async function handlePaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+
+  const imageFiles: File[] = []
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        imageFiles.push(file)
+      }
+    }
+  }
+
+  if (imageFiles.length > 0) {
+    e.preventDefault() // 阻止默认粘贴行为
+    await processFiles(imageFiles)
+  }
+}
+
+// 处理文件列表
+async function processFiles(files: File[]) {
+  // 过滤出图片
+  const imageFiles = files.filter(f => ALLOWED_TYPES.includes(f.type))
+
+  if (imageFiles.length === 0) {
+    ElMessage.warning('仅支持 PNG 和 JPG 格式')
+    return
+  }
+
+  // 检查数量限制
+  const remaining = MAX_ATTACHMENTS - pendingAttachments.value.length
+  if (remaining <= 0) {
+    ElMessage.warning(`最多添加 ${MAX_ATTACHMENTS} 张图片`)
+    return
+  }
+
+  const filesToProcess = imageFiles.slice(0, remaining)
+  if (imageFiles.length > remaining) {
+    ElMessage.warning(`已选择前 ${remaining} 张图片`)
+  }
+
+  isUploading.value = true
+
+  for (const file of filesToProcess) {
+    try {
+      // 压缩
+      const compressed = await compressImageForAI(file)
+
+      // 上传
+      const res = await imageApi.upload(compressed)
+      const fileName = res.data.data?.fileName
+      if (fileName) {
+        pendingAttachments.value.push({
+          filename: fileName,
+          previewUrl: imageApi.getUrl(fileName)
+        })
+      } else {
+        ElMessage.error(`上传失败: ${file.name}`)
+      }
+    } catch (err) {
+      console.error('图片处理失败:', err)
+      ElMessage.error(`处理失败: ${file.name}`)
+    }
+  }
+
+  isUploading.value = false
+}
+
+// 移除附件
+function removeAttachment(index: number) {
+  pendingAttachments.value.splice(index, 1)
+}
+
+// 图片预览状态
+const imagePreviewVisible = ref(false)
+const imagePreviewList = ref<string[]>([])
+const imagePreviewIndex = ref(0)
+
+// 预览图片
+function previewImage(url: string, urls?: string[]) {
+  if (urls && urls.length > 0) {
+    imagePreviewList.value = urls
+    imagePreviewIndex.value = urls.indexOf(url)
+  } else {
+    imagePreviewList.value = [url]
+    imagePreviewIndex.value = 0
+  }
+  imagePreviewVisible.value = true
 }
 
 // 重新连接
@@ -321,6 +502,16 @@ const canSend = computed(() => {
           <!-- 用户消息 -->
           <div v-if="msg.role === 'user'" class="message-item user">
             <div class="message-bubble user-bubble">
+              <!-- 附件图片 -->
+              <div v-if="msg.content.attachments?.length" class="message-images">
+                <img
+                  v-for="filename in msg.content.attachments"
+                  :key="filename"
+                  :src="imageApi.getUrl(filename)"
+                  class="message-image"
+                  @click="previewImage(imageApi.getUrl(filename), msg.content.attachments!.map(f => imageApi.getUrl(f)))"
+                />
+              </div>
               <div class="message-text">{{ msg.content.text }}</div>
             </div>
             <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
@@ -330,20 +521,38 @@ const canSend = computed(() => {
           <div v-else-if="msg.role === 'assistant'" class="message-item assistant">
             <div class="message-bubble assistant-bubble">
               <!-- 思维链（可折叠） -->
-              <div v-if="msg.content.reasoning" class="reasoning-section">
-                <div class="reasoning-header" @click="toggleReasoning(msg.id)">
-                  <el-icon :size="14">
+              <div
+                v-if="msg.content.reasoning"
+                class="reasoning-card"
+                :class="{
+                  expanded: isReasoningExpanded(msg.id) || !msg.content.text,
+                  'reasoning-only': !msg.content.text && !msg.content.isStreaming
+                }"
+              >
+                <div class="reasoning-header" @click="msg.content.text && toggleReasoning(msg.id)">
+                  <el-icon v-if="msg.content.text" :size="12" class="reasoning-toggle">
                     <component :is="isReasoningExpanded(msg.id) ? ArrowDown : ArrowRight" />
                   </el-icon>
-                  <span class="reasoning-label">思考过程</span>
+                  <span class="reasoning-label">
+                    {{ msg.content.isStreaming && msg.content.streamType === 'reasoning' ? '思考中' : '思考过程' }}
+                  </span>
+                  <span v-if="msg.content.isStreaming && msg.content.streamType === 'reasoning'" class="thinking-indicator">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                  </span>
                 </div>
-                <div v-show="isReasoningExpanded(msg.id)" class="reasoning-content">
-                  {{ msg.content.reasoning }}
+                <div
+                  v-show="isReasoningExpanded(msg.id) || !msg.content.text"
+                  class="reasoning-body"
+                >
+                  <div class="reasoning-text">{{ msg.content.reasoning }}</div>
                 </div>
               </div>
 
               <!-- 正文内容 -->
               <div
+                v-if="msg.content.text || (msg.content.isStreaming && msg.content.streamType === 'content')"
                 class="message-content markdown-body"
                 v-html="renderMarkdown(msg.content.text)"
               ></div>
@@ -352,11 +561,12 @@ const canSend = computed(() => {
               <span v-if="msg.content.isStreaming" class="typing-cursor">|</span>
 
               <!-- 复制按钮 -->
-              <div v-if="msg.content.text && !msg.content.isStreaming" class="message-actions">
+              <div v-if="(msg.content.text || msg.content.reasoning) && !msg.content.isStreaming" class="message-actions">
                 <el-button
                   text
                   size="small"
-                  @click="copyText(msg.content.text)"
+                  @click="copyText(msg.content.text || msg.content.reasoning)"
+                  title="复制内容"
                 >
                   <el-icon><DocumentCopy /></el-icon>
                 </el-button>
@@ -368,27 +578,22 @@ const canSend = computed(() => {
           <!-- 工具调用 -->
           <div v-else-if="msg.role === 'tool'" class="message-item tool">
             <div
-              class="message-bubble tool-bubble"
+              class="tool-card"
               :class="[msg.tool.status, { clickable: isToolClickable(msg.tool.name) }]"
               @click="handleToolClick(msg)"
             >
-              <div class="tool-header">
-                <el-icon v-if="msg.tool.status === 'pending'" class="spin" :size="14">
-                  <Loading />
-                </el-icon>
-                <el-icon v-else-if="msg.tool.status === 'success'" :size="14" class="tool-icon success">
-                  <CircleCheck />
-                </el-icon>
-                <el-icon v-else :size="14" class="tool-icon error">
-                  <CircleClose />
-                </el-icon>
-                <span class="tool-name">{{ getToolDisplayName(msg) }}</span>
-                <span v-if="getToolExtraInfo(msg)" class="tool-extra-info">{{ getToolExtraInfo(msg) }}</span>
-                <span class="tool-status-text">
-                  {{ msg.tool.status === 'pending' ? '执行中...' : msg.tool.status === 'success' ? '成功' : '失败' }}
-                </span>
-                <el-icon v-if="isToolClickable(msg.tool.name)" class="tool-arrow"><ArrowRight /></el-icon>
-              </div>
+              <el-icon v-if="msg.tool.status === 'pending'" class="tool-icon spin" :size="14">
+                <Loading />
+              </el-icon>
+              <el-icon v-else-if="msg.tool.status === 'success'" class="tool-icon success" :size="14">
+                <CircleCheck />
+              </el-icon>
+              <el-icon v-else class="tool-icon error" :size="14">
+                <CircleClose />
+              </el-icon>
+              <span class="tool-name">{{ getToolDisplayName(msg) }}</span>
+              <span v-if="getToolExtraInfo(msg)" class="tool-extra">{{ getToolExtraInfo(msg) }}</span>
+              <el-icon v-if="isToolClickable(msg.tool.name)" class="tool-arrow" :size="12"><ArrowRight /></el-icon>
             </div>
           </div>
 
@@ -422,28 +627,106 @@ const canSend = computed(() => {
     </div>
 
     <!-- 底部输入区 -->
-    <div class="drawer-footer">
+    <div
+      class="drawer-footer"
+      :class="{ 'drag-over': isDragOver }"
+      @dragenter="handleDragEnter"
+      @dragleave="handleDragLeave"
+      @dragover="handleDragOver"
+      @drop="handleDrop"
+    >
+      <!-- 拖拽提示遮罩 -->
+      <div v-if="isDragOver" class="drag-overlay">
+        <el-icon :size="32"><Picture /></el-icon>
+        <span>松开添加图片</span>
+      </div>
+
+      <!-- 图片预览区 -->
+      <div v-if="pendingAttachments.length > 0" class="attachments-preview">
+        <div
+          v-for="(att, index) in pendingAttachments"
+          :key="att.filename"
+          class="attachment-item"
+        >
+          <img :src="att.previewUrl" :alt="att.filename" class="attachment-thumb" />
+          <div class="attachment-remove" @click="removeAttachment(index)">
+            <el-icon :size="12"><CloseBold /></el-icon>
+          </div>
+        </div>
+        <!-- 添加更多按钮 -->
+        <div
+          v-if="pendingAttachments.length < MAX_ATTACHMENTS"
+          class="attachment-add"
+          @click="handleClickAddImage"
+        >
+          <el-icon :size="16"><Picture /></el-icon>
+        </div>
+      </div>
+
+      <!-- 输入框 -->
       <div class="input-wrapper">
         <el-input
           v-model="inputText"
           type="textarea"
-          placeholder="输入消息，Shift+Enter 换行"
+          placeholder="输入消息，Ctrl+V 粘贴图片，可拖入图片"
           :disabled="connectionState !== 'connected'"
-          :autosize="{ minRows: 1, maxRows: 6 }"
+          :autosize="{ minRows: 3, maxRows: 8 }"
           :maxlength="500"
           show-word-limit
           resize="none"
           @keydown="handleKeydown"
+          @paste="handlePaste"
         />
       </div>
-      <el-button
-        type="primary"
-        :disabled="!canSend"
-        :loading="sending || isStreaming"
-        @click="handleSend"
-      >
-        {{ isStreaming ? '生成中' : '发送' }}
-      </el-button>
+
+      <!-- 操作栏 -->
+      <div class="input-actions">
+        <div class="actions-left">
+          <span class="input-hint">Shift + Enter 换行</span>
+        </div>
+        <div class="actions-right">
+          <!-- 添加图片按钮 -->
+          <el-tooltip content="添加图片 (最多3张)" placement="top">
+            <el-button
+              class="action-btn"
+              :icon="Picture"
+              :disabled="isUploading || pendingAttachments.length >= MAX_ATTACHMENTS"
+              @click="handleClickAddImage"
+            />
+          </el-tooltip>
+          <!-- 停止按钮（生成中显示） -->
+          <el-button
+            v-if="isStreaming"
+            type="danger"
+            class="stop-btn"
+            :loading="stopping"
+            @click="handleStop"
+          >
+            {{ stopping ? '停止中' : '停止' }}
+          </el-button>
+          <!-- 发送按钮 -->
+          <el-button
+            v-else
+            type="primary"
+            class="send-btn"
+            :disabled="!canSend"
+            :loading="sending || isUploading"
+            @click="handleSend"
+          >
+            {{ isUploading ? '上传中' : '发送' }}
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 隐藏的文件选择器 -->
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/png,image/jpeg,image/jpg"
+        multiple
+        style="display: none"
+        @change="handleFileChange"
+      />
     </div>
 
     <!-- 工具详情弹窗 -->
@@ -492,6 +775,14 @@ const canSend = computed(() => {
         </div>
       </div>
     </el-dialog>
+
+    <!-- 图片预览 -->
+    <el-image-viewer
+      v-if="imagePreviewVisible"
+      :url-list="imagePreviewList"
+      :initial-index="imagePreviewIndex"
+      @close="imagePreviewVisible = false"
+    />
   </aside>
 </template>
 
@@ -662,12 +953,18 @@ const canSend = computed(() => {
   padding: 0 4px;
 }
 
-/* ==================== 思维链 ==================== */
-.reasoning-section {
+/* ==================== 思维链卡片 ==================== */
+.reasoning-card {
   margin-bottom: 10px;
-  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
+  background: rgba(24, 144, 255, 0.06);
+  border: 1px solid rgba(24, 144, 255, 0.15);
+}
+
+.reasoning-card.reasoning-only {
+  background: rgba(24, 144, 255, 0.04);
+  border: none;
 }
 
 .reasoning-header {
@@ -675,30 +972,80 @@ const canSend = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: rgba(24, 144, 255, 0.05);
   cursor: pointer;
   user-select: none;
   transition: background 0.2s;
 }
 
-.reasoning-header:hover {
-  background: rgba(24, 144, 255, 0.1);
+.reasoning-card:not(.reasoning-only) .reasoning-header:hover {
+  background: rgba(24, 144, 255, 0.08);
 }
 
 .reasoning-label {
   font-size: 12px;
   color: var(--color-transfer);
   font-weight: 500;
+  flex: 1;
 }
 
-.reasoning-content {
-  padding: 12px;
+.reasoning-toggle {
+  color: var(--color-transfer);
+}
+
+/* 思考中动画指示器 */
+.thinking-indicator {
+  display: flex;
+  gap: 3px;
+}
+
+.thinking-indicator .dot {
+  width: 4px;
+  height: 4px;
+  background: var(--color-transfer);
+  border-radius: 50%;
+  animation: thinking-dots 1.4s ease-in-out infinite;
+}
+
+.thinking-indicator .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-indicator .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinking-dots {
+  0%, 80%, 100% { opacity: 0.4; }
+  40% { opacity: 1; }
+}
+
+.reasoning-body {
+  border-top: 1px solid rgba(24, 144, 255, 0.1);
+}
+
+.reasoning-text {
+  padding: 10px 12px;
   font-size: 13px;
   color: var(--color-text-secondary);
   line-height: 1.6;
   white-space: pre-wrap;
-  border-top: 1px solid var(--color-border);
-  background: rgba(24, 144, 255, 0.02);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.reasoning-card.reasoning-only .reasoning-header {
+  display: none;
+}
+
+.reasoning-card.reasoning-only .reasoning-body {
+  border: none;
+}
+
+.reasoning-card.reasoning-only .reasoning-text {
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  max-height: none;
 }
 
 /* ==================== Markdown 内容 ==================== */
@@ -804,71 +1151,61 @@ const canSend = computed(() => {
   opacity: 1;
 }
 
-/* ==================== 工具调用 ==================== */
-.tool-bubble {
-  background: var(--color-transfer-bg);
-  border: 1px solid rgba(24, 144, 255, 0.2);
-  border-bottom-left-radius: 4px;
-  cursor: pointer;
+/* ==================== 工具调用卡片 ==================== */
+.tool-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
   transition: all 0.2s;
 }
 
-.tool-bubble:hover {
-  background: rgba(24, 144, 255, 0.15);
+.tool-card.clickable {
+  cursor: pointer;
 }
 
-.tool-bubble.success {
-  border-color: rgba(82, 196, 26, 0.3);
-}
-
-.tool-bubble.error {
-  border-color: rgba(245, 34, 45, 0.3);
-}
-
-.tool-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tool-name {
-  font-weight: 500;
-  color: var(--color-transfer);
-}
-
-.tool-extra-info {
-  font-size: 12px;
-  color: var(--color-text-primary);
+.tool-card.clickable:hover {
+  border-color: var(--color-transfer);
   background: var(--color-transfer-bg);
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-left: 4px;
 }
 
-.tool-status-text {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  flex: 1;
-}
-
-.tool-bubble:not(.clickable) {
+.tool-card:not(.clickable) {
   cursor: default;
 }
 
-.tool-bubble:not(.clickable):hover {
-  transform: none;
+.tool-card .tool-icon {
+  flex-shrink: 0;
 }
 
-.tool-icon.success {
+.tool-card .tool-icon.success {
   color: var(--color-income);
 }
 
-.tool-icon.error {
+.tool-card .tool-icon.error {
   color: var(--color-expense);
 }
 
-.tool-arrow {
+.tool-card .tool-name {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.tool-card .tool-extra {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-card .tool-arrow {
   color: var(--color-text-tertiary);
+  margin-left: 4px;
 }
 
 /* ==================== 子智能体 ==================== */
@@ -937,21 +1274,200 @@ const canSend = computed(() => {
 /* ==================== 底部输入区 ==================== */
 .drawer-footer {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   gap: 12px;
   padding: 16px 20px;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg-card);
+  position: relative;
+  transition: all 0.2s;
 }
 
+.drawer-footer.drag-over {
+  background: var(--color-transfer-bg);
+}
+
+/* 拖拽提示遮罩 */
+.drag-overlay {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(24, 144, 255, 0.08);
+  border: 2px dashed var(--color-transfer);
+  border-radius: 12px;
+  z-index: 10;
+  color: var(--color-transfer);
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* 图片预览区 */
+.attachments-preview {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--color-bg-page);
+  border-radius: 8px;
+}
+
+.attachment-item {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.attachment-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-expense);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.attachment-remove:hover {
+  transform: scale(1.1);
+}
+
+.attachment-add {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.attachment-add:hover {
+  border-color: var(--color-transfer);
+  color: var(--color-transfer);
+  background: var(--color-transfer-bg);
+}
+
+/* 输入框容器 */
 .input-wrapper {
-  flex: 1;
+  width: 100%;
 }
 
-.drawer-footer .el-button {
-  flex-shrink: 0;
+.input-wrapper :deep(.el-textarea__inner) {
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  border-radius: 12px;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s;
+}
+
+.input-wrapper :deep(.el-textarea__inner:focus) {
+  border-color: var(--color-transfer);
+  background: var(--color-bg-card);
+  box-shadow: 0 0 0 3px var(--color-transfer-bg);
+}
+
+.input-wrapper :deep(.el-input__count) {
+  background: transparent;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* 操作栏 */
+.input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.actions-left {
+  display: flex;
+  align-items: center;
+}
+
+.input-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-btn {
+  width: 36px;
   height: 36px;
-  min-width: 72px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-page);
+  color: var(--color-text-secondary);
+  transition: all 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  border-color: var(--color-transfer);
+  color: var(--color-transfer);
+  background: var(--color-transfer-bg);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.send-btn,
+.stop-btn {
+  height: 36px;
+  min-width: 80px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* ==================== 消息中的图片 ==================== */
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.message-image:hover {
+  transform: scale(1.02);
 }
 
 /* ==================== 旋转动画 ==================== */
@@ -1069,21 +1585,32 @@ html.dark .agent-bubble {
 }
 
 /* 思维链暗色模式 */
-html.dark .reasoning-section {
+html.dark .reasoning-card {
+  background: rgba(116, 192, 252, 0.08);
+  border-color: rgba(116, 192, 252, 0.2);
+}
+
+html.dark .reasoning-card.reasoning-only {
+  background: rgba(116, 192, 252, 0.06);
+}
+
+html.dark .reasoning-card:not(.reasoning-only) .reasoning-header:hover {
+  background: rgba(116, 192, 252, 0.12);
+}
+
+html.dark .reasoning-body {
+  border-color: rgba(116, 192, 252, 0.15);
+}
+
+/* 工具卡片暗色模式 */
+html.dark .tool-card {
+  background: var(--color-bg-container);
   border-color: var(--color-border);
 }
 
-html.dark .reasoning-header {
-  background: rgba(116, 192, 252, 0.1);
-}
-
-html.dark .reasoning-header:hover {
-  background: rgba(116, 192, 252, 0.15);
-}
-
-html.dark .reasoning-content {
-  background: rgba(116, 192, 252, 0.05);
-  border-color: var(--color-border);
+html.dark .tool-card.clickable:hover {
+  background: var(--color-transfer-bg);
+  border-color: var(--color-transfer);
 }
 
 /* Markdown 暗色模式 */

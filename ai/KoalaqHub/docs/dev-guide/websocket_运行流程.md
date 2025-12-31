@@ -1,10 +1,15 @@
 # WebSocket 运行流程
 
+> 版本: 1.1
+> 更新时间: 2025-12-31
+> 状态: 正式版
+
 本文档描述 KoalaQ Hub 中 WebSocket 通信系统的架构、消息格式和交互流程。
 
 > 关联文档：
 > - [Agent 运行流程](./agent_运行流程.md)
 > - [LLM 运行流程](./llm_运行流程.md)
+> - [VL 运行流程](./VL_运行流程.md) - 图片附件处理
 
 ## 整体架构
 
@@ -69,9 +74,18 @@
 {
   "conversation_id": "conv_123",      // 会话ID（可选，不传则自动生成）
   "content": "用户输入的消息",         // 必填
-  "use_think_llm": true               // 是否使用思考模式（可选）
+  "use_think_llm": true,              // 是否使用思考模式（可选）
+  "attachments": [                    // VL 附件列表（可选）
+    {
+      "filename": "image.png",
+      "data": "base64...",            // 或 URL
+      "media_type": "image/png"
+    }
+  ]
 }
 ```
+
+> **VL 支持**: 详见 [VL 运行流程](./VL_运行流程.md)
 
 心跳包格式：
 ```json

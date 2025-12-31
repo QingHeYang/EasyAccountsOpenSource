@@ -320,12 +320,22 @@ class ConversationManager:
         for msg in raw_messages:
             # 处理 user 消息
             if msg.role == "user" and msg.type == MessageType.CONTENT:
+                # 提取附件文件名列表（只返回 filename，不返回 base64 数据）
+                attachment_filenames = None
+                if msg.attachments:
+                    attachment_filenames = [att.filename for att in msg.attachments]
+                    self.logger.debug("用户消息包含附件，返回前端", {
+                        "message_id": msg.message_id,
+                        "attachments": attachment_filenames
+                    })
+
                 fmsg = FrontendMessage(
                     round_id=msg.round_id,
                     message_id=str(msg.message_id),
                     timestamp=msg.timestamp,
                     role=FrontendMessageRole.USER,
                     text=TextContent(content=msg.content, reasoning_content=""),
+                    attachments=attachment_filenames,
                     token=msg.total_tokens,
                     model=msg.model
                 )

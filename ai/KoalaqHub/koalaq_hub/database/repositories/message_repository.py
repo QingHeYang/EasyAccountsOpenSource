@@ -3,6 +3,8 @@
 负责消息(messages)相关的所有数据库操作
 """
 
+import json
+import warnings
 from typing import Any, Dict, List, Optional
 
 from ...core.logging_utils import ManagerLogger
@@ -17,6 +19,39 @@ class MessageRepository(BaseRepository):
         super().__init__(db_connection)
         self.logger = ManagerLogger("MessageRepository")
 
+    def _parse_message_row(self, row_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """解析消息行数据，处理 attachments JSON 反序列化
+
+        Args:
+            row_dict: 从数据库获取的行字典
+
+        Returns:
+            Dict[str, Any]: 处理后的字典，attachments 已转换为列表
+        """
+        if "attachments" in row_dict:
+            attachments_str = row_dict.get("attachments")
+            if attachments_str:
+                try:
+                    row_dict["attachments"] = json.loads(attachments_str)
+                except (json.JSONDecodeError, TypeError):
+                    row_dict["attachments"] = None
+            else:
+                row_dict["attachments"] = None
+        return row_dict
+
+    def _serialize_attachments(self, message: Message) -> str:
+        """序列化 attachments 为 JSON 字符串
+
+        Args:
+            message: 消息对象
+
+        Returns:
+            str: JSON 字符串，无附件时返回空字符串
+        """
+        if message.attachments:
+            return json.dumps([att.to_dict() for att in message.attachments], ensure_ascii=False)
+        return ""
+
     def add_message(self, round_id: str, message: Message) -> int:
         """添加消息到数据库
 
@@ -29,8 +64,8 @@ class MessageRepository(BaseRepository):
         """
         try:
             sql = """
-                INSERT INTO messages (round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO messages (round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content, attachments)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             params = (
                 round_id,
@@ -42,8 +77,8 @@ class MessageRepository(BaseRepository):
                 message.tool_call_ids,
                 message.tool_call_raw,
                 message.agent_id,
-                message.tool_name,  # 新字段
-                message.sub_conversation_id,  # 新字段
+                message.tool_name,
+                message.sub_conversation_id,
                 getattr(message, "total_tokens", 0),
                 getattr(message, "prompt_tokens", 0),
                 getattr(message, "completion_tokens", 0),
@@ -51,10 +86,13 @@ class MessageRepository(BaseRepository):
                 getattr(message, "platform", None),
                 getattr(message, "model", None),
                 getattr(message, "reasoning_content", ""),
+                self._serialize_attachments(message),  # VL 附件
             )
 
             message_id = self._execute_insert(sql, params)
-            self.logger.info(f"消息添加成功: message_id={message_id}, round_id={round_id}")
+            # 日志：包含 VL 附件信息
+            attachments_count = len(message.attachments) if message.attachments else 0
+            self.logger.info(f"消息添加成功: message_id={message_id}, round_id={round_id}, role={message.role}, attachments={attachments_count}")
             return message_id
 
         except Exception as e:
@@ -78,22 +116,30 @@ class MessageRepository(BaseRepository):
     def get_message(self, message_id: int) -> Optional[Message]:
         """根据消息ID获取消息
 
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+
         Args:
             message_id: 消息ID
 
         Returns:
             Optional[Message]: 消息对象，如果不存在则返回None
         """
+        warnings.warn(
+            "get_message() 目前未被使用，可能在未来版本中移除",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             sql = """
-                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content
+                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content, attachments
                 FROM messages
                 WHERE message_id = ?
             """
             row = self._fetch_one(sql, (message_id,))
 
             if row:
-                message_data = self._row_to_dict(row)
+                message_data = self._parse_message_row(self._row_to_dict(row))
                 self.logger.debug(f"获取消息成功: message_id={message_id}")
                 return Message.from_dict(message_data)
             else:
@@ -126,14 +172,14 @@ class MessageRepository(BaseRepository):
         """
         try:
             sql = """
-                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content
+                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content, attachments
                 FROM messages
                 WHERE round_id = ?
                 ORDER BY message_id ASC
             """
             rows = self._fetch_all(sql, (round_id,))
 
-            messages = [Message.from_dict(self._row_to_dict(row)) for row in rows]
+            messages = [Message.from_dict(self._parse_message_row(self._row_to_dict(row))) for row in rows]
             self.logger.debug(f"获取轮次消息成功: round_id={round_id}, 共{len(messages)}条消息")
             return messages
 
@@ -144,6 +190,10 @@ class MessageRepository(BaseRepository):
     def get_messages_by_conversation(self, conversation_id: str, limit: int = None) -> List[Message]:
         """获取对话的所有消息（通过rounds关联）
 
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+            建议使用 get_conversation_messages_paginated() 替代。
+
         Args:
             conversation_id: 对话ID
             limit: 返回记录数限制（可选）
@@ -151,11 +201,17 @@ class MessageRepository(BaseRepository):
         Returns:
             List[Message]: 消息列表
         """
+        warnings.warn(
+            "get_messages_by_conversation() 目前未被使用，建议使用 get_conversation_messages_paginated()",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             if limit:
                 sql = """
-                    SELECT m.message_id, m.round_id, m.role, m.content, m.type, m.timestamp, 
-                           m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content
+                    SELECT m.message_id, m.round_id, m.role, m.content, m.type, m.timestamp,
+                           m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.tool_name, m.sub_conversation_id,
+                           m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content, m.attachments
                     FROM messages m
                     JOIN rounds r ON m.round_id = r.round_id
                     WHERE r.conversation_id = ?
@@ -166,7 +222,8 @@ class MessageRepository(BaseRepository):
             else:
                 sql = """
                     SELECT m.message_id, m.round_id, m.role, m.content, m.type, m.timestamp,
-                           m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content
+                           m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.tool_name, m.sub_conversation_id,
+                           m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content, m.attachments
                     FROM messages m
                     JOIN rounds r ON m.round_id = r.round_id
                     WHERE r.conversation_id = ?
@@ -176,7 +233,7 @@ class MessageRepository(BaseRepository):
 
             rows = self._fetch_all(sql, params)
 
-            messages = [Message.from_dict(self._row_to_dict(row)) for row in rows]
+            messages = [Message.from_dict(self._parse_message_row(self._row_to_dict(row))) for row in rows]
             self.logger.debug(f"获取对话消息成功: conversation_id={conversation_id}, 共{len(messages)}条消息")
             return messages
 
@@ -187,6 +244,9 @@ class MessageRepository(BaseRepository):
     def get_messages_by_type(self, round_id: str, message_type: MessageType) -> List[Message]:
         """根据消息类型获取轮次的消息
 
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+
         Args:
             round_id: 轮次ID
             message_type: 消息类型
@@ -194,16 +254,21 @@ class MessageRepository(BaseRepository):
         Returns:
             List[Message]: 指定类型的消息列表
         """
+        warnings.warn(
+            "get_messages_by_type() 目前未被使用，可能在未来版本中移除",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             sql = """
-                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content
+                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content, attachments
                 FROM messages
                 WHERE round_id = ? AND type = ?
                 ORDER BY message_id ASC
             """
             rows = self._fetch_all(sql, (round_id, message_type.value))
 
-            messages = [Message.from_dict(self._row_to_dict(row)) for row in rows]
+            messages = [Message.from_dict(self._parse_message_row(self._row_to_dict(row))) for row in rows]
             self.logger.debug(f"获取指定类型消息成功: round_id={round_id}, type={message_type.value}, 共{len(messages)}条")
             return messages
 
@@ -318,10 +383,14 @@ class MessageRepository(BaseRepository):
             self.logger.error(f"删除轮次消息失败 (round_id: {round_id}): {e}")
             raise e
 
-    # ==================== System Message 特殊操作 ====================
+    # ==================== System Message 特殊操作（已废弃） ====================
 
     def create_system_message(self, conversation_id: str, message: Message) -> int:
         """创建系统消息（使用conversation_id作为round_id）
+
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+            系统消息现在由 Agent 动态生成，不再存储于数据库。
 
         Args:
             conversation_id: 对话ID
@@ -330,6 +399,11 @@ class MessageRepository(BaseRepository):
         Returns:
             int: 新插入消息的ID
         """
+        warnings.warn(
+            "create_system_message() 目前未被使用，系统消息由 Agent 动态生成",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             sql = """
                 INSERT INTO messages (round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, reasoning_content)
@@ -359,16 +433,25 @@ class MessageRepository(BaseRepository):
     def get_system_message(self, conversation_id: str) -> Optional[Message]:
         """获取最新的系统消息
 
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+            系统消息现在由 Agent 动态生成，不再存储于数据库。
+
         Args:
             conversation_id: 对话ID
 
         Returns:
             Optional[Message]: 系统消息对象，如果不存在则返回None
         """
+        warnings.warn(
+            "get_system_message() 目前未被使用，系统消息由 Agent 动态生成",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             sql = """
-                SELECT message_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, reasoning_content
-                FROM messages 
+                SELECT message_id, round_id, role, content, type, timestamp, tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content, attachments
+                FROM messages
                 WHERE round_id = ? AND role = 'system'
                 ORDER BY timestamp DESC, message_id DESC
                 LIMIT 1
@@ -376,7 +459,7 @@ class MessageRepository(BaseRepository):
             row = self._fetch_one(sql, (conversation_id,))
 
             if row:
-                message_data = self._row_to_dict(row)
+                message_data = self._parse_message_row(self._row_to_dict(row))
                 self.logger.debug(f"获取系统消息成功: conversation_id={conversation_id}")
                 return Message.from_dict(message_data)
             else:
@@ -390,10 +473,19 @@ class MessageRepository(BaseRepository):
     def update_system_message(self, conversation_id: str, message: Message) -> None:
         """更新或插入系统消息
 
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+            系统消息现在由 Agent 动态生成，不再存储于数据库。
+
         Args:
             conversation_id: 对话ID
             message: 系统消息对象
         """
+        warnings.warn(
+            "update_system_message() 目前未被使用，系统消息由 Agent 动态生成",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             # 检查是否已存在系统消息
             existing_sql = """
@@ -488,6 +580,9 @@ class MessageRepository(BaseRepository):
     def search_messages(self, query: str, user_id: str = None, limit: int = 100) -> List[Message]:
         """搜索消息内容
 
+        .. deprecated::
+            该方法目前未被使用，可能在未来版本中移除。
+
         Args:
             query: 搜索关键词
             user_id: 用户ID（可选，限制搜索范围）
@@ -496,11 +591,17 @@ class MessageRepository(BaseRepository):
         Returns:
             List[Message]: 匹配的消息列表
         """
+        warnings.warn(
+            "search_messages() 目前未被使用，可能在未来版本中移除",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             if user_id:
                 sql = """
                     SELECT m.message_id, m.round_id, m.role, m.content, m.type, m.timestamp,
-                           m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content
+                           m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.tool_name, m.sub_conversation_id,
+                           m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content, m.attachments
                     FROM messages m
                     JOIN rounds r ON m.round_id = r.round_id
                     JOIN conversations c ON r.conversation_id = c.conversation_id
@@ -512,7 +613,8 @@ class MessageRepository(BaseRepository):
             else:
                 sql = """
                     SELECT message_id, round_id, role, content, type, timestamp,
-                           tool_success, tool_call_ids, tool_call_raw, agent_id, total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content
+                           tool_success, tool_call_ids, tool_call_raw, agent_id, tool_name, sub_conversation_id,
+                           total_tokens, prompt_tokens, completion_tokens, reasoning_tokens, platform, model, reasoning_content, attachments
                     FROM messages
                     WHERE content LIKE ?
                     ORDER BY timestamp DESC
@@ -522,7 +624,7 @@ class MessageRepository(BaseRepository):
 
             rows = self._fetch_all(sql, params)
 
-            messages = [Message.from_dict(self._row_to_dict(row)) for row in rows]
+            messages = [Message.from_dict(self._parse_message_row(self._row_to_dict(row))) for row in rows]
             self.logger.debug(f"搜索消息成功: 关键词='{query}', 找到{len(messages)}条消息")
             return messages
 
@@ -577,8 +679,8 @@ class MessageRepository(BaseRepository):
 
             message_sql = f"""
                 SELECT m.message_id, m.round_id, m.role, m.content, m.type, m.timestamp,
-                       m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.sub_conversation_id,
-                       m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content,
+                       m.tool_success, m.tool_call_ids, m.tool_call_raw, m.agent_id, m.tool_name, m.sub_conversation_id,
+                       m.total_tokens, m.prompt_tokens, m.completion_tokens, m.reasoning_tokens, m.platform, m.model, m.reasoning_content, m.attachments,
                        r.created_at as round_created_at
                 FROM messages m
                 JOIN rounds r ON m.round_id = r.round_id
@@ -589,7 +691,7 @@ class MessageRepository(BaseRepository):
             message_rows = self._fetch_all(message_sql, round_ids)
 
             # 返回 Message 对象列表
-            messages = [Message.from_dict(self._row_to_dict(row)) for row in message_rows]
+            messages = [Message.from_dict(self._parse_message_row(self._row_to_dict(row))) for row in message_rows]
             self.logger.debug(f"获取对话消息分页成功: conversation_id={conversation_id}, before_round_id={before_round_id}, 共{len(messages)}条消息，来自{len(round_ids)}个轮次")
             return messages
 

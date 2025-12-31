@@ -157,6 +157,7 @@ class DatabaseConnection:
                     completion_tokens INTEGER DEFAULT 0,
                     reasoning_tokens INTEGER DEFAULT 0,
                     reasoning_content TEXT,
+                    attachments TEXT DEFAULT '',  -- VL附件JSON数组
                     FOREIGN KEY (round_id) REFERENCES rounds (round_id)
                 )
                 """,
@@ -258,6 +259,18 @@ class DatabaseConnection:
             # 执行索引创建语句
             for index in index_scripts:
                 cursor.execute(index)
+
+            # 数据库迁移：为已有数据库添加新字段
+            migrations = [
+                # VL 附件支持
+                ("messages", "attachments", "TEXT DEFAULT ''"),
+            ]
+            for table, column, definition in migrations:
+                try:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+                    self.logger.info(f"数据库迁移：添加 {table}.{column} 字段")
+                except sqlite3.OperationalError:
+                    pass  # 字段已存在，忽略
 
             self.conn.commit()
             self.logger.info("数据库表结构初始化完成")

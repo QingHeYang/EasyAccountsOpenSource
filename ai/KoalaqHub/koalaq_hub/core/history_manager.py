@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from ..config.settings import config
 from ..database.repository_adapter import RepositoryAdapter
 from ..models.agent import Agent
-from ..models.message import Message, MessageType
+from ..models.message import Attachment, Message, MessageType
 from .auto_question_manager import AutoQuestionManager
 from .llm.enhanced_llm_client import TokenUsage
 from .logging_utils import ManagerLogger
@@ -172,16 +172,18 @@ class HistoryManager:
             self.logger.error("轮次结束处理失败", exception=e, extra_data={"conversation_id": conversation_id, "round_id": round_id})
             raise
 
-    def add_user_message(self, agent: Agent, user_id: str, 
-                        conversation_id: str, round_id: str, content: str):
+    def add_user_message(self, agent: Agent, user_id: str,
+                        conversation_id: str, round_id: str, content: str,
+                        attachments: Optional[List[Attachment]] = None):
         """添加用户消息
-        
+
         Args:
             agent: Agent实例
             user_id: 用户ID
             conversation_id: 会话ID
             round_id: 轮次ID
             content: 消息内容
+            attachments: VL 附件列表（Attachment 对象）
         """
         try:
             if user_id not in self.histories or conversation_id not in self.histories[user_id]:
@@ -190,9 +192,18 @@ class HistoryManager:
                 raise ValueError(f"轮次ID不存在: {round_id}")
 
             # 创建消息
-            message = Message.create_user_message(content, round_id)
+            message = Message.create_user_message(content, round_id, attachments=attachments)
             self.histories[user_id][conversation_id]["rounds"][round_id].append(message)
             self.sqlite_storage.add_message(round_id, message)
+
+            # VL 日志
+            if attachments:
+                self.logger.info("用户消息包含附件", {
+                    "conversation_id": conversation_id,
+                    "round_id": round_id,
+                    "attachments_count": len(attachments),
+                    "filenames": [att.filename for att in attachments]
+                })
 
         except Exception as e:
             self.logger.error("添加用户消息失败", exception=e, extra_data={
@@ -464,8 +475,20 @@ class HistoryManager:
                     if msg.role == "assistant" and not content:
                         content = "[思考被中断...]"
                         self.logger.warning(f"[{round_id}][{idx}] 普通 assistant 消息内容为空，可能被中断")
-                        
-                    result.append({"role": msg.role, "content": content})
+
+                    # 对于用户消息，使用 to_llm_content() 处理 VL 附件
+                    if msg.role == "user":
+                        llm_content = msg.to_llm_content()
+                        result.append({"role": msg.role, "content": llm_content})
+                        # VL 日志：记录附件转换
+                        if msg.attachments:
+                            self.logger.info(f"[{round_id}][{idx}] VL 附件转换为 LLM 格式", {
+                                "attachments_count": len(msg.attachments),
+                                "filenames": [att.filename for att in msg.attachments],
+                                "content_parts": len(llm_content) if isinstance(llm_content, list) else 1
+                            })
+                    else:
+                        result.append({"role": msg.role, "content": content})
                     self.logger.debug(f"[{round_id}][{idx}] {msg.type.value}", {
                         "role": msg.role
                     })

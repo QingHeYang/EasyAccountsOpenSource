@@ -10,6 +10,7 @@ from fastapi import WebSocket
 from koalaq_hub.core.agents.agent_executor import AgentExecutor
 from koalaq_hub.core.agents.agent_registry import AgentRegistry
 from koalaq_hub.core.conversation_manager import ConversationManager
+from koalaq_hub.core.image_service import convert_attachments
 from koalaq_hub.core.logging_utils import ManagerLogger
 from koalaq_hub.core.user_manager import UserManager
 from koalaq_hub.models.agent import Agent
@@ -117,6 +118,13 @@ def create_websocket_handler( user_manager: UserManager, conversation_manager: C
                         
                         conversation_id = data.get("conversation_id")
                         content = data.get("content")
+                        raw_attachments = data.get("attachments")  # VL 附件列表（原始格式）
+
+                        # 转换附件：从 filename 下载图片并转为 base64
+                        attachments = None
+                        if raw_attachments:
+                            attachments = await convert_attachments(raw_attachments)
+                            logger.info("附件转换完成", {"count": len(attachments) if attachments else 0})
 
                         # 正确解析布尔参数：字符串"true"、"1"、"yes"为True，其他为False
                         if agent.enable_thinking:
@@ -162,7 +170,8 @@ def create_websocket_handler( user_manager: UserManager, conversation_manager: C
                             message=content,
                             conversation_id=conversation_id,
                             user_id=user_id,
-                            source='websocket'
+                            source='websocket',
+                            attachments=attachments
                         )
 
                     except json.JSONDecodeError as e:
@@ -177,7 +186,12 @@ def create_websocket_handler( user_manager: UserManager, conversation_manager: C
                         await websocket.send_text(json.dumps({"error": "消息格式无效"}))
 
                 except Exception as e:
-                    logger.error("处理消息时出错", exception=e, extra_data={"conversation_id": conversation_id, "user_id": user_id})
+                    # 检查是否是正常的 WebSocket 断开（状态码 1000）
+                    error_str = str(e)
+                    if "1000" in error_str or "User disconnect" in error_str:
+                        logger.info("用户主动断开连接", {"conversation_id": conversation_id, "user_id": user_id})
+                    else:
+                        logger.error("处理消息时出错", exception=e, extra_data={"conversation_id": conversation_id, "user_id": user_id})
                     # 发送错误消息给客户端
                     try:
                         await websocket.send_text(json.dumps({"error": "服务器处理消息时出错"}))

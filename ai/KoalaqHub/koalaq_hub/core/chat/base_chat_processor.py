@@ -105,7 +105,8 @@ class BaseChatProcessor(ABC):
 
             # 2. 添加用户消息到历史
             if not is_call_tool: # 如果is_call_tool为True，说明已经把tool添加完了，直接调用即可
-                self.history_manager.add_user_message(agent=agent, user_id=user_id, conversation_id=conversation_id, round_id=round_id, content=message)
+                attachments = kwargs.get('attachments')  # VL 附件
+                self.history_manager.add_user_message(agent=agent, user_id=user_id, conversation_id=conversation_id, round_id=round_id, content=message, attachments=attachments)
 
             self.logger.info("对话索引",
                              {"conversation_id": conversation_id, 

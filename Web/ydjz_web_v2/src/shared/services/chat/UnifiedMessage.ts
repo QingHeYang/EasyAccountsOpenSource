@@ -14,6 +14,7 @@ export interface MessageContent {
   isStreaming: boolean
   streamBuffer: string
   streamType: StreamType
+  attachments: string[]  // 图片附件文件名列表
 }
 
 export interface ToolInfo {
@@ -101,7 +102,8 @@ export class UnifiedMessage {
       reasoning: data.content?.reasoning || '',
       isStreaming: data.content?.isStreaming || false,
       streamBuffer: data.content?.streamBuffer || '',
-      streamType: data.content?.streamType || ''
+      streamType: data.content?.streamType || '',
+      attachments: data.content?.attachments || []
     }
 
     // 工具相关
