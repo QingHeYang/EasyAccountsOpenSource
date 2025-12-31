@@ -257,6 +257,10 @@ class RepositoryAdapter:
         """获取对话消息（按轮次分页）"""
         return self.factory.get_message_repository().get_conversation_messages_paginated(conversation_id, before_round_id, limit)
 
+    def get_user_attachments_by_round(self, round_id: str) -> List[str]:
+        """获取轮次中用户消息的附件文件名列表"""
+        return self.factory.get_message_repository().get_user_attachments_by_round(round_id)
+
     # ==================== 总结相关方法 ====================
 
     def create_summary_log(self, summary_log: SummaryLog) -> int:

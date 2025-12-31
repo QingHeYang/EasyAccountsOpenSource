@@ -12,6 +12,7 @@ import httpx
 from ..base import BaseTool, ToolParam, tool
 from ..registry import register_tool
 from ...config.settings import config
+from ...database.repository_adapter import RepositoryAdapter
 
 
 # ==============================================================================
@@ -151,7 +152,7 @@ ADD_FLOW_PARAMS = [
     ToolParam(
         name="images",
         param_type="array",
-        description="附件图片文件名列表，可选。用户上传的图片文件名，如['1767172174107_5872.jpg']",
+        description="图片序号列表，可选。用户上传图片按顺序编号（从1开始），如 [1] 表示第1张图片，[1,2] 表示第1和第2张图片",
         required=False
     )
 ]
@@ -573,6 +574,21 @@ class AddFlowTool(BaseTool):
             if arguments.get("accountToId") is not None:
                 payload["accountToId"] = arguments["accountToId"]
 
+            # 处理图片附件（索引转文件名）
+            image_indices = arguments.get("images")
+            if image_indices:
+                round_id = context.get("round_id")
+                if round_id:
+                    repo = RepositoryAdapter()
+                    user_attachments = repo.get_user_attachments_by_round(round_id)
+                    # 根据索引获取文件名（索引从1开始）
+                    filenames = []
+                    for idx in image_indices:
+                        if isinstance(idx, int) and 1 <= idx <= len(user_attachments):
+                            filenames.append(user_attachments[idx - 1])
+                    if filenames:
+                        payload["images"] = filenames
+
             async with httpx.AsyncClient() as http_client:
                 response = await http_client.post(
                     url,
@@ -641,6 +657,21 @@ class UpdateFlowTool(BaseTool):
             }
             if arguments.get("accountToId") is not None:
                 payload["accountToId"] = arguments["accountToId"]
+
+            # 处理图片附件（索引转文件名）
+            image_indices = arguments.get("images")
+            if image_indices:
+                round_id = context.get("round_id")
+                if round_id:
+                    repo = RepositoryAdapter()
+                    user_attachments = repo.get_user_attachments_by_round(round_id)
+                    # 根据索引获取文件名（索引从1开始）
+                    filenames = []
+                    for idx in image_indices:
+                        if isinstance(idx, int) and 1 <= idx <= len(user_attachments):
+                            filenames.append(user_attachments[idx - 1])
+                    if filenames:
+                        payload["images"] = filenames
 
             async with httpx.AsyncClient() as http_client:
                 response = await http_client.put(

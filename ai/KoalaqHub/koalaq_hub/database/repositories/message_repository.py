@@ -187,6 +187,44 @@ class MessageRepository(BaseRepository):
             self.logger.error(f"获取轮次消息失败 (round_id: {round_id}): {e}")
             return []  # 兼容原代码，失败时返回空列表
 
+    def get_user_attachments_by_round(self, round_id: str) -> List[str]:
+        """获取轮次中用户消息的附件文件名列表
+
+        按顺序返回用户消息中的附件文件名，用于 Tool 根据索引获取文件名。
+
+        Args:
+            round_id: 轮次ID
+
+        Returns:
+            List[str]: 附件文件名列表（按顺序）
+        """
+        try:
+            sql = """
+                SELECT attachments
+                FROM messages
+                WHERE round_id = ? AND role = 'user' AND attachments IS NOT NULL AND attachments != ''
+                ORDER BY message_id ASC
+                LIMIT 1
+            """
+            row = self._fetch_one(sql, (round_id,))
+
+            if not row or not row[0]:
+                return []
+
+            # 解析 attachments JSON
+            import json
+            attachments_data = json.loads(row[0])
+
+            # 提取文件名列表
+            filenames = [att.get("filename", "") for att in attachments_data if att.get("filename")]
+
+            self.logger.debug(f"获取用户附件成功: round_id={round_id}, 共{len(filenames)}个附件")
+            return filenames
+
+        except Exception as e:
+            self.logger.error(f"获取用户附件失败 (round_id: {round_id}): {e}")
+            return []
+
     def get_messages_by_conversation(self, conversation_id: str, limit: int = None) -> List[Message]:
         """获取对话的所有消息（通过rounds关联）
 
