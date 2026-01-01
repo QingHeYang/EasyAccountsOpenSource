@@ -256,16 +256,10 @@ class DatabaseConnection:
             for script in ddl_scripts:
                 cursor.execute(script)
 
-            # 执行索引创建语句
-            for index in index_scripts:
-                cursor.execute(index)
-
-            # 数据库迁移：为已有数据库添加新字段
+            # 数据库迁移：为已有数据库添加新字段（必须在索引创建之前）
             migrations = [
                 # VL 附件支持
                 ("messages", "attachments", "TEXT DEFAULT ''"),
-                # models 表新字段
-                ("models", "llm_config_name", "TEXT"),
             ]
             for table, column, definition in migrations:
                 try:
@@ -274,7 +268,7 @@ class DatabaseConnection:
                 except sqlite3.OperationalError:
                     pass  # 字段已存在，忽略
 
-            # 检查 models 表结构是否兼容，如果旧表结构不兼容则重建
+            # 检查 models 表结构是否兼容，如果旧表结构不兼容则重建（必须在索引创建之前）
             try:
                 cursor.execute("SELECT llm_config_name FROM models LIMIT 1")
             except sqlite3.OperationalError:
@@ -305,6 +299,10 @@ class DatabaseConnection:
                         updated_at TEXT NOT NULL
                     )
                 """)
+
+            # 执行索引创建语句（必须在迁移之后）
+            for index in index_scripts:
+                cursor.execute(index)
 
             self.conn.commit()
             self.logger.info("数据库表结构初始化完成")
