@@ -1,17 +1,23 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import httpProxy from 'http-proxy'
 
-export default defineConfig({
-  plugins: [
+export default defineConfig(({ mode }) => {
+  // 加载环境变量
+  const env = loadEnv(mode, process.cwd(), '')
+  const aiTarget = env.VITE_AI_TARGET || 'http://localhost:8001'
+  const serverTarget = env.VITE_SERVER_TARGET || 'http://localhost:8081'
+
+  return {
+    plugins: [
     vue(),
     {
       name: 'sse-proxy-middleware',
       configureServer(server) {
         // 创建原生 http-proxy 实例（SSE需要特殊配置）
         const proxy = httpProxy.createProxyServer({
-          target: 'http://192.168.50.231:8001',
+          target: aiTarget,
           changeOrigin: true,
           // SSE 关键配置
           selfHandleResponse: false,
@@ -102,14 +108,19 @@ export default defineConfig({
     host: true, // 允许局域网访问
     proxy: {
       '/api': {
-        target: 'http://www.lllama.cn:10672',
+        target: serverTarget,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/ai-api': {
-        target: 'http://192.168.50.231:8001',
+        target: aiTarget,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ai-api/, ''),
+      },
+      '/ws': {
+        target: aiTarget,
+        changeOrigin: true,
+        ws: true, // 启用 WebSocket 代理
       },
       // 注意: /sse, /mcp, /messages 在 configureServer 中间件中处理
     },
@@ -122,4 +133,4 @@ export default defineConfig({
       },
     },
   },
-})
+}})

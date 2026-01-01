@@ -5,7 +5,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # 先复制requirements.txt（依赖文件变化较少）
-COPY koalaq_hub_python/requirements.txt /app/requirements.txt
+COPY KoalaqHub/requirements.txt /app/requirements.txt
 
 # 安装Python依赖（使用清华源）
 RUN pip install --upgrade pip && \
@@ -16,13 +16,13 @@ RUN pip install --upgrade pip && \
     -r /app/requirements.txt
 
 # 最后复制项目代码（代码变化频繁）
-COPY koalaq_hub_python /app/koalaq_hub_python
+COPY KoalaqHub /app/KoalaqHub
 
 # 设置Python路径
-ENV PYTHONPATH="/app/koalaq_hub_python"
+ENV PYTHONPATH="/app/KoalaqHub"
 
 # 设置工作目录
-WORKDIR /app/koalaq_hub_python
+WORKDIR /app/KoalaqHub
 
 # 暴露端口
 # KoalaQ Hub API端口

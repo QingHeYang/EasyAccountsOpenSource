@@ -21,6 +21,8 @@ public class AuthUtils {
     @Value("${auth.folder}")
     private String authFolder;
 
+    @Value("${auth.expired}")
+    private long expired;
 
     public int isAuth(String token) {
         if (!authEnable) {
@@ -55,6 +57,11 @@ public class AuthUtils {
             }
             long currentTime = System.currentTimeMillis();
             if (auth.getToken().equals(token)&&auth.getExpireTime()>currentTime) {
+                // 滑动刷新：每次验证成功后延长过期时间
+                long newExpireTime = currentTime + expired * 60 * 1000;
+                auth.setExpireTime(newExpireTime);
+                saveAuth(auth);
+                log.info("Token 滑动刷新: 新过期时间 {}", new java.util.Date(newExpireTime));
                 return 200;
             }else {
                 return 401;

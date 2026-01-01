@@ -7,5 +7,7 @@ public class VersionDto {
     private String fontBranch;
     private String backendBranch;
     private String mysqlBranch;
+    private String agentBranch;
+    private String webhookBranch;
     private String release;
 }

@@ -1,0 +1,87 @@
+server {
+    listen 80;
+
+    server_name localhost;
+    # 设置字符编码为utf-8
+    charset utf-8;
+    
+    # 允许请求头中包含下划线（重要：支持 user_id）
+    underscores_in_headers on;
+
+    # Vue编译好的项目
+    location / {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 后端 API 代理 - 代理到内部网络的 server 服务
+    location /api/ {
+        proxy_pass http://server:8081/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 文件上传大小限制（支持图片上传）
+        client_max_body_size 20M;
+        
+        # 超时设置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # AI WebSocket 连接代理（必须在 /ai/ 之前）
+    location /ws/ {
+        proxy_pass http://ai:8001/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 确保转发所有请求头
+        proxy_pass_request_headers on;
+        # 显式转发 user_id
+        proxy_set_header user_id $http_user_id;
+        
+        # WebSocket 超时设置
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # AI HTTP API 代理
+    location /ai/ {
+        proxy_pass http://ai:8001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 重要：确保转发所有请求头
+        proxy_pass_request_headers on;
+        # 显式转发 user_id（防止下划线问题）
+        proxy_set_header user_id $http_user_id;
+        
+        # 超时设置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # 静态资源
+    location /resources/ {
+        alias /usr/share/nginx/html/resources/;
+        autoindex on;
+        charset utf-8;  # 确保资源目录也使用utf-8字符编码
+    }
+
+    # 健康检查
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+    }
+
+}

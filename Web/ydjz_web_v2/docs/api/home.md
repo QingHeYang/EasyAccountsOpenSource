@@ -106,14 +106,33 @@
 
 ```json
 {
-  "code": "integer",
+  "code": 200,
+  "msg": "成功",
   "data": {
-    "backendBranch": "string",
-    "fontBranch": "string",
-    "mysqlBranch": "string",
-    "release": "string"
-  },
-  "msg": "string"
+    "release": "string",       // 总版本号
+    "fontBranch": "string",    // 前端版本
+    "backendBranch": "string", // 后端版本
+    "mysqlBranch": "string",   // 数据库版本
+    "agentBranch": "string",   // AI Agent 版本
+    "webhookBranch": "string"  // WebHook 版本
+  }
+}
+```
+
+#### 响应示例
+
+```json
+{
+  "code": 200,
+  "msg": "成功",
+  "data": {
+    "release": "3.0.0",
+    "fontBranch": "4.0.0",
+    "backendBranch": "2.5.1",
+    "mysqlBranch": "2.5.0",
+    "agentBranch": "1.1.0",
+    "webhookBranch": "1.0.0"
+  }
 }
 ```
 

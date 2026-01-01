@@ -18,9 +18,10 @@ let errorHandler: ((status: number, msg: string) => void) | undefined
 
 /**
  * 获取 AI API 基础地址
+ * 开发环境和生产环境都使用 /ai-api 路径前缀，由代理层（Vite/Nginx）转发
  */
 function getAiApiUrl(): string {
-  return window.config?.aiApiUrl || '/ai-api'
+  return '/ai-api'
 }
 
 /**
@@ -35,9 +36,6 @@ function createAiAxiosInstance(timeout: number): AxiosInstance {
   // 请求拦截器
   instance.interceptors.request.use(
     (config) => {
-      // 动态更新 baseURL（支持运行时配置变化）
-      config.baseURL = getAiApiUrl()
-
       // 添加 user_id 请求头（固定值）
       config.headers['user_id'] = 'user_67ce21d6-a11c-4340-851b-7a8949906aa3'
 
@@ -86,7 +84,9 @@ export function getAiRequest(): AxiosInstance {
 
 /**
  * 获取 AI WebSocket 地址
+ * 开发环境和生产环境都使用当前域名 + /ws 路径，由代理层（Vite/Nginx）转发
  */
 export function getAiWebSocketUrl(): string {
-  return window.config?.aiWebSocketUrl || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ai-api`
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/ws`
 }

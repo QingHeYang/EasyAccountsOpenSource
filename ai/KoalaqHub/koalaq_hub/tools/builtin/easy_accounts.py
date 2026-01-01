@@ -263,6 +263,18 @@ MAKE_EXCEL_DESC = (
     "当流水数量较多时（超过100条），建议使用此工具导出完整报表。"
 )
 
+GET_FLOW_DESC = "根据流水ID获取单条流水的详细信息。包含完整的账户、分类、金额、日期、备注、图片等信息。"
+
+# 获取流水详情参数
+GET_FLOW_PARAMS = [
+    ToolParam(
+        name="flowId",
+        param_type="integer",
+        description="流水ID，必填。通过flows工具查询获取，或从add_flow/update_flow返回值获取",
+        required=True
+    )
+]
+
 
 # ==============================================================================
 #                              HTTP 客户端
@@ -576,19 +588,15 @@ class AddFlowTool(BaseTool):
 
                 if response.status_code == 200:
                     resp_data = response.json()
-                    # 从响应中提取 flowId（可能在 data.id 或直接 id）
+                    # data 是对象 {"id": 123}
                     flow_id = None
-                    if isinstance(resp_data, dict):
-                        if "data" in resp_data and isinstance(resp_data["data"], dict):
-                            flow_id = resp_data["data"].get("id") or resp_data["data"].get("flowId")
-                        else:
-                            flow_id = resp_data.get("id") or resp_data.get("flowId")
+                    if isinstance(resp_data, dict) and isinstance(resp_data.get("data"), dict):
+                        flow_id = resp_data["data"].get("id")
 
                     return self._success(result=json.dumps({
                         "success": True,
                         "message": "流水添加成功",
-                        "flowId": flow_id,  # 前端可直接用于查看详情
-                        "data": resp_data
+                        "flowId": flow_id  # 前端可直接用于查看详情
                     }, ensure_ascii=False))
                 elif response.status_code == 401:
                     return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
@@ -647,8 +655,7 @@ class UpdateFlowTool(BaseTool):
                     return self._success(result=json.dumps({
                         "success": True,
                         "message": f"流水ID={flow_id}更新成功",
-                        "flowId": flow_id,  # 前端可直接用于查看详情
-                        "data": response.json()
+                        "flowId": flow_id  # 前端可直接用于查看详情
                     }, ensure_ascii=False))
                 elif response.status_code == 401:
                     return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
@@ -714,3 +721,71 @@ class MakeExcelTool(BaseTool):
                     return self._error(error=f"生成Excel失败: {error_msg}")
         except Exception as e:
             return self._error(error=f"生成Excel失败: {str(e)}")
+
+
+@register_tool
+@tool(name="get_flow", description=GET_FLOW_DESC, parameters=GET_FLOW_PARAMS)
+class GetFlowTool(BaseTool):
+    """根据ID获取流水详情"""
+
+    async def execute(self, arguments: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            flow_id = arguments.get("flowId")
+            if flow_id is None:
+                return self._error(error="缺少必要参数: flowId")
+
+            client = _get_client(context)
+            url = f"{client.base_url}/flow/getFlow/{flow_id}"
+
+            async with httpx.AsyncClient() as http_client:
+                response = await http_client.get(url, headers=client._build_headers())
+
+                if response.status_code == 401:
+                    return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
+
+                resp_data = response.json()
+                if resp_data.get("code") != 0:
+                    return self._error(error=resp_data.get("msg", "获取流水失败"))
+
+                data = resp_data.get("data", {})
+                if not data:
+                    return self._error(error=f"未找到流水ID={flow_id}")
+
+                # 格式化返回结果
+                result = {
+                    "flowId": data.get("id"),
+                    "money": data.get("money"),
+                    "date": data.get("fdate"),
+                    "note": data.get("note"),
+                    "collect": data.get("collect"),
+                    "from": data.get("from"),
+                    "images": data.get("images", []),
+                    # 账户信息
+                    "account": {
+                        "id": data.get("account", {}).get("id"),
+                        "name": data.get("account", {}).get("aname"),
+                        "balance": data.get("account", {}).get("money")
+                    } if data.get("account") else None,
+                    # 转入账户（内部转账时）
+                    "accountTo": {
+                        "id": data.get("accountTo", {}).get("id"),
+                        "name": data.get("accountTo", {}).get("aname"),
+                        "balance": data.get("accountTo", {}).get("money")
+                    } if data.get("accountTo") else None,
+                    # 收支动作
+                    "action": {
+                        "id": data.get("action", {}).get("id"),
+                        "handle": data.get("action", {}).get("handle"),
+                        "name": data.get("action", {}).get("hname")
+                    } if data.get("action") else None,
+                    # 分类信息
+                    "type": {
+                        "id": data.get("type", {}).get("id"),
+                        "name": data.get("type", {}).get("tname"),
+                        "parent": data.get("type", {}).get("parent")
+                    } if data.get("type") else None
+                }
+
+                return self._success(result=json.dumps(result, ensure_ascii=False))
+        except Exception as e:
+            return self._error(error=f"获取流水详情失败: {str(e)}")

@@ -16,15 +16,22 @@ public class VersionUtils {
     @Value("${version.mysql_branch}")
     private String mysqlBranch;
 
+    @Value("${version.agent_branch}")
+    private String agentBranch;
+
+    @Value("${version.webhook_branch}")
+    private String webhookBranch;
+
     @Value("${version.release}")
     private String release;
-
 
     public VersionDto getVersion() {
         VersionDto versionDto = new VersionDto();
         versionDto.setFontBranch(fontBranch);
         versionDto.setBackendBranch(backendBranch);
         versionDto.setMysqlBranch(mysqlBranch);
+        versionDto.setAgentBranch(agentBranch);
+        versionDto.setWebhookBranch(webhookBranch);
         versionDto.setRelease(release);
         return versionDto;
     }

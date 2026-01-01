@@ -364,6 +364,77 @@ async def flows(
 
 
 @mcp.tool
+async def get_flow(ctx: Context, flowId: int) -> str:
+    """根据流水ID获取单条流水的详细信息。包含完整的账户、分类、金额、日期、备注、图片等信息。
+
+    Args:
+        flowId: 流水ID，必填。通过flows工具查询获取，或从add_flow/update_flow返回值获取
+
+    Returns:
+        流水详细信息
+    """
+    try:
+        if flowId is None:
+            return json.dumps({"error": "缺少必要参数: flowId"}, ensure_ascii=False)
+
+        client = _get_client(ctx)
+        url = f"{client.base_url}/flow/getFlow/{flowId}"
+
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.get(url, headers=client._build_headers())
+
+            if response.status_code == 401:
+                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
+
+            resp_data = response.json()
+            if resp_data.get("code") != 0:
+                return json.dumps({"error": resp_data.get("msg", "获取流水失败")}, ensure_ascii=False)
+
+            data = resp_data.get("data", {})
+            if not data:
+                return json.dumps({"error": f"未找到流水ID={flowId}"}, ensure_ascii=False)
+
+            # 格式化返回结果
+            result = {
+                "flowId": data.get("id"),
+                "money": data.get("money"),
+                "date": data.get("fdate"),
+                "note": data.get("note"),
+                "collect": data.get("collect"),
+                "from": data.get("from"),
+                "images": data.get("images", []),
+                # 账户信息
+                "account": {
+                    "id": data.get("account", {}).get("id"),
+                    "name": data.get("account", {}).get("aname"),
+                    "balance": data.get("account", {}).get("money")
+                } if data.get("account") else None,
+                # 转入账户（内部转账时）
+                "accountTo": {
+                    "id": data.get("accountTo", {}).get("id"),
+                    "name": data.get("accountTo", {}).get("aname"),
+                    "balance": data.get("accountTo", {}).get("money")
+                } if data.get("accountTo") else None,
+                # 收支动作
+                "action": {
+                    "id": data.get("action", {}).get("id"),
+                    "handle": data.get("action", {}).get("handle"),
+                    "name": data.get("action", {}).get("hname")
+                } if data.get("action") else None,
+                # 分类信息
+                "type": {
+                    "id": data.get("type", {}).get("id"),
+                    "name": data.get("type", {}).get("tname"),
+                    "parent": data.get("type", {}).get("parent")
+                } if data.get("type") else None
+            }
+
+            return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"获取流水详情失败: {str(e)}"}, ensure_ascii=False)
+
+
+@mcp.tool
 async def add_flow(
     ctx: Context,
     accountId: int,
@@ -427,19 +498,15 @@ async def add_flow(
 
             if response.status_code == 200:
                 resp_data = response.json()
-                # 从响应中提取 flowId
+                # data 是对象 {"id": 123}
                 flow_id = None
-                if isinstance(resp_data, dict):
-                    if "data" in resp_data and isinstance(resp_data["data"], dict):
-                        flow_id = resp_data["data"].get("id") or resp_data["data"].get("flowId")
-                    else:
-                        flow_id = resp_data.get("id") or resp_data.get("flowId")
+                if isinstance(resp_data, dict) and isinstance(resp_data.get("data"), dict):
+                    flow_id = resp_data["data"].get("id")
 
                 return json.dumps({
                     "success": True,
                     "message": "流水添加成功",
-                    "flowId": flow_id,
-                    "data": resp_data
+                    "flowId": flow_id
                 }, ensure_ascii=False)
             elif response.status_code == 401:
                 return json.dumps(client._handle_auth_error(), ensure_ascii=False)
@@ -517,8 +584,7 @@ async def update_flow(
                 return json.dumps({
                     "success": True,
                     "message": f"流水ID={flowId}更新成功",
-                    "flowId": flowId,
-                    "data": response.json()
+                    "flowId": flowId
                 }, ensure_ascii=False)
             elif response.status_code == 401:
                 return json.dumps(client._handle_auth_error(), ensure_ascii=False)

@@ -47,10 +47,10 @@ public class FlowService {
 
 
     @Transactional(rollbackFor = Exception.class)
-    public void doAddFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
+    public int doAddFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
-        
+
         String log = "新增flow\n"+"金额： "+ flowAddRequestDto.getMoney()+"";
         LogUtils.log_print(log);
         Flow flow = setNewFlow(flowAddRequestDto);
@@ -59,11 +59,13 @@ public class FlowService {
         flow.setFCreateDate(createDate);
         BeanUtils.copyProperties(flowAddRequestDto, flow);
         flowDao.addFlow(flow);
-        
+
         // 保存图片关联
         if (flowAddRequestDto.getImages() != null && !flowAddRequestDto.getImages().isEmpty()) {
             imageService.saveFlowImages(flow.getId(), flowAddRequestDto.getImages());
         }
+
+        return flow.getId();
     }
 
     private Flow setNewFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
@@ -109,15 +111,15 @@ public class FlowService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void doUpdateFlow(int id, FlowAddRequestDto flowAddRequestDto) throws Exception {
+    public int doUpdateFlow(int id, FlowAddRequestDto flowAddRequestDto) throws Exception {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
-        
+
         // 处理from字段：如果没有传入from字段，则置空
         if (flowAddRequestDto.getFrom() == null) {
             flowAddRequestDto.setFrom("");
         }
-        
+
         String log = "更新flow\n"+"id: "+id+"\n金额： "+ flowAddRequestDto.getMoney()+"\n原操作： ";
         Flow lastFlow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(lastFlow.getActionId());
@@ -145,12 +147,14 @@ public class FlowService {
         flow.setId(id);
         BeanUtils.copyProperties(flowAddRequestDto, flow);
         flowDao.updateFlow(flow);
-        
+
         // 更新图片关联（先删后加）
         imageService.deleteFlowImages(id);
         if (flowAddRequestDto.getImages() != null && !flowAddRequestDto.getImages().isEmpty()) {
             imageService.saveFlowImages(id, flowAddRequestDto.getImages());
         }
+
+        return id;
     }
 
     private Account handleAccount(int handle, String money, Account account, boolean isExempt) {

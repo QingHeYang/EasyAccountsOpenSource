@@ -43,10 +43,18 @@ export interface HomeInfo {
 
 /** 版本信息 */
 export interface VersionInfo {
+  /** 总版本号 */
   release: string
-  backendBranch: string
+  /** 前端版本 */
   fontBranch: string
+  /** 后端版本 */
+  backendBranch: string
+  /** 数据库版本 */
   mysqlBranch: string
+  /** AI Agent 版本 */
+  agentBranch: string
+  /** WebHook 版本 */
+  webhookBranch: string
 }
 
 /** 首页 API */

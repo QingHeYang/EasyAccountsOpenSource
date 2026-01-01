@@ -889,7 +889,7 @@ watch(selectedTag, () => {
     </van-popup>
 
     <!-- 日期选择器 - 50%高度 -->
-    <van-popup v-model:show="showCalendar" position="bottom" round teleport="body" :style="{ height: '50%' }">
+    <van-popup v-model:show="showCalendar" position="bottom" round teleport="body" :style="{ height: '50%' }" class="flow-calendar-popup">
       <van-calendar
         :show="true"
         :poppable="false"
@@ -1716,24 +1716,6 @@ html.dark .flow-add-page .van-popup {
   background: var(--color-bg-page);
 }
 
-/* 日历暗黑模式 */
-html.dark .flow-add-page .van-calendar {
-  background: var(--color-bg-card);
-}
-
-html.dark .flow-add-page .van-calendar__header-title,
-html.dark .flow-add-page .van-calendar__header-subtitle {
-  color: var(--color-text-primary);
-}
-
-html.dark .flow-add-page .van-calendar__weekday {
-  color: var(--color-text-secondary);
-}
-
-html.dark .flow-add-page .van-calendar__day {
-  color: var(--color-text-primary);
-}
-
 /* Dialog 暗黑模式 */
 html.dark .flow-add-page .van-dialog {
   background: var(--color-bg-card);
@@ -1755,5 +1737,69 @@ html.dark .flow-add-page .van-dialog__header {
 
 html.dark .flow-add-page .van-uploader__upload {
   background: var(--color-bg-elevated);
+}
+</style>
+
+<!-- 日历暗黑模式 - 全局样式（因为 teleport 到 body） -->
+<style>
+/* 日历弹窗暗黑模式 */
+html.dark .flow-calendar-popup {
+  background: var(--color-bg-card);
+}
+
+html.dark .flow-calendar-popup .van-calendar {
+  background: var(--color-bg-card);
+}
+
+html.dark .flow-calendar-popup .van-calendar__header {
+  background: var(--color-bg-card);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .flow-calendar-popup .van-calendar__header-title,
+html.dark .flow-calendar-popup .van-calendar__header-subtitle {
+  color: var(--color-text-primary);
+}
+
+html.dark .flow-calendar-popup .van-calendar__weekday {
+  color: var(--color-text-secondary);
+}
+
+html.dark .flow-calendar-popup .van-calendar__day {
+  color: var(--color-text-primary);
+}
+
+html.dark .flow-calendar-popup .van-calendar__month-title {
+  color: var(--color-text-primary);
+}
+
+html.dark .flow-calendar-popup .van-calendar__month-mark {
+  color: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .flow-calendar-popup .van-calendar__selected-day {
+  background: var(--color-transfer);
+  color: #fff;
+}
+
+html.dark .flow-calendar-popup .van-calendar__day--today {
+  color: var(--color-transfer);
+}
+
+html.dark .flow-calendar-popup .van-calendar__day--disabled {
+  color: var(--color-text-tertiary);
+}
+
+html.dark .flow-calendar-popup .van-calendar__bottom-info {
+  color: var(--color-text-secondary);
+}
+
+html.dark .flow-calendar-popup .van-calendar__footer {
+  background: var(--color-bg-card);
+}
+
+html.dark .flow-calendar-popup .van-calendar__confirm {
+  background: var(--color-transfer);
+  color: #fff;
 }
 </style>

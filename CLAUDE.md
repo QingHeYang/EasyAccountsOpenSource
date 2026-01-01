@@ -1,43 +1,123 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.  
-全部使用中文进行交互  
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+全部使用中文进行交互
+
+## Claude 角色定义
+
+**你是这个项目的主管**，负责：
+- 全局调度与协调多端开发
+- Git 分支管理与提交
+- 版本文档与总文档编写
+- 打包、发布流程管理
+
+> 注意：过程文档由各端的 Claude 负责编写，你只负责版本文档和总文档。
 
 ## 项目概述
 
-EasyAccounts 是一个个人财务管理应用，采用三层架构：
-- **Server**: Spring Boot 2.4.11 后端，Java 11，MySQL 数据库，双重数据访问（JPA + MyBatis）
-- **Web**: Vue 3 前端，移动优先设计，使用 Vant UI 组件，还包含桌面 Electron 应用
-- **WebHook**: FastAPI Python 服务，用于通过邮件发送文件通知
+EasyAccounts 是一个个人财务管理应用，包含以下模块：
 
-这是 EasyAccounts 的开源版本。当前版本：v2.4.0
+| 模块 | 技术栈 | 说明 |
+|------|--------|------|
+| **Server** | Spring Boot 2.4.11, Java 11, MySQL | 后端服务，双重数据访问（JPA + MyBatis） |
+| **Web** | Vue 3 + TypeScript, Vant UI | 前端（移动端 + 桌面 Electron） |
+| **AI** | Python + MCP 架构 | AI 服务端 |
+| **WebHook** | FastAPI Python | 钩子服务，用户可自定义操作 |
+
+这是 EasyAccounts 的开源版本。当前版本：v2.6.0
+
+---
+
+## Git 分支管理规则
+
+### 分支结构
+
+```
+main                    # 正式版 - 稳定发布
+├── develop             # 开发版本 - 最新代码
+│   ├── 2.6.0          # 版本分支 - 正在开发的版本
+│   │   └── 2.6.0-VL   # feature 分支 - 探索性功能
+│   └── 2.7.0          # 下一个版本分支
+```
+
+### 分支说明
+
+| 分支类型 | 命名规则 | 说明 |
+|----------|----------|------|
+| `main` | 固定 | 正式版，稳定可发布 |
+| `develop` | 固定 | 开发版本，包含最新功能 |
+| 版本分支 | `x.x.x` | 正在开发的具体版本 |
+| feature 分支 | `x.x.x-{feature}` | 基于版本分支的探索性功能 |
+
+### 工作流程
+
+#### 日常开发
+1. 在**版本分支**上进行开发（如 `2.6.0`）
+
+#### Feature 开发
+1. 遇到大功能/新特性/不确定能否完成的功能 → 创建 feature 分支
+2. 开发完毕，测试通过 → 编写 feature 文档 → 合并到版本分支
+3. 开发失败 → 不合并，直接删除该分支
+
+#### 版本发布
+1. 版本分支开发测试完毕 → 编写版本总文档 → 合并到 `develop`
+2. `develop` 打包测试
+3. 测试通过，确认发版 → 合并到 `main`
+4. 发布 Release，确定版本号，打 Tag，制作镜像，上传
+
+---
+
+## 文档管理规则
+
+### 文档类型
+
+| 类型 | 负责人 | 时机 |
+|------|--------|------|
+| **过程文档** | 各端 Claude | 开发过程中 |
+| **Feature 文档** | 项目主管 Claude | feature 分支完成后 |
+| **版本文档** | 项目主管 Claude | 版本分支完成后 |
+| **总文档** | 项目主管 Claude | 发布时更新 |
+
+### 文档规则
+- 每个版本只有一个版本文档
+- Feature 文档在分支结束后编写
+- 版本文档包含该版本所有变更的汇总
 
 ## 开发命令
 
-### 服务端 (Spring Boot)
+### 统一构建（推荐）
 ```bash
-# 进入服务端目录
+# 查看帮助
+./build.sh --help
+
+# 构建所有模块
+./build.sh all
+
+# 构建单个模块
+./build.sh server
+./build.sh web
+./build.sh ai
+./build.sh webhook
+```
+
+### 服务端 (Server)
+```bash
 cd Server/YD_JZ
 
-# 使用 Maven 构建（需要 Java 11）
+# Maven 构建（需要 Java 11）
 mvn clean package
 
-# 运行带特定配置文件
-mvn clean package -P dev
-mvn clean package -P server  
-mvn clean package -P windows
+# 使用不同配置文件
+mvn clean package -P dev      # 开发环境
+mvn clean package -P server   # 生产服务器
+mvn clean package -P windows  # Windows 开发
 
 # 运行测试
 mvn test
-
-# 构建 Docker 镜像
-cd ../
-./make_jar.sh
 ```
 
 ### Web 前端
 ```bash
-# 进入 Web 应用目录
 cd Web/ydjz_web
 
 # 安装依赖（需要 Node.js v16）
@@ -49,67 +129,78 @@ npm run serve
 # 生产构建
 npm run build
 
-# 运行单个测试文件
-npm run test:unit -- tests/unit/example.spec.js
-
-# 运行所有测试
+# 测试
 npm run test:unit
 
-# 代码检查和自动修复
+# 代码检查
 npm run lint
-
-# 构建 Docker 镜像
-cd ../
-./make_nginx.sh
 ```
 
 ### 桌面应用
 ```bash
-# 进入桌面应用目录
 cd Web/ydjz_web_desktop
 
-# 安装依赖
 npm install
+npm run dev              # 开发模式
+npm run electron:build   # 构建 Electron 应用
+```
 
-# 开发模式
-npm run dev
+### AI 服务
+```bash
+cd AI
 
-# 构建 Electron 应用
-npm run electron:build
+# Python 环境（需要 Python 3.9+）
+pip install -r requirements.txt
+
+# 运行服务
+python main.py
 ```
 
 ### WebHook 服务
 ```bash
-# 进入 webhook 目录
 cd WebHook
 
-# 构建 Docker 镜像
-./make_webhook.sh
+# Python 环境
+pip install -r requirements.txt
+
+# 运行服务
+python main.py
 ```
 
 ## 架构和关键组件
 
-### 后端结构
+### Server（后端）
 - **YdJzApplication.java**: Spring Boot 应用主入口
-- **Controllers**: REST API 端点，包括账户、流水、分析、认证等
+- **Controllers**: REST API 端点（账户、流水、分析、认证等）
 - **Services**: 业务逻辑层
-- **DAO**: 双重数据访问，JPA 仓库 + MyBatis 映射器
+- **DAO**: 双重数据访问（JPA + MyBatis）
 - **Entities/DTOs**: 数据模型和传输对象
-- **Config**: Swagger、安全配置和应用配置
+- **Config**: Swagger、安全配置
 
-### 前端结构
-- **Vue 3 + Vue Router**: 单页应用，基于路由的代码分割
-- **Layouts**: HomeLayout 和 SettingLayout 用于不同页面布局
-- **Views**: 主要应用界面（看板、流水、分析、设置）
+### Web（前端）
+- **Vue 3 + Vue Router + TypeScript**: 单页应用
+- **Layouts**: HomeLayout / SettingLayout
+- **Views**: 看板、流水、分析、设置
 - **Store**: Vuex 状态管理
-- **移动优先**: 使用 Vant UI 组件提供移动端体验
+- **UI**: Vant 组件库，移动优先设计
+
+### AI（AI服务）
+- **MCP 架构**: Model Context Protocol
+- **Python**: 后端服务
+- 提供智能分析、自动分类等 AI 能力
+
+### WebHook（钩子服务）
+- **FastAPI**: Python Web 框架
+- 用户可自定义的事件钩子
+- 支持邮件通知等扩展功能
 
 ### 核心功能
-- 财务交易记录跟踪（流水）
+- 财务交易记录（流水）
 - 账户和分类管理
 - 分析报告和 Excel 导出
-- 重复交易模板系统
+- 重复交易模板
 - 身份验证和授权
+- AI 智能辅助
 - 多环境配置（dev/server/windows）
 
 ## 数据库和配置文件
@@ -146,9 +237,18 @@ cd WebHook
 
 ## 重要说明
 
-- 后端开发需要 Java 11 和 Maven
-- 前端开发需要 Node.js v16
-- `Server/excel_template/` 中的 Excel 模板不应修改（包含导出模板）
-- WebHook 服务提供可扩展的通知系统
-- 所有 Docker 构建脚本都在各组件根目录中
-- 修改代码后需要重新构建 Docker 镜像才能生效
+### 环境要求
+- **Server**: Java 11 + Maven
+- **Web**: Node.js v16
+- **AI / WebHook**: Python 3.9+
+
+### 注意事项
+- `Server/excel_template/` 中的 Excel 模板不应修改
+- 使用根目录的 `build.sh` 进行统一构建
+- 版本信息统一管理在 `versions.json`
+- 修改代码后需重新构建 Docker 镜像
+
+### 版本管理
+- 版本号遵循语义化版本规范 (SemVer)
+- 版本历史记录在 `version-history.csv`
+- Docker 镜像 Tag 与版本号保持一致

@@ -13,6 +13,8 @@ import {
   DocumentCopy,
   InfoFilled,
   ArrowRight,
+  ArrowDown,
+  ArrowUp,
   Close,
   MagicStick
 } from '@element-plus/icons-vue'
@@ -51,11 +53,14 @@ const currentTheme = computed({
 
 // 关于弹窗
 const showAbout = ref(false)
+const showVersionDetail = ref(false)
 const versions = ref<VersionInfo>({
   release: '',
-  backendBranch: '',
   fontBranch: '',
+  backendBranch: '',
   mysqlBranch: '',
+  agentBranch: '',
+  webhookBranch: '',
 })
 
 async function loadVersion() {
@@ -286,10 +291,35 @@ onMounted(() => {
         <!-- 副标题 -->
         <div class="about-slogan">认真生活, 好好记账</div>
 
-        <!-- 版本标签 -->
-        <div class="about-version-tag">
+        <!-- 版本标签（可点击展开） -->
+        <div class="about-version-tag" @click="showVersionDetail = !showVersionDetail">
           <span class="version-label">Version</span>
           <span class="version-value">{{ versions.release || '...' }}</span>
+          <el-icon class="version-arrow"><component :is="showVersionDetail ? ArrowUp : ArrowDown" /></el-icon>
+        </div>
+
+        <!-- 版本详情 -->
+        <div v-if="showVersionDetail" class="version-detail">
+          <div class="version-item">
+            <span class="item-label">前端</span>
+            <span class="item-value">{{ versions.fontBranch || '-' }}</span>
+          </div>
+          <div class="version-item">
+            <span class="item-label">后端</span>
+            <span class="item-value">{{ versions.backendBranch || '-' }}</span>
+          </div>
+          <div class="version-item">
+            <span class="item-label">数据库</span>
+            <span class="item-value">{{ versions.mysqlBranch || '-' }}</span>
+          </div>
+          <div class="version-item">
+            <span class="item-label">AI Agent</span>
+            <span class="item-value">{{ versions.agentBranch || '-' }}</span>
+          </div>
+          <div class="version-item">
+            <span class="item-label">WebHook</span>
+            <span class="item-value">{{ versions.webhookBranch || '-' }}</span>
+          </div>
         </div>
 
         <!-- 分隔线 -->
@@ -570,6 +600,12 @@ onMounted(() => {
   background: var(--color-bg-page);
   border-radius: 20px;
   font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.about-version-tag:hover {
+  background: var(--color-border);
 }
 
 .version-label {
@@ -579,6 +615,45 @@ onMounted(() => {
 .version-value {
   color: var(--color-transfer);
   font-weight: 600;
+}
+
+.version-arrow {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+/* 版本详情 */
+.version-detail {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--color-bg-page);
+  border-radius: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.version-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.version-item:not(:last-child) {
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.version-item .item-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.version-item .item-value {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .developer-card {

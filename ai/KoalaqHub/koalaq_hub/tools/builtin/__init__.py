@@ -14,6 +14,7 @@ from .easy_accounts import (
     AddFlowTool,
     UpdateFlowTool,
     MakeExcelTool,
+    GetFlowTool,
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "AddFlowTool",
     "UpdateFlowTool",
     "MakeExcelTool",
+    "GetFlowTool",
 ]
 
 

@@ -58,14 +58,16 @@ def validate_and_print_config():
         app = agent_builder[agent_id]
 
         # 检查主LLM配置（从ini配置验证）
+        llm_ready = True
         if app.llm_use:
             llm_config = llm_builder.get_ini_config(app.llm_use)
             if not llm_config:
                 main_logger.error(f"应用 {agent_id} 的主LLM配置不存在", {"llm_use": app.llm_use})
                 return False
             if not llm_config.get("api_key"):
-                main_logger.error(f"应用 {agent_id} 的主LLM配置缺少有效的API Key", {"llm_use": app.llm_use})
-                return False
+                # 开源版本：允许先启动服务，后续再配置 LLM
+                main_logger.warning(f"应用 {agent_id} 的主LLM配置缺少API Key，请通过环境变量或 docker-compose 配置后重启", {"llm_use": app.llm_use})
+                llm_ready = False
 
         # 检查总结LLM配置（如果启用了总结功能）
         if app.enable_summary and app.summary_llm_use:
@@ -77,21 +79,27 @@ def validate_and_print_config():
                 )
                 return False
             if not summary_llm_config.get("api_key"):
-                main_logger.error(
-                    f"应用 {agent_id} 的总结LLM配置缺少有效的API Key",
+                main_logger.warning(
+                    f"应用 {agent_id} 的总结LLM配置缺少API Key",
                     {"summary_llm_use": app.summary_llm_use},
                 )
-                return False
+                llm_ready = False
 
-        main_logger.info(
-            "应用配置验证成功",
-            {
-                "agent_id": agent_id,
-                "name": app.name,
-                "llm_use": app.llm_use,
-                "summary_llm_use": app.summary_llm_use if app.enable_summary else "disabled",
-            },
-        )
+        if llm_ready:
+            main_logger.info(
+                "应用配置验证成功",
+                {
+                    "agent_id": agent_id,
+                    "name": app.name,
+                    "llm_use": app.llm_use,
+                    "summary_llm_use": app.summary_llm_use if app.enable_summary else "disabled",
+                },
+            )
+        else:
+            main_logger.warning(
+                "应用配置待完善（服务已启动，但 LLM 功能暂不可用）",
+                {"agent_id": agent_id, "name": app.name},
+            )
 
     return True
 

@@ -23,9 +23,11 @@ public class FlowController {
 
     @ApiOperation(value = "添加流水")
     @PostMapping("/addFlow")
-    public BaseDto addFlow(@RequestBody FlowAddRequestDto flowAddRequestDto) throws Exception {
-        flowService.doAddFlow(flowAddRequestDto);
-        return BaseDto.setSuccessBean();
+    public BaseDto<FlowIdResponseDto> addFlow(@RequestBody FlowAddRequestDto flowAddRequestDto) throws Exception {
+        int id = flowService.doAddFlow(flowAddRequestDto);
+        BaseDto<FlowIdResponseDto> baseDto = BaseDto.setSuccessBean();
+        baseDto.setData(new FlowIdResponseDto(id));
+        return baseDto;
     }
 
 
@@ -45,9 +47,11 @@ public class FlowController {
 
     @ApiOperation(value = "更新流水")
     @PutMapping("/updateFlow/{id}")
-    public BaseDto updateFlow(@PathVariable int id, @RequestBody FlowAddRequestDto flowAddRequestDto) throws Exception {
-        flowService.doUpdateFlow(id, flowAddRequestDto);
-        return BaseDto.setSuccessBean();
+    public BaseDto<FlowIdResponseDto> updateFlow(@PathVariable int id, @RequestBody FlowAddRequestDto flowAddRequestDto) throws Exception {
+        int flowId = flowService.doUpdateFlow(id, flowAddRequestDto);
+        BaseDto<FlowIdResponseDto> baseDto = BaseDto.setSuccessBean();
+        baseDto.setData(new FlowIdResponseDto(flowId));
+        return baseDto;
     }
 
     @ApiOperation(value = "收藏流水")

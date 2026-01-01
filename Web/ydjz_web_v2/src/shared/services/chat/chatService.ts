@@ -98,8 +98,9 @@ class ChatService {
       this._conversationId.value = conversationId || ''
       messageStore.setConversationId(this._conversationId.value)
 
-      // 构建 WebSocket URL（直接连接后端）
-      const baseUrl = 'ws://192.168.50.231:8001'
+      // 构建 WebSocket URL（通过代理连接，开发环境使用 Vite 代理，生产环境使用 Nginx 代理）
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const baseUrl = `${protocol}//${window.location.host}`
 
       // 从 localStorage 获取 token，用于工具调用认证
       const token = localStorage.getItem('token') || ''
