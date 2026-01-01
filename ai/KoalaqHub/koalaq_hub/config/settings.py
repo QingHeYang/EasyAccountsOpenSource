@@ -145,7 +145,8 @@ class Configuration:
         """
         required_paths = [self.resource_dir, self.resource_config_dir, self.prompts_dir, self.role_dir]
 
-        required_files = [self.env_file_path, self.agent_config_path, self.llm_config_path]
+        # .env 文件在 Docker 环境中不是必需的（通过 compose 注入环境变量）
+        required_files = [self.agent_config_path, self.llm_config_path]
 
         # 检查目录
         for path in required_paths:
