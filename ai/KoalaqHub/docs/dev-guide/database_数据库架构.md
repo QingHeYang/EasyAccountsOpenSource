@@ -1,7 +1,7 @@
 # 数据库架构文档
 
-> 版本: 1.1
-> 更新时间: 2025-12-31
+> 版本: 1.2
+> 更新时间: 2026-01-01
 > 状态: 正式版
 
 ## 一、概述
@@ -237,15 +237,22 @@ KoalaQ Hub 采用 **Repository 模式** 的分层数据库架构，基于 SQLite
 
 ---
 
-### 3.7 models 表 (模型统计表)
+### 3.7 models 表 (LLM 配置统计表)
 
-**业务用途**: 统计各 LLM 平台/模型的使用情况
+**业务用途**: 存储 LLM 配置信息并统计各配置的使用情况
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
-| model_id | INTEGER | PRIMARY KEY AUTOINCREMENT | 模型ID |
+| llm_id | TEXT | PRIMARY KEY | LLM 配置唯一标识 (UUID) |
+| llm_config_name | TEXT | UNIQUE NOT NULL | LLM 配置名称 |
 | platform | TEXT | NOT NULL | 平台名称 |
 | model | TEXT | NOT NULL | 模型名称 |
+| api_key | TEXT | | API 密钥 |
+| url | TEXT | | API 地址 |
+| temperature | REAL | DEFAULT 0.7 | 温度参数 |
+| top_p | REAL | DEFAULT 1.0 | Top-P 参数 |
+| max_tokens | INTEGER | DEFAULT 4096 | 最大 Token 数 |
+| description | TEXT | DEFAULT '' | 描述信息 |
 | total_tokens | INTEGER | DEFAULT 0 | 累计总 Token |
 | prompt_tokens | INTEGER | DEFAULT 0 | 累计提示 Token |
 | completion_tokens | INTEGER | DEFAULT 0 | 累计完成 Token |
@@ -257,9 +264,11 @@ KoalaQ Hub 采用 **Repository 模式** 的分层数据库架构，基于 SQLite
 | created_at | TEXT | NOT NULL | 创建时间 |
 | updated_at | TEXT | NOT NULL | 更新时间 |
 
-**约束**: `UNIQUE(platform, model)`
+**约束**: `llm_config_name UNIQUE`
 
-**索引**: `idx_models_platform`, `idx_models_total_tokens`
+**索引**: `idx_models_platform`, `idx_models_total_tokens`, `idx_models_llm_config_name`
+
+> **v2.6.0 变更**: 表结构重构，详见 [版本迁移指南](./database_版本迁移指南.md)
 
 ---
 

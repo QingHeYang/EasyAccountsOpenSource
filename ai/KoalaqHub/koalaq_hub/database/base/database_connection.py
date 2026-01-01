@@ -264,6 +264,8 @@ class DatabaseConnection:
             migrations = [
                 # VL 附件支持
                 ("messages", "attachments", "TEXT DEFAULT ''"),
+                # models 表新字段
+                ("models", "llm_config_name", "TEXT"),
             ]
             for table, column, definition in migrations:
                 try:
@@ -271,6 +273,38 @@ class DatabaseConnection:
                     self.logger.info(f"数据库迁移：添加 {table}.{column} 字段")
                 except sqlite3.OperationalError:
                     pass  # 字段已存在，忽略
+
+            # 检查 models 表结构是否兼容，如果旧表结构不兼容则重建
+            try:
+                cursor.execute("SELECT llm_config_name FROM models LIMIT 1")
+            except sqlite3.OperationalError:
+                # 旧表结构不兼容，重建 models 表
+                self.logger.warning("检测到旧版 models 表结构，正在重建...")
+                cursor.execute("DROP TABLE IF EXISTS models")
+                cursor.execute("""
+                    CREATE TABLE models (
+                        llm_id TEXT PRIMARY KEY,
+                        llm_config_name TEXT UNIQUE NOT NULL,
+                        platform TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        api_key TEXT,
+                        url TEXT,
+                        temperature REAL DEFAULT 0.7,
+                        top_p REAL DEFAULT 1.0,
+                        max_tokens INTEGER DEFAULT 4096,
+                        description TEXT DEFAULT '',
+                        total_tokens INTEGER DEFAULT 0,
+                        prompt_tokens INTEGER DEFAULT 0,
+                        completion_tokens INTEGER DEFAULT 0,
+                        reasoning_tokens INTEGER DEFAULT 0,
+                        request_count INTEGER DEFAULT 0,
+                        success_count INTEGER DEFAULT 0,
+                        error_count INTEGER DEFAULT 0,
+                        avg_response_time REAL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
 
             self.conn.commit()
             self.logger.info("数据库表结构初始化完成")
