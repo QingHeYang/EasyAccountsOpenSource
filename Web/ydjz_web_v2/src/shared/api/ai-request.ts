@@ -18,10 +18,10 @@ let errorHandler: ((status: number, msg: string) => void) | undefined
 
 /**
  * 获取 AI API 基础地址
- * 开发环境和生产环境都使用 /ai-api 路径前缀，由代理层（Vite/Nginx）转发
+ * 使用运行时配置 window.config.aiApiUrl
  */
 function getAiApiUrl(): string {
-  return '/ai-api'
+  return window.config?.aiApiUrl || '/ai'
 }
 
 /**
@@ -84,9 +84,8 @@ export function getAiRequest(): AxiosInstance {
 
 /**
  * 获取 AI WebSocket 地址
- * 开发环境和生产环境都使用当前域名 + /ws 路径，由代理层（Vite/Nginx）转发
+ * 使用运行时配置 window.config.wsBaseUrl
  */
 export function getAiWebSocketUrl(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}/ws`
+  return window.config?.wsBaseUrl || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
 }

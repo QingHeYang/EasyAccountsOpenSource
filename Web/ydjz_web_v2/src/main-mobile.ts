@@ -10,9 +10,9 @@ import router from './mobile/router'
 import { setupRequest } from '@shared/api'
 import { ApiCode } from '@shared/types'
 
-// 初始化请求
+// 初始化请求（使用运行时配置 window.config）
 setupRequest({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: window.config?.apiBaseUrl || '/api',
   onUnauthorized: (code) => {
     const redirect = router.currentRoute.value.fullPath
 

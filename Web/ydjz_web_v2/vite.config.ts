@@ -112,10 +112,10 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/ai-api': {
+      '/ai': {
         target: aiTarget,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ai-api/, ''),
+        rewrite: (path) => path.replace(/^\/ai/, ''),
       },
       '/ws': {
         target: aiTarget,
