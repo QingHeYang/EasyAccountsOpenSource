@@ -122,11 +122,11 @@ build_component() {
     echo -e "${BLUE}========================================${NC}"
     echo ""
 
-    # 执行预构建命令
+    # 执行预构建命令（在子shell中执行，避免cd影响当前目录）
     if [ "$pre_build" != "null" ] && [ -n "$pre_build" ]; then
         echo -e "${YELLOW}执行预构建命令...${NC}"
         echo "  $pre_build"
-        eval "$pre_build"
+        (eval "$pre_build")
         echo -e "${GREEN}预构建完成${NC}"
         echo ""
     fi
