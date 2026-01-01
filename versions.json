@@ -1,0 +1,30 @@
+{
+  "namespace": "775495797",
+  "aliyun_registry": "registry.cn-beijing.aliyuncs.com/easy_accounts",
+  "components": {
+    "server": {
+      "version": "2.5.0",
+      "image": "easyaccounts-server",
+      "context": "Server",
+      "pre_build": "cd Server/YD_JZ && mvn clean install -Pserver"
+    },
+    "web": {
+      "version": "3.1.0",
+      "image": "easyaccounts-nginx",
+      "context": "Web",
+      "pre_build": "cd Web/ydjz_web && npm run build"
+    },
+    "webhook": {
+      "version": "1.0.0",
+      "image": "easyaccounts-webhook",
+      "context": "WebHook",
+      "pre_build": null
+    },
+    "ai": {
+      "version": "1.0.0",
+      "image": "easyaccounts-ai",
+      "context": "ai",
+      "pre_build": null
+    }
+  }
+}
