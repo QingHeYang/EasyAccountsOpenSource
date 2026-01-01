@@ -208,7 +208,7 @@ export const aiApi = {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-      const baseUrl = '/ai-api'
+      const baseUrl = window.config?.aiApiUrl || '/ai'
       const response = await fetch(`${baseUrl}/health`, {
         method: 'GET',
         signal: controller.signal,
