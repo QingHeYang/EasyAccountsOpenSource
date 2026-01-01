@@ -29,11 +29,14 @@ tests/
 
 # 文档
 docs/
+KoalaqHub/docs/
 *.md
 !README.md
 
 # 数据文件
 data/
+resource/database/
+KoalaqHub/resource/database/
 *.db
 *.sqlite
 *.log
