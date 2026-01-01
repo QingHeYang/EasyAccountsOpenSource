@@ -76,8 +76,8 @@ class Configuration:
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "120.0"))  # LLM API 调用超时时间（秒）
 
         # EasyAccounts API 配置
-        # Docker 内部网络使用容器名:内部端口，外部访问使用映射端口
-        self.easyaccounts_url = os.getenv("EASYACCOUNTS_URL", "http://easy_accounts_server:8081")
+        # Docker 内部网络使用服务名:内部端口，外部访问使用映射端口
+        self.easyaccounts_url = os.getenv("EASYACCOUNTS_URL", "http://server:8081")
 
     @staticmethod
     def load_env() -> None:
@@ -110,7 +110,7 @@ class Configuration:
         """初始化数据库路径配置"""
         # 从环境变量获取数据库目录配置
         database_dir_env = os.getenv("DATABASE_DIR", "./resource/database")
-        database_name_env = os.getenv("DATABASE_NAME", "chatbot.db")
+        database_name_env = os.getenv("DATABASE_NAME", "koalaq.db")
 
         # 处理相对路径和绝对路径
         if database_dir_env.startswith("./"):
