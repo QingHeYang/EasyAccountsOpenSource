@@ -145,15 +145,19 @@ npm run dev              # 开发模式
 npm run electron:build   # 构建 Electron 应用
 ```
 
-### AI 服务
+### AI 服务（KoalaqHub）
 ```bash
-cd AI
+cd ai/KoalaqHub
 
-# Python 环境（需要 Python 3.9+）
+# Python 环境（需要 Python 3.10+）
 pip install -r requirements.txt
 
-# 运行服务
-python main.py
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 配置 LLM API Key、URL、Model
+
+# 运行服务 (http://localhost:8001)
+python -m koalaq_hub
 ```
 
 ### WebHook 服务
@@ -184,10 +188,21 @@ python main.py
 - **Store**: Vuex 状态管理
 - **UI**: Vant 组件库，移动优先设计
 
-### AI（AI服务）
-- **MCP 架构**: Model Context Protocol
-- **Python**: 后端服务
-- 提供智能分析、自动分类等 AI 能力
+### AI（KoalaqHub）
+- **项目名**: KoalaqHub
+- **技术栈**: Python 3.10+ / FastAPI / MCP / SQLite
+- **端口**: 8001
+- **核心模块**:
+  - Agent 系统：AgentRegistry、AgentExecutor、ChatProcessor
+  - LLM 集成：支持多平台（OpenAI、智谱等）
+  - 工具系统：内部工具 + MCP 工具
+  - 对话管理：历史记录、Token 统计、多层总结
+- **MCP 服务**: 可被 Cherry Studio、Claude Desktop 等客户端调用
+- **内部工具**: accounts、types、flows、get_flow、add_flow、update_flow、make_excel 等
+- **配置文件**:
+  - `.env` - 环境变量（LLM API Key、端口等）
+  - `resource/config/agent.ini` - Agent 配置
+  - `resource/config/llm_config.ini` - LLM 配置
 
 ### WebHook（钩子服务）
 - **FastAPI**: Python Web 框架
