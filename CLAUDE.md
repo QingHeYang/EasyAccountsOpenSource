@@ -83,21 +83,50 @@ main                    # 正式版 - 稳定发布
 - Feature 文档在分支结束后编写
 - 版本文档包含该版本所有变更的汇总
 
+## 打包规则
+
+### 版本号管理
+
+**版本号参考文件**: `Server/YD_JZ/src/main/resources/application-server.properties`
+
+| 属性 | 说明 | 对应 Docker 镜像 |
+|------|------|------------------|
+| `version.release` | 整体版本号 | - |
+| `version.font_branch` | 前端版本 | `easyaccounts-web` |
+| `version.backend_branch` | 后端版本 | `easyaccounts-server` |
+| `version.agent_branch` | AI Agent 版本 | `easyaccounts-ai` |
+| `version.webhook_branch` | WebHook 版本 | `easyaccounts-webhook` |
+| `version.mysql_branch` | 数据库版本 | - |
+
+### 打包流程
+
+1. **确认版本号**: 检查 `application-server.properties` 中的版本号
+2. **同步 versions.json**: 确保 `versions.json` 中的版本与配置文件一致
+3. **运行构建脚本**: 执行 `./build.sh` 进入交互式菜单
+4. **选择构建目标**: 单个模块或全部构建
+5. **上传镜像**: 构建完成后选择上传到 Docker Hub / 阿里云
+
+### 打包命令
+
+```bash
+# 运行交互式构建脚本
+./build.sh
+
+# 脚本功能:
+# - 构建单个/全部 Docker 镜像
+# - 自动打版本标签和 latest 标签
+# - 上传到 Docker Hub 或阿里云
+# - 管理版本号和历史记录
+```
+
+---
+
 ## 开发命令
 
 ### 统一构建（推荐）
 ```bash
-# 查看帮助
-./build.sh --help
-
-# 构建所有模块
-./build.sh all
-
-# 构建单个模块
-./build.sh server
-./build.sh web
-./build.sh ai
-./build.sh webhook
+# 运行交互式构建脚本
+./build.sh
 ```
 
 ### 服务端 (Server)
