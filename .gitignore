@@ -1,6 +1,5 @@
 .DS_Store
 .vscode
-.claude/
 upload-image.sh
 CLAUDE.md
 *.log
@@ -109,5 +108,5 @@ Desktop.ini
 ai/koalaq_hub_webui/
 ai/koalaq_hub_webui_full.tar.gz
 
-# Claude配置目录
-.claude/
+# Claude配置目录（所有层级）
+**/.claude/
