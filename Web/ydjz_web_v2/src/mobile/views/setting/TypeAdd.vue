@@ -223,7 +223,6 @@ async function onSubmit() {
     if (isEdit.value && typeId.value) {
       // 编辑模式
       await typeApi.update(typeId.value, {
-        id: typeId.value,
         tname: tname.value.trim(),
         parent: parentId.value === -1 ? undefined : parentId.value,
         actionId: actionId.value,  // undefined 时 JSON 不传此字段
@@ -251,7 +250,7 @@ async function onSubmit() {
 
 // 归档
 async function onArchive() {
-  const msg = curParent === -1
+  const msg = curParent.value === -1
     ? '确定将此分类归档吗？\n注意，一级分类归档会连带子分类一起归档\n归档后将不再显示，但不会删除数据'
     : '确定将此分类归档吗？\n归档后将不再显示，但不会删除数据'
 
@@ -271,7 +270,7 @@ async function onArchive() {
 
 // 停用
 async function onDelete() {
-  const msg = curParent === -1
+  const msg = curParent.value === -1
     ? '确定停用此分类吗？\n注意，一级分类停用会连带子分类一起停用\n停用后将无法再使用此分类'
     : '确定停用此分类吗？\n停用后将无法再使用此分类'
 

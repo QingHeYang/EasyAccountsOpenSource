@@ -351,8 +351,8 @@ function onChildMoneyInput(item: ChildMoney, e: Event) {
 
 // ==================== 图片上传 ====================
 async function onAfterRead(
-  file: { file: File; content: string; status?: string; message?: string } | Array<{ file: File; content: string; status?: string; message?: string }>,
-  detail: { index: number; name: string }
+  file: any,
+  detail: { index: number; name: string | number }
 ) {
   const files = Array.isArray(file) ? file : [file]
   const startIndex = Array.isArray(file) ? detail.index : detail.index
@@ -513,7 +513,7 @@ function validateForm(): boolean {
 
 // ==================== 金额计算 ====================
 function addMoney(...moneyList: (string | number)[]): number {
-  return moneyList.reduce((sum: number, val) => {
+  return moneyList.reduce<number>((sum, val) => {
     const num = typeof val === 'string' ? parseFloat(val) || 0 : val
     return sum + num
   }, 0)

@@ -140,7 +140,7 @@ onMounted(() => {
           @click="onAiClick"
         >
           <template #value>
-            <van-tag v-if="!aiConfigured" type="warning" size="small">未配置</van-tag>
+            <van-tag v-if="!aiConfigured" type="warning">未配置</van-tag>
           </template>
         </van-cell>
       </van-cell-group>

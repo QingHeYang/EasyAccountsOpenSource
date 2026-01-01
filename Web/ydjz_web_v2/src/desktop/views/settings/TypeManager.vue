@@ -277,10 +277,7 @@ async function onSubmit() {
     }
 
     if (editingType.value) {
-      await typeApi.update(editingType.value.id, {
-        id: editingType.value.id,
-        ...params,
-      })
+      await typeApi.update(editingType.value.id, params)
       ElMessage.success('保存成功')
     } else {
       await typeApi.add(params)

@@ -28,7 +28,7 @@ const yearInput = ref(new Date().getFullYear())
 const accountIdInput = ref(1)
 const accountForm = ref({
   name: '',
-  money: 0,
+  money: '',
   note: '',
 })
 

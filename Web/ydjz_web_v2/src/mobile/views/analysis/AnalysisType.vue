@@ -488,7 +488,6 @@ onMounted(async () => {
                 <van-tag
                   v-if="type.action"
                   :type="type.action.handle === 0 ? 'success' : type.action.handle === 2 ? 'primary' : 'danger'"
-                  size="small"
                 >{{ type.action.hname }}</van-tag>
               </div>
               <div class="type-parent-right">

@@ -12,7 +12,6 @@ type EventCallback = (data: unknown) => void
 
 class WebSocketClient {
   private ws: WebSocket | null = null
-  private baseURL: string | null = null
   private lastUrl: string | null = null
   private reconnectCount = 0
   private isReconnecting = false
@@ -31,7 +30,6 @@ class WebSocketClient {
     params: Record<string, string> = {},
     options: Partial<WebSocketOptions> = {}
   ): Promise<void> {
-    this.baseURL = baseURL
     this.options = { ...this.options, ...options }
 
     // 构建完整的 WebSocket URL

@@ -289,7 +289,7 @@ function onFlowClick(flow: Flow) {
 
 async function onFlowCollect(flow: Flow) {
   try {
-    await flowApi.toggleCollect(flow.id)
+    await flowApi.toggleCollect(flow.id, !flow.collect)
     flow.collect = !flow.collect
     showToast(flow.collect ? '已收藏' : '已取消收藏')
   } catch (err) {

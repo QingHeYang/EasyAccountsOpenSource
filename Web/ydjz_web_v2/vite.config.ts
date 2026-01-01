@@ -74,8 +74,8 @@ export default defineConfig(({ mode }) => {
 
         proxy.on('error', (err, req, res) => {
           console.error('[MCP Proxy] Error:', err.message, req.url)
-          // 防止连接挂起
-          if (res && !res.headersSent) {
+          // 防止连接挂起（res 可能是 ServerResponse 或 Socket）
+          if (res && 'headersSent' in res && !res.headersSent) {
             res.writeHead(502, { 'Content-Type': 'text/plain' })
             res.end('Proxy Error: ' + err.message)
           }
