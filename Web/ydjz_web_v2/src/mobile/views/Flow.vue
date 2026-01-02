@@ -1,22 +1,26 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast, showDialog } from 'vant'
 import { flowApi, type Flow, type FlowListResult } from '@shared/api/flow'
+import { useFlowFilterStore } from '@shared/stores/flowFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
 
 const route = useRoute()
 const router = useRouter()
+const filterStore = useFlowFilterStore()
 
 // 数据
 const loading = ref(false)
 const flowData = ref<FlowListResult | null>(null)
 
-// 当前月份
+// 当前月份（优先级：路由参数 > store保存 > 当月）
 const currentDate = new Date()
+const defaultMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
 const chooseMonth = ref(
   (route.query.month as string) ||
-  `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+  (filterStore.initialized ? filterStore.chooseMonth : '') ||
+  defaultMonth
 )
 
 // 滚动检测 - 标题切换
@@ -134,10 +138,10 @@ function cancelMonthPicker() {
   showMonthPicker.value = false
 }
 
-// 筛选条件 - 折叠显示
+// 筛选条件 - 折叠显示（从 store 恢复）
 const filterExpanded = ref(false)
-const handleType = ref(3) // 3=全部, 0=流入, 1=流出, 2=转账
-const orderType = ref(0) // 0=按时间, 1=按金额
+const handleType = ref(filterStore.initialized ? filterStore.handleType : 3) // 3=全部, 0=流入, 1=流出, 2=转账
+const orderType = ref(filterStore.initialized ? filterStore.orderType : 0) // 0=按时间, 1=按金额
 
 const handleOptions = [
   { text: '全部', value: 3 },
@@ -323,6 +327,15 @@ watch(() => route.query.month, (newMonth) => {
 
 onMounted(() => {
   fetchFlows()
+})
+
+// 离开页面前保存状态
+onBeforeUnmount(() => {
+  filterStore.save({
+    chooseMonth: chooseMonth.value,
+    handleType: handleType.value,
+    orderType: orderType.value,
+  })
 })
 </script>
 

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { showLoadingToast, closeToast } from 'vant'
 import { analysisApi, type AnalysisTypeItem } from '@shared/api/analysis'
+import { useAnalysisFilterStore } from '@shared/stores/analysisFilter'
 import AnalysisChartOverlay from '@mobile/components/AnalysisChartOverlay.vue'
 
 const router = useRouter()
+const filterStore = useAnalysisFilterStore()
 
 // ==================== 状态 ====================
 const loading = ref(false)
@@ -199,6 +201,8 @@ function onTabClick(index: number) {
 }
 
 function toTypeDetail(typeId: number) {
+  // 标记是从统计页面进入的
+  sessionStorage.setItem('analysisTypeFrom', 'analysis')
   router.push({
     path: '/analysis/type',
     query: {
@@ -257,8 +261,32 @@ function openChart() {
 
 // ==================== 生命周期 ====================
 onMounted(() => {
-  // 默认当月
-  onFastChoose(0)
+  // 从 store 恢复状态（如果有保存的状态）
+  if (filterStore.initialized) {
+    fastChoose.value = filterStore.fastChoose
+    startDate.value = filterStore.startDate
+    endDate.value = filterStore.endDate
+    tabIndex.value = filterStore.tabIndex
+    combineSubType.value = filterStore.combineSubType
+    showDisableAnalysisType.value = filterStore.showDisableAnalysisType
+    // 使用保存的时间范围获取数据
+    fetchData()
+  } else {
+    // 首次进入，默认当月
+    onFastChoose(0)
+  }
+})
+
+// 离开页面前保存状态
+onBeforeUnmount(() => {
+  filterStore.save({
+    fastChoose: fastChoose.value,
+    startDate: startDate.value,
+    endDate: endDate.value,
+    tabIndex: tabIndex.value,
+    combineSubType: combineSubType.value,
+    showDisableAnalysisType: showDisableAnalysisType.value,
+  })
 })
 </script>
 
@@ -463,6 +491,7 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   padding: 0 16px;
+  margin-top: 10px;
   margin-bottom: 12px;
 }
 
@@ -534,6 +563,11 @@ onMounted(() => {
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   padding: 0 16px;
+}
+
+.type-grid :deep(.van-empty) {
+  grid-column: span 2;
+  padding-top: 40px;
 }
 
 .type-card {

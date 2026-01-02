@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showLoadingToast, closeToast, showToast } from 'vant'
 import { analysisApi, type AnalysisTypeMonthResult, type MonthData } from '@shared/api/analysis'
@@ -7,12 +7,14 @@ import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { screenApi, type ScreenFlowParams } from '@shared/api/screen'
 import type { Flow } from '@shared/api/flow'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import { useAnalysisTypeFilterStore } from '@shared/stores/analysisTypeFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
 import YearLineChartOverlay from '@mobile/components/YearLineChartOverlay.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { smartBack } = useSmartBack()
+const filterStore = useAnalysisTypeFilterStore()
 
 // ==================== 状态 ====================
 const loading = ref(false)
@@ -46,6 +48,7 @@ const yearAmountExpanded = ref<Set<number>>(new Set())
 const showFlowPopup = ref(false)
 const flowList = ref<Flow[]>([])
 const flowMonth = ref('')
+const flowChooseHandle = ref(0) // 0收入 1支出
 const flowLoading = ref(false)
 
 // 年度图表弹窗
@@ -281,6 +284,7 @@ function getMonthTotal(month: MonthData): number {
 async function onMonthClick(year: number, month: number, chooseHandle: number) {
   const monthStr = `${year}-${String(month).padStart(2, '0')}`
   flowMonth.value = `${year}年${month}月`
+  flowChooseHandle.value = chooseHandle
   showFlowPopup.value = true
   flowLoading.value = true
   flowList.value = []
@@ -311,37 +315,89 @@ async function onMonthClick(year: number, month: number, chooseHandle: number) {
 }
 
 function onFlowClick(flow: Flow) {
-  showFlowPopup.value = false
+  // 不关闭 popup，保持状态以便返回时恢复
   router.push({ path: `/flow/edit/${flow.id}` })
 }
 
 // ==================== 生命周期 ====================
 onMounted(async () => {
-  initDateRange()
   await fetchTypes()
 
-  // 从路由获取 typeId
-  if (route.query.typeId) {
-    const typeId = Number(route.query.typeId)
-    selectedTypeId.value = typeId
+  // 判断来源：sessionStorage 标记表示从统计页面进入
+  const isFromAnalysis = sessionStorage.getItem('analysisTypeFrom') === 'analysis'
+  // 立即清除标记
+  sessionStorage.removeItem('analysisTypeFrom')
 
-    // 查找分类名称
-    for (const parent of allTypes.value) {
-      if (parent.id === typeId) {
-        selectedTypeName.value = parent.tname
-        break
-      }
-      if (parent.childrenTypes) {
-        const child = parent.childrenTypes.find((c) => c.id === typeId)
-        if (child) {
-          selectedTypeName.value = `${parent.tname}/${child.tname}`
+  if (isFromAnalysis) {
+    // 从统计页面进入，必须使用路由参数
+    filterStore.reset()
+    initDateRange()
+
+    const routeTypeId = route.query.typeId ? Number(route.query.typeId) : null
+    if (routeTypeId) {
+      selectedTypeId.value = routeTypeId
+
+      // 查找分类名称
+      for (const parent of allTypes.value) {
+        if (parent.id === routeTypeId) {
+          selectedTypeName.value = parent.tname
           break
         }
+        if (parent.childrenTypes) {
+          const child = parent.childrenTypes.find((c) => c.id === routeTypeId)
+          if (child) {
+            selectedTypeName.value = `${parent.tname}/${child.tname}`
+            break
+          }
+        }
+      }
+
+      fetchData()
+    }
+    return
+  }
+
+  // 非统计页面进入（如从 FlowAdd 返回），恢复 store 状态
+  if (filterStore.initialized) {
+    selectedTypeId.value = filterStore.selectedTypeId
+    selectedTypeName.value = filterStore.selectedTypeName
+    fastChoose.value = filterStore.fastChoose
+    startDate.value = filterStore.startDate
+    endDate.value = filterStore.endDate
+    showFlowPopup.value = filterStore.showFlowPopup
+    flowMonth.value = filterStore.flowMonth
+    result.value = filterStore.result
+    // 恢复日期选择器的值
+    chooseStartTime.value = startDate.value.split('-')
+    chooseEndTime.value = endDate.value.split('-')
+
+    // 如果 popup 是打开的，重新请求流水数据（可能有修改）
+    if (filterStore.showFlowPopup && filterStore.flowMonth) {
+      // 解析年月，重新请求
+      const match = filterStore.flowMonth.match(/(\d+)年(\d+)月/)
+      if (match) {
+        const year = parseInt(match[1])
+        const month = parseInt(match[2])
+        onMonthClick(year, month, filterStore.flowChooseHandle)
       }
     }
-
-    fetchData()
   }
+})
+
+// 离开页面前保存状态
+onBeforeUnmount(() => {
+  filterStore.save({
+    selectedTypeId: selectedTypeId.value,
+    selectedTypeName: selectedTypeName.value,
+    fastChoose: fastChoose.value,
+    startDate: startDate.value,
+    endDate: endDate.value,
+    showFlowPopup: showFlowPopup.value,
+    flowMonth: flowMonth.value,
+    flowChooseHandle: flowChooseHandle.value,
+    flowList: flowList.value,
+    result: result.value,
+  })
 })
 </script>
 
