@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import { screenApi, type ScreenFlowParams } from '@shared/api/screen'
@@ -9,11 +9,16 @@ import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { flowApi, type Flow } from '@shared/api/flow'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 import { consumeScreenParams, type ScreenParams } from '@shared/services/screenParams'
+import { useScreenFilterStore } from '@mobile/stores/screenFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { smartBack } = useSmartBack()
+const filterStore = useScreenFilterStore()
+
+// 滚动定位相关
+const lastClickedFlowId = ref<number | null>(null)
 
 // ==================== 筛选条件 ====================
 const searchNote = ref('')
@@ -43,6 +48,7 @@ const allTypes = ref<any[]>([])
 const showFilterPopup = ref(false)
 const showDatePicker = ref(false)
 const showTypeMoney = ref(false)
+const showFullTypeMoney = ref(false) // 分类明细是否显示完整金额
 const showExcelDialog = ref(false)
 const isStartDate = ref(true)
 const excelName = ref('')
@@ -109,6 +115,22 @@ function formatDate(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+// 格式化金额（超过1万显示为x.xx万）
+function formatAmount(amount: string | number | undefined): string {
+  if (!amount) return '0.00'
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount
+  if (Math.abs(num) >= 10000) {
+    return (num / 10000).toFixed(2) + '万'
+  }
+  return num.toFixed(2)
+}
+
+// 点击显示原金额
+function showFullAmount(label: string, amount: string | number | undefined) {
+  const num = amount ? (typeof amount === 'string' ? parseFloat(amount) : amount) : 0
+  showToast({ message: `${label}: ¥${num.toFixed(2)}`, position: 'top' })
 }
 
 function onFastChoose(value: number) {
@@ -284,6 +306,8 @@ function resetFilter() {
 }
 
 function onFlowClick(flow: Flow) {
+  // 记录点击的 flow ID，用于返回时滚动定位
+  lastClickedFlowId.value = flow.id
   router.push(`/flow/edit/${flow.id}`)
 }
 
@@ -313,6 +337,33 @@ async function onFlowDelete(flow: Flow) {
 function onBack() {
   // 智能返回：优先返回上一页，否则返回明细页
   smartBack('/flow')
+}
+
+// 滚动到指定 flow 并高亮
+async function scrollToFlowAndHighlight(flowId: number) {
+  await nextTick()
+  const el = document.querySelector(`[data-flow-id="${flowId}"]`) as HTMLElement
+  if (el) {
+    // 滚动到元素
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+    // 等滚动完成后再添加高亮动画
+    // 使用 scrollend 事件（现代浏览器）或 fallback 延迟
+    const addHighlight = () => {
+      el.classList.add('highlight')
+      el.addEventListener('animationend', () => {
+        el.classList.remove('highlight')
+      }, { once: true })
+    }
+
+    if ('onscrollend' in window) {
+      // 现代浏览器支持 scrollend 事件
+      window.addEventListener('scrollend', addHighlight, { once: true })
+    } else {
+      // fallback: 延迟 400ms 等待滚动完成
+      setTimeout(addHighlight, 400)
+    }
+  }
 }
 
 // 生成 Excel
@@ -382,15 +433,27 @@ function applyExternalParams(params: ScreenParams) {
 }
 
 // ==================== 生命周期 ====================
-onMounted(() => {
+onMounted(async () => {
+  // 判断来源：sessionStorage 标记表示新进入页面
+  const isNewEntry = sessionStorage.getItem('screenFrom') === 'new'
+  sessionStorage.removeItem('screenFrom')
+
   // 检查是否有 AI 传递的参数
   const externalParams = consumeScreenParams()
 
+  // 加载基础数据
+  fetchActions()
+  fetchAccounts()
+  fetchTypes()
+
   if (externalParams) {
-    // 应用 AI 传递的参数
+    // AI 传递的参数优先级最高
+    filterStore.reset()
     applyExternalParams(externalParams)
-  } else {
-    // 初始化日期为当月
+    await fetchFlows()
+  } else if (isNewEntry || !filterStore.initialized) {
+    // 新进入页面或未初始化，使用默认值或路由参数
+    filterStore.reset()
     const now = new Date()
     startDate.value = formatDate(new Date(now.getFullYear(), now.getMonth(), 1))
 
@@ -398,12 +461,48 @@ onMounted(() => {
     if (route.query.acid) {
       accountId.value = Number(route.query.acid)
     }
-  }
+    await fetchFlows()
+  } else {
+    // 从 FlowAdd 返回，恢复 store 状态
+    searchNote.value = filterStore.searchNote
+    fastChoose.value = filterStore.fastChoose
+    startDate.value = filterStore.startDate
+    endDate.value = filterStore.endDate
+    singleMonth.value = filterStore.singleMonth
+    accountId.value = filterStore.accountId
+    accountName.value = filterStore.accountName
+    handleType.value = filterStore.handleType
+    collectOnly.value = filterStore.collectOnly
+    chooseActions.value = [...filterStore.chooseActions]
+    chooseTypes.value = [...filterStore.chooseTypes]
+    lastClickedFlowId.value = filterStore.lastClickedFlowId
 
-  fetchActions()
-  fetchAccounts()
-  fetchTypes()
-  fetchFlows()
+    // 重新请求数据（可能有修改）
+    await fetchFlows()
+
+    // 滚动到之前点击的 flow 并高亮
+    if (lastClickedFlowId.value) {
+      scrollToFlowAndHighlight(lastClickedFlowId.value)
+    }
+  }
+})
+
+// 离开页面前保存状态
+onBeforeUnmount(() => {
+  filterStore.save({
+    searchNote: searchNote.value,
+    fastChoose: fastChoose.value,
+    startDate: startDate.value,
+    endDate: endDate.value,
+    singleMonth: singleMonth.value,
+    accountId: accountId.value,
+    accountName: accountName.value,
+    handleType: handleType.value,
+    collectOnly: collectOnly.value,
+    chooseActions: chooseActions.value,
+    chooseTypes: chooseTypes.value,
+    lastClickedFlowId: lastClickedFlowId.value,
+  })
 })
 </script>
 
@@ -447,19 +546,19 @@ onMounted(() => {
     <!-- 统计卡片 -->
     <div class="stats-card">
       <div class="stats-row">
-        <div class="stats-item">
+        <div class="stats-item" @click="showFullAmount('收入', totalIn)">
           <span class="stats-label">收入</span>
-          <span class="stats-value income">¥{{ totalIn }}</span>
+          <span class="stats-value income">¥{{ formatAmount(totalIn) }}</span>
         </div>
         <div class="stats-divider"></div>
-        <div class="stats-item">
+        <div class="stats-item" @click="showFullAmount('支出', totalOut)">
           <span class="stats-label">支出</span>
-          <span class="stats-value expense">¥{{ totalOut }}</span>
+          <span class="stats-value expense">¥{{ formatAmount(totalOut) }}</span>
         </div>
         <div class="stats-divider"></div>
-        <div class="stats-item">
+        <div class="stats-item" @click="showFullAmount('结余', totalEarn)">
           <span class="stats-label">结余</span>
-          <span class="stats-value">¥{{ totalEarn }}</span>
+          <span class="stats-value">¥{{ formatAmount(totalEarn) }}</span>
         </div>
       </div>
       <div class="stats-action" @click="showTypeMoney = true">
@@ -667,18 +766,27 @@ onMounted(() => {
     </van-popup>
 
     <!-- 分类明细弹窗 -->
-    <van-action-sheet v-model:show="showTypeMoney" title="分类收支明细" teleport="body">
+    <van-action-sheet
+      v-model:show="showTypeMoney"
+      title="分类收支明细"
+      teleport="body"
+      class="type-money-sheet"
+    >
+      <span
+        class="toggle-full-btn"
+        @click="showFullTypeMoney = !showFullTypeMoney"
+      >{{ showFullTypeMoney ? '缩略' : '完整' }}</span>
       <div class="type-money-list">
         <template v-if="typeMoneyList.length > 0">
           <div v-for="type in typeMoneyList" :key="type.typeId" class="type-money-item">
             <div class="type-money-header">
               <span class="type-name">{{ type.typeName }}</span>
-              <span class="type-total">¥{{ type.money }}</span>
+              <span class="type-total">¥{{ showFullTypeMoney ? type.money : formatAmount(type.money) }}</span>
             </div>
             <div v-if="type.children?.length" class="type-children">
               <div v-for="child in type.children" :key="child.typeId" class="child-item">
                 <span class="child-name">{{ child.typeName }}</span>
-                <span class="child-money">¥{{ child.money }}</span>
+                <span class="child-money">¥{{ showFullTypeMoney ? child.money : formatAmount(child.money) }}</span>
               </div>
             </div>
           </div>
@@ -1208,6 +1316,23 @@ onMounted(() => {
 }
 
 /* 分类明细 */
+.type-money-sheet {
+  position: relative;
+}
+
+.type-money-sheet .toggle-full-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1;
+  font-size: 13px;
+  color: var(--color-transfer);
+  padding: 4px 10px;
+  background: var(--color-transfer-bg);
+  border-radius: 12px;
+  font-weight: 400;
+}
+
 .type-money-list {
   padding: 16px;
   max-height: 60vh;

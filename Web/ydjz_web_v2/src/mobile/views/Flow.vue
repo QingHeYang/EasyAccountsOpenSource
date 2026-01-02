@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, onBe
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast, showDialog } from 'vant'
 import { flowApi, type Flow, type FlowListResult } from '@shared/api/flow'
-import { useFlowFilterStore } from '@shared/stores/flowFilter'
+import { useFlowFilterStore } from '@mobile/stores/flowFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
 
 const route = useRoute()
@@ -262,6 +262,7 @@ function toFlowDetail(flow: Flow) {
 }
 
 function toScreen() {
+  sessionStorage.setItem('screenFrom', 'new')
   router.push('/screen')
 }
 

@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { showLoadingToast, closeToast } from 'vant'
 import { analysisApi, type AnalysisTypeItem } from '@shared/api/analysis'
-import { useAnalysisFilterStore } from '@shared/stores/analysisFilter'
+import { useAnalysisFilterStore } from '@mobile/stores/analysisFilter'
 import AnalysisChartOverlay from '@mobile/components/AnalysisChartOverlay.vue'
 
 const router = useRouter()

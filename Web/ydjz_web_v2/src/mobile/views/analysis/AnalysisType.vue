@@ -7,7 +7,7 @@ import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { screenApi, type ScreenFlowParams } from '@shared/api/screen'
 import type { Flow } from '@shared/api/flow'
 import { useSmartBack } from '@shared/composables/useSmartBack'
-import { useAnalysisTypeFilterStore } from '@shared/stores/analysisTypeFilter'
+import { useAnalysisTypeFilterStore } from '@mobile/stores/analysisTypeFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
 import YearLineChartOverlay from '@mobile/components/YearLineChartOverlay.vue'
 
@@ -280,6 +280,18 @@ function getMonthTotal(month: MonthData): number {
 }
 
 // ==================== 流水列表 ====================
+// 点击月份格子，自动判断显示收入还是支出
+function onMonthItemClick(year: number, month: MonthData) {
+  const hasIncome = parseFloat(month.income) > 0
+  const hasExpense = parseFloat(month.outcome) > 0
+
+  if (!hasIncome && !hasExpense) return
+
+  // 优先显示支出，如果只有收入则显示收入
+  const chooseHandle = hasExpense ? 1 : 0
+  onMonthClick(year, month.month, chooseHandle)
+}
+
 // chooseHandle: 0收入 1支出
 async function onMonthClick(year: number, month: number, chooseHandle: number) {
   const monthStr = `${year}-${String(month).padStart(2, '0')}`
@@ -490,20 +502,14 @@ onBeforeUnmount(() => {
               empty: getMonthTotal(month) === 0,
               highest: isHighest(year, month.month),
               lowest: isLowest(year, month.month),
+              clickable: getMonthTotal(month) > 0,
             }"
+            @click="onMonthItemClick(year.year, month)"
           >
             <span class="month-label">{{ month.month }}月</span>
             <template v-if="getMonthTotal(month) > 0">
-              <span
-                v-if="parseFloat(month.income) > 0"
-                class="month-income clickable"
-                @click="onMonthClick(year.year, month.month, 0)"
-              >+{{ month.income }}</span>
-              <span
-                v-if="parseFloat(month.outcome) > 0"
-                class="month-expense clickable"
-                @click="onMonthClick(year.year, month.month, 1)"
-              >-{{ month.outcome }}</span>
+              <span v-if="parseFloat(month.income) > 0" class="month-income">+{{ month.income }}</span>
+              <span v-if="parseFloat(month.outcome) > 0" class="month-expense">-{{ month.outcome }}</span>
             </template>
             <span v-else class="month-empty">--</span>
 
@@ -880,6 +886,15 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 
+.month-item.clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.month-item.clickable:active {
+  background: var(--color-bg-page);
+}
+
 /* 最高最低使用中性色，避免与收支颜色混淆 */
 .month-item.highest {
   background: rgba(59, 130, 246, 0.1); /* 蓝色背景 */
@@ -903,21 +918,6 @@ onBeforeUnmount(() => {
 .month-expense {
   font-size: 12px;
   color: var(--color-expense);
-}
-
-.month-income.clickable,
-.month-expense.clickable {
-  padding: 2px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.month-income.clickable:active {
-  background: var(--color-income-bg);
-}
-
-.month-expense.clickable:active {
-  background: var(--color-expense-bg);
 }
 
 .month-empty {

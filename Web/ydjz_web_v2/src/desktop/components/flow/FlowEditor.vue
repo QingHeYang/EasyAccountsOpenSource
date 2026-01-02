@@ -105,6 +105,9 @@ interface ChildMoney {
 }
 const childMoneyList = ref<ChildMoney[]>([])
 
+// 流水不存在（已删除）
+const flowNotFound = ref(false)
+
 // ==================== 列表数据 ====================
 const actions = ref<Action[]>([])
 const accounts = ref<Account[]>([])
@@ -217,47 +220,60 @@ async function initData() {
 }
 
 async function loadFlowDetail(id: number) {
-  const res = await flowApi.getById(id)
-  const data = res.data.data
+  try {
+    const res = await flowApi.getById(id)
+    const data = res.data.data
 
-  money.value = data.money
-  note.value = data.note || ''
-  isCollect.value = data.collect
-  chooseDate.value = data.fdate
-
-  // 匹配收支
-  if (data.action) {
-    selectedAction.value = actions.value.find(a => a.id === data.action.id) || null
-    if (selectedAction.value) {
-      await fetchTypesByAction()
+    // 流水不存在
+    if (!data) {
+      flowNotFound.value = true
+      ElMessage.warning('该流水已被删除')
+      return
     }
-  }
 
-  // 匹配账户
-  if (data.account) {
-    selectedAccount.value = accounts.value.find(a => a.id === data.account.id) || null
-  }
+    money.value = data.money
+    note.value = data.note || ''
+    isCollect.value = data.collect
+    chooseDate.value = data.fdate
 
-  // 匹配目标账户
-  if (data.accountTo) {
-    selectedAccountTo.value = accounts.value.find(a => a.id === data.accountTo!.id) || null
-  }
-
-  // 匹配分类
-  if (data.type) {
-    selectedType.value = {
-      id: data.type.id,
-      tname: data.type.tname.replace(/——/g, '/'),
+    // 匹配收支
+    if (data.action) {
+      selectedAction.value = actions.value.find(a => a.id === data.action.id) || null
+      if (selectedAction.value) {
+        await fetchTypesByAction()
+      }
     }
-  }
 
-  // 处理图片
-  if (data.images && data.images.length > 0) {
-    fileList.value = data.images.map(fileName => ({
-      url: imageApi.getUrl(fileName),
-      status: 'done' as const,
-      serverFileName: fileName,
-    }))
+    // 匹配账户
+    if (data.account) {
+      selectedAccount.value = accounts.value.find(a => a.id === data.account.id) || null
+    }
+
+    // 匹配目标账户
+    if (data.accountTo) {
+      selectedAccountTo.value = accounts.value.find(a => a.id === data.accountTo!.id) || null
+    }
+
+    // 匹配分类
+    if (data.type) {
+      selectedType.value = {
+        id: data.type.id,
+        tname: data.type.tname.replace(/——/g, '/'),
+      }
+    }
+
+    // 处理图片
+    if (data.images && data.images.length > 0) {
+      fileList.value = data.images.map(fileName => ({
+        url: imageApi.getUrl(fileName),
+        status: 'done' as const,
+        serverFileName: fileName,
+      }))
+    }
+  } catch (err) {
+    flowNotFound.value = true
+    ElMessage.warning('流水加载失败，可能已被删除')
+    console.error(err)
   }
 }
 
@@ -597,6 +613,7 @@ function resetForm() {
   selectedTag.value = null
   childMoneyList.value = []
   exemptActionsExpanded.value = false
+  flowNotFound.value = false
 }
 
 // ==================== 表单验证 ====================
@@ -970,10 +987,15 @@ function onClose() {
 
         <!-- 底部操作 -->
         <div class="panel-footer">
-          <el-button v-if="isEdit" type="danger" plain @click="onDelete">删除</el-button>
+          <el-button v-if="isEdit && !flowNotFound" type="danger" plain @click="onDelete">删除</el-button>
           <el-button @click="onClose">取消</el-button>
-          <el-button type="primary" :loading="submitting" @click="onSubmit">
-            {{ isEdit ? '保存' : '提交账单' }}
+          <el-button
+            type="primary"
+            :loading="submitting"
+            :disabled="flowNotFound"
+            @click="onSubmit"
+          >
+            {{ flowNotFound ? '流水已删除' : (isEdit ? '保存' : '提交账单') }}
           </el-button>
         </div>
       </div>

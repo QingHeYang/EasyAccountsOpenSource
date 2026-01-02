@@ -62,6 +62,9 @@ const childMoneyList = ref<ChildMoney[]>([])
 // 来源标记（编辑时保留）
 const fromSource = ref<string | null>(null)
 
+// 流水不存在（已删除）
+const flowNotFound = ref(false)
+
 // ==================== 列表数据 ====================
 const actions = ref<Action[]>([])
 const accounts = ref<Account[]>([])
@@ -187,6 +190,14 @@ async function loadFlowDetail() {
     const res = await flowApi.getById(flowId.value)
     const data = res.data.data
 
+    // 流水不存在
+    if (!data) {
+      flowNotFound.value = true
+      closeToast()
+      showToast('该流水已被删除')
+      return
+    }
+
     money.value = data.money
     note.value = data.note || ''
     isCollect.value = data.collect
@@ -232,7 +243,8 @@ async function loadFlowDetail() {
     closeToast()
   } catch (err) {
     closeToast()
-    showToast('加载失败')
+    flowNotFound.value = true
+    showToast('流水加载失败，可能已被删除')
     console.error(err)
   }
 }
@@ -610,6 +622,9 @@ function onBack() {
 
 // ==================== 生命周期 ====================
 onMounted(() => {
+  // 重置滚动位置，避免从其他页面滚动状态穿透
+  window.scrollTo(0, 0)
+
   fetchActions()
   fetchAccounts()
 
@@ -816,12 +831,17 @@ watch(selectedTag, () => {
 
       <!-- 操作按钮 -->
       <div class="action-buttons">
-        <button v-if="isEdit" class="add-child-btn" @click="addChildMoney">
+        <button v-if="isEdit && !flowNotFound" class="add-child-btn" @click="addChildMoney">
           <van-icon name="plus" size="16" />
           追加分账单
         </button>
-        <button class="submit-btn" @click="onSubmit">
-          {{ isEdit ? '保存修改' : '提交账单' }}
+        <button
+          class="submit-btn"
+          :class="{ disabled: flowNotFound }"
+          :disabled="flowNotFound"
+          @click="onSubmit"
+        >
+          {{ flowNotFound ? '流水已删除' : (isEdit ? '保存修改' : '提交账单') }}
         </button>
       </div>
     </div>
@@ -1394,6 +1414,15 @@ watch(selectedTag, () => {
 
 .submit-btn:active {
   opacity: 0.9;
+}
+
+.submit-btn.disabled {
+  background: var(--color-text-quaternary);
+  cursor: not-allowed;
+}
+
+.submit-btn.disabled:active {
+  opacity: 1;
 }
 
 /* ActionSheet 列表 */

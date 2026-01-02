@@ -39,4 +39,4 @@ export {
   getToolNavigationParams,
   formatToolJson
 } from './toolHelper'
-export type { FlowsNavigationParams, ToolNavigationResult } from './toolHelper'
+export type { FlowsNavigationParams, FlowNavigationParams, ToolNavigationResult } from './toolHelper'

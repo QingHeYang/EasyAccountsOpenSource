@@ -121,6 +121,7 @@ const toAccountIcon = computed(() => getAccountIcon(props.flow.toAName))
 <template>
   <div
     class="flow-item"
+    :data-flow-id="flow.id"
     @click="onClick"
     @touchstart="onTouchStart"
     @touchend="onTouchEnd"
@@ -312,5 +313,21 @@ const toAccountIcon = computed(() => getAccountIcon(props.flow.toAName))
   font-size: 17px;
   font-weight: 600;
   flex-shrink: 0;
+}
+
+/* 高亮闪烁动画 - 用于返回时定位 */
+.flow-item.highlight {
+  animation: flow-highlight 1.2s ease-out;
+}
+
+@keyframes flow-highlight {
+  0% {
+    background: var(--color-transfer-bg);
+    box-shadow: 0 0 0 2px var(--color-border);
+  }
+  100% {
+    background: var(--color-bg-card);
+    box-shadow: none;
+  }
 }
 </style>

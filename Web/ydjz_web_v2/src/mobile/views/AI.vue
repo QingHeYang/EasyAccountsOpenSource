@@ -35,6 +35,7 @@ const {
   connect,
   disconnect,
   sendMessage: sendChatMessage,
+  stopConversation,
   newConversation,
   loadHistoryMessages,
   getSavedConversationId
@@ -47,6 +48,7 @@ const { mainMessages } = useMessageStore()
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const sending = ref(false)
+const stopping = ref(false)
 
 // 图片附件状态
 const pendingAttachments = ref<Array<{ filename: string; previewUrl: string }>>([])
@@ -118,6 +120,17 @@ async function handleSend() {
     }
   } finally {
     sending.value = false
+  }
+}
+
+// 停止生成
+async function handleStop() {
+  if (stopping.value) return
+  stopping.value = true
+  try {
+    await stopConversation()
+  } finally {
+    stopping.value = false
   }
 }
 
@@ -285,10 +298,20 @@ async function copyText(text: string) {
 
 // 处理工具点击
 function handleToolClick(msg: UnifiedMessage) {
+  // 流式生成时不允许点击（避免断开 websocket）
+  if (isStreaming.value) {
+    return
+  }
+
   const toolName = msg.tool?.name || ''
 
   // 只有可跳转的工具才处理
   if (!isToolNavigable(toolName)) {
+    return
+  }
+
+  // 工具未完成时不允许跳转
+  if (msg.tool?.status !== 'success') {
     return
   }
 
@@ -299,7 +322,11 @@ function handleToolClick(msg: UnifiedMessage) {
     // 设置筛选参数
     setScreenParams(navResult.params, 'ai')
     // 跳转到筛选页面（移动端路由）
+    sessionStorage.setItem('screenFrom', 'new')
     router.push('/screen')
+  } else if (navResult.type === 'flow' && navResult.flowParams) {
+    // 跳转到流水详情页
+    router.push(`/flow/edit/${navResult.flowParams.flowId}`)
   }
 }
 </script>
@@ -383,7 +410,12 @@ function handleToolClick(msg: UnifiedMessage) {
           <div v-else-if="msg.role === 'tool'" class="message-item tool">
             <div
               class="tool-card"
-              :class="[msg.tool.status, { navigable: isToolNavigable(msg.tool?.name || '') }]"
+              :class="[
+                msg.tool.status,
+                {
+                  navigable: isToolNavigable(msg.tool?.name || '') && msg.tool.status === 'success' && !isStreaming
+                }
+              ]"
               @click="handleToolClick(msg)"
             >
               <div class="tool-status-dot" :class="msg.tool.status">
@@ -394,7 +426,7 @@ function handleToolClick(msg: UnifiedMessage) {
                 <span v-if="getToolExtraInfo(msg)" class="tool-extra">{{ getToolExtraInfo(msg) }}</span>
               </div>
               <van-icon
-                v-if="isToolNavigable(msg.tool?.name || '') && msg.tool.status === 'success'"
+                v-if="isToolNavigable(msg.tool?.name || '') && msg.tool.status === 'success' && !isStreaming"
                 name="arrow"
                 size="14"
                 class="tool-arrow"
@@ -435,10 +467,20 @@ function handleToolClick(msg: UnifiedMessage) {
           :key="att.filename"
           class="attachment-item"
         >
-          <img :src="att.previewUrl" :alt="att.filename" class="attachment-thumb" />
-          <div class="attachment-remove" @click="removeAttachment(index)">
-            <van-icon name="cross" size="10" />
-          </div>
+          <van-image
+            :src="att.previewUrl"
+            width="52"
+            height="52"
+            radius="8"
+            fit="cover"
+            @click="previewImage(att.previewUrl, pendingAttachments.map(a => a.previewUrl))"
+          />
+          <van-icon
+            name="clear"
+            size="18"
+            class="attachment-close"
+            @click.stop="removeAttachment(index)"
+          />
         </div>
         <div
           v-if="pendingAttachments.length < MAX_ATTACHMENTS"
@@ -451,16 +493,6 @@ function handleToolClick(msg: UnifiedMessage) {
 
       <!-- 输入行 -->
       <div class="input-row">
-        <!-- 添加图片按钮 -->
-        <div
-          v-if="pendingAttachments.length === 0"
-          class="add-image-btn"
-          :class="{ disabled: isUploading }"
-          @click="handleClickAddImage"
-        >
-          <van-icon name="photo-o" size="22" />
-        </div>
-
         <div class="input-wrapper">
           <van-field
             v-model="inputText"
@@ -473,13 +505,44 @@ function handleToolClick(msg: UnifiedMessage) {
           />
         </div>
 
-        <div
-          class="send-btn"
-          :class="{ disabled: !canSend, loading: sending || isStreaming || isUploading }"
-          @click="handleSend"
-        >
-          <van-loading v-if="sending || isStreaming || isUploading" size="18" color="#fff" />
-          <van-icon v-else name="guide-o" size="20" />
+        <!-- 右侧按钮组 -->
+        <div class="action-buttons">
+          <!-- 添加图片按钮 -->
+          <div
+            class="action-btn image-btn"
+            :class="{ disabled: isUploading || pendingAttachments.length >= MAX_ATTACHMENTS }"
+            @click="handleClickAddImage"
+          >
+            <van-icon name="photo-o" size="14" />
+            <span>图片</span>
+          </div>
+
+          <!-- 停止按钮（生成时显示） -->
+          <div
+            v-if="isStreaming"
+            class="action-btn stop-btn"
+            :class="{ loading: stopping }"
+            @click="handleStop"
+          >
+            <van-loading v-if="stopping" size="14" color="#fff" />
+            <template v-else>
+              <van-icon name="stop-circle-o" size="14" />
+              <span>停止</span>
+            </template>
+          </div>
+          <!-- 发送按钮 -->
+          <div
+            v-else
+            class="action-btn send-btn"
+            :class="{ disabled: !canSend, loading: sending || isUploading }"
+            @click="handleSend"
+          >
+            <van-loading v-if="sending || isUploading" size="14" color="#fff" />
+            <template v-else>
+              <van-icon name="guide-o" size="14" />
+              <span>发送</span>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -918,31 +981,15 @@ function handleToolClick(msg: UnifiedMessage) {
 
 .attachment-item {
   position: relative;
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-.attachment-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.attachment-remove {
+.attachment-close {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-expense);
+  top: -6px;
+  right: -6px;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-card);
   border-radius: 50%;
-  color: #fff;
 }
 
 .attachment-add {
@@ -968,25 +1015,6 @@ function handleToolClick(msg: UnifiedMessage) {
   gap: 10px;
 }
 
-.add-image-btn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-
-.add-image-btn:active {
-  color: var(--color-transfer);
-}
-
-.add-image-btn.disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
 .input-wrapper {
   flex: 1;
   background: var(--color-bg-page);
@@ -1001,34 +1029,62 @@ function handleToolClick(msg: UnifiedMessage) {
 }
 
 .input-wrapper :deep(.van-field__control) {
-  min-height: 24px;
+  min-height: 50px;
   line-height: 1.5;
 }
 
-.send-btn {
-  width: 44px;
-  height: 44px;
+/* 右侧按钮组 */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  width: 56px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-transfer);
-  border-radius: 12px;
+  gap: 2px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
   color: #fff;
-  flex-shrink: 0;
   transition: opacity 0.2s;
 }
 
-.send-btn:active {
+.action-btn:active {
   opacity: 0.8;
 }
 
-.send-btn.disabled {
-  background: var(--color-text-quaternary);
+.action-btn.disabled {
+  opacity: 0.4;
   pointer-events: none;
 }
 
-.send-btn.loading {
+.action-btn.loading {
   pointer-events: none;
+}
+
+.image-btn {
+  background: var(--color-bg-page);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.image-btn:active {
+  border-color: var(--color-transfer);
+  color: var(--color-transfer);
+}
+
+.send-btn {
+  background: var(--color-transfer);
+}
+
+.stop-btn {
+  background: var(--color-expense);
 }
 
 /* 消息中的图片 */

@@ -12,7 +12,8 @@ export const toolNameMap: Record<string, string> = {
   accounts: '查询账户',
   types: '查询全部分类',
   current_date: '获取日期',
-  year_statistics: '年度统计'
+  year_statistics: '年度统计',
+  get_flow: '查询流水详情'
 }
 
 /** 带 title 的工具前缀映射 */
@@ -31,13 +32,11 @@ export const nonClickableTools = [
   'types',
   'current_date',
   'year_statistics',
-  'add_flow',
-  'update_flow',
   'make_excel'
 ]
 
 /** 可跳转的工具列表（点击后跳转到其他页面） */
-export const navigableTools = ['flows']
+export const navigableTools = ['flows', 'get_flow', 'add_flow', 'update_flow']
 
 // ==================== 工具数据解析 ====================
 
@@ -136,10 +135,16 @@ export interface FlowsNavigationParams {
   note?: string
 }
 
+/** flow 详情跳转参数 */
+export interface FlowNavigationParams {
+  flowId: number
+}
+
 /** 工具跳转结果 */
 export interface ToolNavigationResult {
-  type: 'flows' | 'unknown'
+  type: 'flows' | 'flow' | 'unknown'
   params?: FlowsNavigationParams
+  flowParams?: FlowNavigationParams
   route?: string
 }
 
@@ -174,6 +179,20 @@ export function getToolNavigationParams(msg: UnifiedMessage): ToolNavigationResu
         },
         // PC 端路由
         route: '/flow?tab=screen'
+      }
+    }
+  }
+
+  // get_flow / add_flow / update_flow 都返回 flow id
+  if (toolName === 'get_flow' || toolName === 'add_flow' || toolName === 'update_flow') {
+    const result = parseToolData(msg.tool?.result)
+    // add_flow/update_flow 返回 flowId，get_flow 返回 id
+    const flowId = (result.flowId ?? result.id) as number | undefined
+
+    if (flowId) {
+      return {
+        type: 'flow',
+        flowParams: { flowId }
       }
     }
   }

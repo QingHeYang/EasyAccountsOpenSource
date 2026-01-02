@@ -32,6 +32,7 @@ import {
   parseToolData
 } from '@shared/services/chat'
 import { setScreenParams } from '@shared/services/screenParams'
+import FlowEditor from '@desktop/components/flow/FlowEditor.vue'
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -102,6 +103,10 @@ const currentToolDetail = ref<{
   arguments: {},
   result: ''
 })
+
+// FlowEditor 状态
+const flowEditorVisible = ref(false)
+const flowEditorId = ref<number | null>(null)
 
 // 抽屉打开时连接 WebSocket 并加载历史
 watch(() => props.modelValue, async (isOpen) => {
@@ -373,10 +378,16 @@ function isReasoningExpanded(msgId: string): boolean {
 
 // 处理工具点击
 function handleToolClick(msg: UnifiedMessage) {
+  // 流式生成时不允许点击（避免断开 websocket）
+  if (isStreaming.value) return
+
   const toolName = msg.tool.name
 
   // 不可点击的工具（且不可跳转）直接返回
   if (!isToolClickable(toolName)) return
+
+  // 工具未完成时不允许跳转
+  if (isToolNavigable(toolName) && msg.tool.status !== 'success') return
 
   // 可跳转的工具
   if (isToolNavigable(toolName)) {
@@ -399,6 +410,10 @@ function navigateFromTool(msg: UnifiedMessage) {
     setScreenParams(navResult.params)
     // 跳转到筛选页面（添加时间戳确保路由变化被检测）
     router.push(`${navResult.route}&_t=${Date.now()}`)
+  } else if (navResult.type === 'flow' && navResult.flowParams) {
+    // 打开流水编辑器
+    flowEditorId.value = navResult.flowParams.flowId
+    flowEditorVisible.value = true
   }
 }
 
@@ -579,7 +594,13 @@ const canSend = computed(() => {
           <div v-else-if="msg.role === 'tool'" class="message-item tool">
             <div
               class="tool-card"
-              :class="[msg.tool.status, { clickable: isToolClickable(msg.tool.name) }]"
+              :class="[
+                msg.tool.status,
+                {
+                  clickable: isToolClickable(msg.tool.name) && !isStreaming,
+                  navigable: isToolNavigable(msg.tool.name) && msg.tool.status === 'success' && !isStreaming
+                }
+              ]"
               @click="handleToolClick(msg)"
             >
               <el-icon v-if="msg.tool.status === 'pending'" class="tool-icon spin" :size="14">
@@ -593,7 +614,7 @@ const canSend = computed(() => {
               </el-icon>
               <span class="tool-name">{{ getToolDisplayName(msg) }}</span>
               <span v-if="getToolExtraInfo(msg)" class="tool-extra">{{ getToolExtraInfo(msg) }}</span>
-              <el-icon v-if="isToolClickable(msg.tool.name)" class="tool-arrow" :size="12"><ArrowRight /></el-icon>
+              <el-icon v-if="isToolNavigable(msg.tool.name) && msg.tool.status === 'success' && !isStreaming" class="tool-arrow" :size="12"><ArrowRight /></el-icon>
             </div>
           </div>
 
@@ -782,6 +803,12 @@ const canSend = computed(() => {
       :url-list="imagePreviewList"
       :initial-index="imagePreviewIndex"
       @close="imagePreviewVisible = false"
+    />
+
+    <!-- 流水编辑器 -->
+    <FlowEditor
+      v-model:visible="flowEditorVisible"
+      :flow-id="flowEditorId"
     />
   </aside>
 </template>

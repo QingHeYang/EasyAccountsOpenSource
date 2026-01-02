@@ -221,6 +221,7 @@ function toFlow(month: string) {
 
 function toScreen(accountId: number) {
   showAccountSheet.value = false
+  sessionStorage.setItem('screenFrom', 'new')
   router.push({ path: '/screen', query: { acid: accountId } })
 }
 
