@@ -97,6 +97,10 @@ const fileList = ref<FileItem[]>([])
 const previewVisible = ref(false)
 const previewUrl = ref('')
 
+// 拖拽状态
+const isDragOver = ref(false)
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+
 // 追加分账单（编辑模式）
 interface ChildMoney {
   index: number
@@ -532,6 +536,111 @@ function onPreviewImage(file: FileItem) {
   }
 }
 
+// ==================== 拖拽和粘贴图片 ====================
+function handleDragEnter(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = true
+}
+
+function handleDragLeave(e: DragEvent) {
+  e.preventDefault()
+  // 确保是离开整个区域，而不是进入子元素
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  if (
+    e.clientX < rect.left ||
+    e.clientX > rect.right ||
+    e.clientY < rect.top ||
+    e.clientY > rect.bottom
+  ) {
+    isDragOver.value = false
+  }
+}
+
+function handleDragOver(e: DragEvent) {
+  e.preventDefault()
+}
+
+async function handleDrop(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = false
+
+  const files = e.dataTransfer?.files
+  if (files) {
+    await processImageFiles(Array.from(files))
+  }
+}
+
+async function handlePaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+
+  const imageFiles: File[] = []
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        imageFiles.push(file)
+      }
+    }
+  }
+
+  if (imageFiles.length > 0) {
+    e.preventDefault()
+    await processImageFiles(imageFiles)
+  }
+}
+
+async function processImageFiles(files: File[]) {
+  // 过滤出允许的图片类型
+  const imageFiles = files.filter(f => ALLOWED_IMAGE_TYPES.includes(f.type))
+
+  if (imageFiles.length === 0) {
+    ElMessage.warning('仅支持 PNG、JPG、WebP 格式的图片')
+    return
+  }
+
+  for (const file of imageFiles) {
+    if (fileList.value.length >= 3) {
+      ElMessage.warning('最多上传3张图片')
+      break
+    }
+
+    const fileItem: FileItem = {
+      url: URL.createObjectURL(file),
+      status: 'uploading',
+      file,
+    }
+    const itemIndex = fileList.value.length
+    fileList.value.push(fileItem)
+
+    try {
+      const compressedFile = await compressImage(file)
+      const res = await imageApi.upload(compressedFile)
+      if (res.data.code === 0 && res.data.data) {
+        fileList.value[itemIndex] = {
+          ...fileList.value[itemIndex],
+          status: 'done',
+          serverFileName: res.data.data.fileName,
+          url: imageApi.getUrl(res.data.data.fileName),
+        }
+      } else {
+        fileList.value[itemIndex] = {
+          ...fileList.value[itemIndex],
+          status: 'failed',
+        }
+        ElMessage.error('图片上传失败')
+      }
+    } catch (err) {
+      fileList.value[itemIndex] = {
+        ...fileList.value[itemIndex],
+        status: 'failed',
+      }
+      ElMessage.error('图片上传失败')
+      console.error(err)
+    }
+  }
+}
+
 // ==================== 追加分账单 ====================
 function addChildMoney() {
   childMoneyList.value.push({
@@ -910,13 +1019,26 @@ function onClose() {
             placeholder="添加备注..."
             maxlength="200"
             show-word-limit
+            @paste="handlePaste"
           />
         </div>
 
         <!-- 图片上传 -->
         <div class="form-item">
-          <label class="form-label">图片</label>
-          <div class="upload-area">
+          <label class="form-label">图片 <span class="hint">（支持拖拽/粘贴）</span></label>
+          <div
+            class="upload-area"
+            :class="{ 'drag-over': isDragOver }"
+            @dragenter="handleDragEnter"
+            @dragleave="handleDragLeave"
+            @dragover="handleDragOver"
+            @drop="handleDrop"
+          >
+            <!-- 拖拽提示遮罩 -->
+            <div v-if="isDragOver" class="drag-overlay">
+              <el-icon :size="24"><Picture /></el-icon>
+              <span>松开添加图片</span>
+            </div>
             <div
               v-for="(file, index) in fileList"
               :key="index"
@@ -1565,6 +1687,12 @@ function onClose() {
   margin-left: 2px;
 }
 
+.form-label .hint {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
 .form-select {
   display: flex;
   justify-content: space-between;
@@ -1642,6 +1770,33 @@ function onClose() {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  position: relative;
+  min-height: 80px;
+  padding: 12px;
+  border: 2px dashed transparent;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.upload-area.drag-over {
+  border-color: var(--color-transfer);
+  background: var(--color-transfer-bg);
+}
+
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(24, 144, 255, 0.1);
+  border-radius: 10px;
+  color: var(--color-transfer);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 10;
 }
 
 .upload-preview {

@@ -669,7 +669,12 @@ const canSend = computed(() => {
           :key="att.filename"
           class="attachment-item"
         >
-          <img :src="att.previewUrl" :alt="att.filename" class="attachment-thumb" />
+          <img
+            :src="att.previewUrl"
+            :alt="att.filename"
+            class="attachment-thumb"
+            @click="previewImage(att.previewUrl, pendingAttachments.map(a => a.previewUrl))"
+          />
           <div class="attachment-remove" @click="removeAttachment(index)">
             <el-icon :size="12"><CloseBold /></el-icon>
           </div>
@@ -1348,7 +1353,6 @@ const canSend = computed(() => {
   width: 56px;
   height: 56px;
   border-radius: 8px;
-  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -1356,27 +1360,33 @@ const canSend = computed(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 .attachment-remove {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: 2px;
+  right: 2px;
   width: 18px;
   height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-expense);
+  background: rgba(0, 0, 0, 0.6);
   border-radius: 50%;
   color: #fff;
   cursor: pointer;
-  transition: transform 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.attachment-item:hover .attachment-remove {
+  opacity: 1;
 }
 
 .attachment-remove:hover {
-  transform: scale(1.1);
+  background: var(--color-expense);
 }
 
 .attachment-add {
