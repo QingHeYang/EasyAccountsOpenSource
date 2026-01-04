@@ -22,6 +22,8 @@ public class AuthService {
     private AuthUtils authUtils;
     @Value("${auth.expired}")
     private long expired;
+    @Value("${auth.single_login:true}")
+    private boolean singleLogin;
 
     public boolean verfiyAuthFiles() {
         Auth auth = authUtils.getAuth();
@@ -37,7 +39,20 @@ public class AuthService {
         Auth auth = authUtils.getAuth();
         if (auth != null) {
             if (auth.getUsername().equals(username)&&auth.getPasswordMD5().equals(password)) {
-                auth.refreshToken(expired);
+                long now = System.currentTimeMillis();
+
+                if (!singleLogin && auth.getExpireTime() > now) {
+                    // 多端模式 + Token未过期：只刷新过期时间，不换Token
+                    auth.setExpireTime(now + expired * 60 * 1000);
+                    log.info("多端登录模式：复用现有Token，刷新过期时间");
+                } else {
+                    // 单端模式 或 Token已过期：生成新Token
+                    auth.refreshToken(expired);
+                    if (!singleLogin) {
+                        log.info("多端登录模式：Token已过期，生成新Token");
+                    }
+                }
+
                 token = auth.getToken();
                 AuthDto authDto = new AuthDto();
                 authDto.setToken(token);

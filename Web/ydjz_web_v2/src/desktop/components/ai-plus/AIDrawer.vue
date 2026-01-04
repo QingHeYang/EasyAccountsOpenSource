@@ -18,6 +18,7 @@ import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import { imageApi } from '@shared/api/image'
 import { compressImageForAI } from '@shared/utils/image-compress'
+import { copyToClipboard } from '@shared/utils/clipboard'
 import {
   useChatService,
   useMessageStore,
@@ -431,10 +432,10 @@ function showToolDetail(msg: UnifiedMessage) {
 
 // 复制文本
 async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text)
+  const success = await copyToClipboard(text)
+  if (success) {
     ElMessage.success('已复制')
-  } catch {
+  } else {
     ElMessage.error('复制失败')
   }
 }

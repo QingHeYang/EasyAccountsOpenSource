@@ -2421,6 +2421,11 @@ function onClose() {
   z-index: 3050 !important;
 }
 
+/* ElMessage 层级：确保在抽屉(z-index:3000)之上 */
+.el-message {
+  z-index: 3200 !important;
+}
+
 /* 暗色模式 */
 html.dark .money-section {
   background: linear-gradient(135deg, var(--action-color) 0%, color-mix(in srgb, var(--action-color) 50%, #000) 100%);
@@ -2481,9 +2486,18 @@ html.dark .type-parent {
   background: rgba(255, 255, 255, 0.05);
 }
 
+html.dark .type-parent:hover {
+  background: rgba(24, 144, 255, 0.1);
+}
+
 html.dark .type-child {
   background: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .type-child:hover {
+  background: rgba(24, 144, 255, 0.15);
+  border-color: var(--color-transfer);
 }
 
 html.dark .child-money-item {
@@ -2538,11 +2552,6 @@ html.dark .type-group {
 
 html.dark .type-children {
   background: rgba(0, 0, 0, 0.2);
-}
-
-html.dark .type-child {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.06);
 }
 
 html.dark .template-main:hover {

@@ -349,6 +349,9 @@ function toTagManage() {
 }
 
 onMounted(() => {
+  // 重置滚动位置，避免从其他页面滚动状态透传
+  window.scrollTo(0, 0)
+
   fetchActions()
   fetchAccounts()
   fetchTags()

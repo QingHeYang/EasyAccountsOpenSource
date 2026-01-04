@@ -9,8 +9,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface FlowRepository  extends JpaRepository<FlowJpaEntity,Integer> {
-    // 根据年份查询该年份的所有Flow
-    @Query("SELECT f FROM FlowJpaEntity f WHERE f.fDate LIKE CONCAT(:year, '%')")
+    // 根据年份查询该年份的所有Flow（排除无效分类 type_id <= 0）
+    @Query("SELECT f FROM FlowJpaEntity f WHERE f.fDate LIKE CONCAT(:year, '%') AND f.typeId > 0")
     List<FlowJpaEntity> findByYear(@Param("year") Integer year);
 
 

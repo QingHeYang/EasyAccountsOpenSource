@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Close, Refresh, Coin, ChatDotRound, SetUp, Connection, CopyDocument, InfoFilled } from '@element-plus/icons-vue'
 import { aiApi, type AiStats } from '@shared/api/ai'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 const props = defineProps<{
   visible: boolean
@@ -95,10 +96,10 @@ const mcpUrl = computed(() => {
 async function copyMcpUrl() {
   if (!mcpUrl.value) return
 
-  try {
-    await navigator.clipboard.writeText(mcpUrl.value)
+  const success = await copyToClipboard(mcpUrl.value)
+  if (success) {
     ElMessage.success('链接已复制')
-  } catch {
+  } else {
     ElMessage.error('复制失败')
   }
 }

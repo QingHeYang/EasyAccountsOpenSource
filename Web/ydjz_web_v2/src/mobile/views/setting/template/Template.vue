@@ -97,6 +97,9 @@ function onEdit(id: number) {
 }
 
 onMounted(() => {
+  // 重置滚动位置
+  window.scrollTo(0, 0)
+
   fetchTags()
   fetchTemplates()
 })

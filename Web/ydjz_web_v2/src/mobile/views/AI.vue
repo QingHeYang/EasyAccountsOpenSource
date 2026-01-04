@@ -16,6 +16,7 @@ import {
 import { setScreenParams } from '@shared/services/screenParams'
 import { imageApi } from '@shared/api/image'
 import { compressImageForAI } from '@shared/utils/image-compress'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 const router = useRouter()
 
@@ -288,12 +289,8 @@ const canSend = computed(() => {
 
 // 复制文本
 async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    showToast('已复制')
-  } catch {
-    showToast('复制失败')
-  }
+  const success = await copyToClipboard(text)
+  showToast(success ? '已复制' : '复制失败')
 }
 
 // 处理工具点击

@@ -27,7 +27,7 @@ public class TypeListResponseDto {
 
     public TypeListResponseDto convertToDto(Type type) {
         if (type == null) {
-            return this;
+            return null;
         }
         TypeListResponseDto typeListResponseDto = this;
         typeListResponseDto.setId(type.getId());

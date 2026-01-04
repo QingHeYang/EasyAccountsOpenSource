@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { showToast, showLoadingToast, closeToast } from 'vant'
 import { aiApi, type AiStats } from '@shared/api/ai'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import { copyToClipboard } from '@shared/utils/clipboard'
 
 const { smartBack } = useSmartBack()
 
@@ -75,12 +76,8 @@ const mcpUrl = computed(() => {
 async function copyMcpUrl() {
   if (!mcpUrl.value) return
 
-  try {
-    await navigator.clipboard.writeText(mcpUrl.value)
-    showToast('链接已复制')
-  } catch {
-    showToast('复制失败')
-  }
+  const success = await copyToClipboard(mcpUrl.value)
+  showToast(success ? '链接已复制' : '复制失败')
 }
 
 // 返回

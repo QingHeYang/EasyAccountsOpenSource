@@ -17,7 +17,7 @@ public class AccountResponseDto {
 
     public AccountResponseDto convertToDto(Account account) {
         if (account == null) {
-            return this;
+            return null;
         }
         AccountResponseDto accountResponseDto = this;
         accountResponseDto.setId(account.getId());

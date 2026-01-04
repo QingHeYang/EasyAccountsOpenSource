@@ -17,10 +17,12 @@ import { tagApi, type Tag } from '@shared/api/tag'
 import { imageApi } from '@shared/api/image'
 import { compressImage } from '@shared/utils/image-compress'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import { useFlowAddStateStore } from '@shared/stores/flowAddState'
 
 const route = useRoute()
 const router = useRouter()
 const { smartBack } = useSmartBack()
+const flowAddStateStore = useFlowAddStateStore()
 
 // ==================== 模式判断 ====================
 const flowId = computed(() => {
@@ -457,20 +459,20 @@ function onSelectTemplate(template: Template) {
   if (template.money) {
     money.value = template.money
   }
-  if (template.action) {
+  if (template.action?.hname) {
     selectedAction.value = actions.value.find(a => a.id === template.action!.id) || null
     if (selectedAction.value) {
       fetchTypesByAction()
     }
   }
-  if (template.account) {
+  if (template.account?.name) {
     selectedAccount.value = accounts.value.find(a => a.id === template.account!.id) || null
   }
   // 只有转账类型才设置目标账户
-  if (template.action?.handle === 2 && template.accountTo) {
+  if (template.action?.handle === 2 && template.accountTo?.name) {
     selectedAccountTo.value = accounts.value.find(a => a.id === template.accountTo!.id) || null
   }
-  if (template.type) {
+  if (template.type?.tname) {
     selectedType.value = { id: template.type.id, tname: template.type.tname }
     cascaderValue.value = template.type.id
   }
@@ -487,11 +489,61 @@ function onSelectTemplate(template: Template) {
 
 function showTemplateInfo(template: Template) {
   selectedTemplate.value = template
+  // 先关闭模板列表弹窗，再显示详情对话框
+  showTemplatePopup.value = false
   showTemplateDetail.value = true
 }
 
 function toTemplateManage() {
+  // 保存当前表单状态
+  saveFormState()
   router.push('/setting/template')
+}
+
+// 保存表单状态到 store
+function saveFormState() {
+  // 只保存已上传成功的图片
+  const uploadedImages = fileList.value
+    .filter(f => f.status === 'done' && f.serverFileName)
+    .map(f => ({ url: f.url, serverFileName: f.serverFileName! }))
+
+  flowAddStateStore.save({
+    money: money.value,
+    note: note.value,
+    isCollect: isCollect.value,
+    chooseDate: chooseDate.value,
+    selectedAction: selectedAction.value,
+    selectedAccount: selectedAccount.value,
+    selectedAccountTo: selectedAccountTo.value,
+    selectedType: selectedType.value,
+    cascaderValue: cascaderValue.value,
+    uploadedImages,
+  })
+}
+
+// 从 store 恢复表单状态
+function restoreFormState() {
+  money.value = flowAddStateStore.money
+  note.value = flowAddStateStore.note
+  isCollect.value = flowAddStateStore.isCollect
+  chooseDate.value = flowAddStateStore.chooseDate
+  selectedAction.value = flowAddStateStore.selectedAction
+  selectedAccount.value = flowAddStateStore.selectedAccount
+  selectedAccountTo.value = flowAddStateStore.selectedAccountTo
+  selectedType.value = flowAddStateStore.selectedType
+  cascaderValue.value = flowAddStateStore.cascaderValue
+
+  // 恢复图片列表
+  if (flowAddStateStore.uploadedImages.length > 0) {
+    fileList.value = flowAddStateStore.uploadedImages.map(img => ({
+      url: img.url,
+      status: 'done' as const,
+      serverFileName: img.serverFileName,
+    }))
+  }
+
+  // 恢复后重置 store，避免下次进入时再次恢复
+  flowAddStateStore.reset()
 }
 
 // ==================== 表单验证 ====================
@@ -512,7 +564,7 @@ function validateForm(): boolean {
     showToast('请选择目标账户')
     return false
   }
-  if (!selectedType.value) {
+  if (!selectedType.value?.tname) {
     showToast('请选择分类')
     return false
   }
@@ -630,8 +682,14 @@ onMounted(() => {
 
   if (!isEdit.value) {
     fetchTags()
-    // 默认日期为今天
-    chooseDate.value = formatDate(new Date())
+
+    // 检查是否有保存的状态需要恢复（从模板管理页返回）
+    if (flowAddStateStore.initialized) {
+      restoreFormState()
+    } else {
+      // 默认日期为今天
+      chooseDate.value = formatDate(new Date())
+    }
   }
 })
 
@@ -1010,7 +1068,7 @@ watch(selectedTag, () => {
       show-cancel-button
       cancel-button-text="编辑"
       confirm-button-text="选择"
-      @cancel="() => { showTemplateDetail = false; router.push(`/setting/template/edit/${selectedTemplate?.id}`) }"
+      @cancel="() => { showTemplateDetail = false; saveFormState(); router.push(`/setting/template/edit/${selectedTemplate?.id}`) }"
       @confirm="() => selectedTemplate && onSelectTemplate(selectedTemplate)"
     >
       <div v-if="selectedTemplate" class="template-detail">
