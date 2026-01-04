@@ -2,8 +2,8 @@ package com.deepblue.yd_jz.controller;
 
 import com.deepblue.yd_jz.dto.BaseDto;
 import com.deepblue.yd_jz.service.ImageService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/image")
 @Slf4j
-@Api(value = "ImageController", tags = {"图片管理"})
+@Tag(name = "图片管理")
 public class ImageController {
     
     @Autowired
@@ -31,7 +31,7 @@ public class ImageController {
     @Value("${image.upload.path:/Ledger/images/}")
     private String uploadPath;
     
-    @ApiOperation(value = "上传图片")
+    @Operation(summary = "上传图片")
     @PostMapping("/upload")
     public BaseDto<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
@@ -78,7 +78,7 @@ public class ImageController {
         }
     }
     
-    @ApiOperation(value = "获取图片")
+    @Operation(summary = "获取图片")
     @GetMapping("/{fileName}")
     public ResponseEntity<Resource> getImage(@PathVariable String fileName) {
         try {

@@ -1,7 +1,7 @@
 package com.deepblue.yd_jz.entity;
 
 import lombok.Data;
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Data
 @Entity

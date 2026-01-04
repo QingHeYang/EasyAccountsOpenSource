@@ -2,13 +2,12 @@ package com.deepblue.yd_jz.service;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.metadata.CellData;
-import com.alibaba.excel.metadata.Head;
 import com.alibaba.excel.write.handler.CellWriteHandler;
+import com.alibaba.excel.write.handler.context.CellWriteHandlerContext;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.metadata.fill.FillWrapper;
-import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
-import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
+import com.alibaba.excel.write.metadata.style.WriteCellStyle;
+import com.alibaba.excel.write.metadata.style.WriteFont;
 import com.deepblue.yd_jz.entity.Account;
 import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.data.MonthExcelData;
@@ -17,8 +16,12 @@ import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.awt.Color;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -90,7 +93,16 @@ public class ExcelService {
             SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd");
             Date fDate = (Date) map.get("f_date");
             flow.setFlowDate(sdfDate.format(fDate));
-            flow.setMoney("￥" + map.get("money"));
+
+            int handle = (int) map.get("handle");
+            String money = (String) map.get("money");
+            // 支出显示为负数，去掉￥符号
+            if (handle == 1) {
+                flow.setMoney("-" + money);
+            } else {
+                flow.setMoney(money);
+            }
+
             if (map.get("p_t_name") != null) {
                 flow.setTypeName(map.get("p_t_name") + "/" + map.get("t_name"));
             } else {
@@ -98,12 +110,13 @@ public class ExcelService {
             }
             flow.setNote((String) map.get("note"));
             flow.setActionName((String) map.get("h_name"));
+            flow.setHandle(handle);
             flowList.add(flow);
             flow.setAccountName((String) map.get("a_name"));
-            if ((int) map.get("handle") == 1) {
-                moneyOut = moneyOut.add(new BigDecimal((String) map.get("money")));
-            } else if ((int) map.get("handle") == 0) {
-                moneyIn = moneyIn.add(new BigDecimal((String) map.get("money")));
+            if (handle == 1) {
+                moneyOut = moneyOut.add(new BigDecimal(money));
+            } else if (handle == 0) {
+                moneyIn = moneyIn.add(new BigDecimal(money));
             } else {
                 flow.setAccountName(map.get("a_name") + "->" + map.get("t_a_name"));
             }
@@ -138,11 +151,12 @@ public class ExcelService {
 
     private String writeMonthExcel(String excelDate, MonthExcelData monthExcelData) {
         Date date = new Date();
-        String excelFileName = excelDate + "月账单_" + date.getTime() + ".xls";
+        String excelFileName = excelDate + "月账单_" + date.getTime() + ".xlsx";
         String excelPath = excelFolder + excelFileName;
         ExcelWriter excelWriter = EasyExcel.write().file(excelPath)
                 .withTemplate(baseExcelPath)
-                .registerWriteHandler(new ExcelWriteHandler())
+                .inMemory(true)  // EasyExcel 4.x 大数据量模板填充需要
+                .registerWriteHandler(new ExcelWriteHandler(monthExcelData.getFlow(), 3))
                 .build();
         WriteSheet writeSheet = EasyExcel.writerSheet().build();
         excelWriter.fill(monthExcelData, writeSheet);
@@ -167,34 +181,101 @@ public class ExcelService {
     }
 
     public static class ExcelWriteHandler implements CellWriteHandler {
+        private final List<MonthExcelData.Flow> flowList;
+        private final int dataStartRow;  // 数据开始的行号
+        // 缓存样式，避免创建过多
+        private XSSFCellStyle incomeStyle;   // 收入样式
+        private XSSFCellStyle expenseStyle;  // 支出样式
+        private XSSFCellStyle transferStyle; // 转账样式
 
-        @Override
-        public void beforeCellCreate(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder, Row row, Head head, Integer integer, Integer integer1, Boolean aBoolean) {
+        public ExcelWriteHandler() {
+            this.flowList = null;
+            this.dataStartRow = 0;
+        }
 
+        public ExcelWriteHandler(List<MonthExcelData.Flow> flowList, int dataStartRow) {
+            this.flowList = flowList;
+            this.dataStartRow = dataStartRow;
         }
 
         @Override
-        public void afterCellCreate(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder, Cell cell, Head head, Integer integer, Boolean aBoolean) {
+        public void afterCellDispose(CellWriteHandlerContext context) {
+            if (context.getFirstCellData() != null) {
+                WriteCellStyle writeCellStyle = context.getFirstCellData().getOrCreateStyle();
 
+                // 设置边框
+                writeCellStyle.setBorderBottom(BorderStyle.THIN);
+                writeCellStyle.setBorderLeft(BorderStyle.THIN);
+                writeCellStyle.setBorderRight(BorderStyle.THIN);
+                writeCellStyle.setBorderTop(BorderStyle.THIN);
+                writeCellStyle.setBottomBorderColor((short) 0);
+                writeCellStyle.setTopBorderColor((short) 0);
+                writeCellStyle.setLeftBorderColor((short) 0);
+                writeCellStyle.setRightBorderColor((short) 0);
+
+                // 只对 E 列(金额列, columnIndex=4) 根据 handle 设置字体颜色
+                if (flowList != null && context.getRowIndex() != null && context.getColumnIndex() != null
+                        && context.getColumnIndex() == 4) {
+                    int dataIndex = context.getRowIndex() - dataStartRow;
+                    if (dataIndex >= 0 && dataIndex < flowList.size()) {
+                        Integer handle = flowList.get(dataIndex).getHandle();
+                        if (handle != null) {
+                            Cell cell = context.getCell();
+                            if (cell != null && cell.getSheet().getWorkbook() instanceof XSSFWorkbook) {
+                                XSSFWorkbook workbook = (XSSFWorkbook) cell.getSheet().getWorkbook();
+                                XSSFCellStyle colorStyle = getOrCreateColorStyle(workbook, handle, cell.getCellStyle());
+                                if (colorStyle != null) {
+                                    // 用 setOriginCellStyle 设置样式
+                                    context.getFirstCellData().setOriginCellStyle(colorStyle);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        @Override
-        public void afterCellDataConverted(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder, CellData cellData, Cell cell, Head head, Integer integer, Boolean aBoolean) {
+        private XSSFCellStyle getOrCreateColorStyle(XSSFWorkbook workbook, int handle, org.apache.poi.ss.usermodel.CellStyle baseStyle) {
+            XSSFCellStyle targetStyle;
+            Color awtColor;
 
-        }
+            switch (handle) {
+                case 0:  // 收入 - 绿色 #52C41A
+                    if (incomeStyle != null) return incomeStyle;
+                    awtColor = new Color(0x52, 0xC4, 0x1A);
+                    break;
+                case 1:  // 支出 - 红色 #F5222D
+                    if (expenseStyle != null) return expenseStyle;
+                    awtColor = new Color(0xF5, 0x22, 0x2D);
+                    break;
+                case 2:  // 转账 - 蓝色 #1890FF
+                    if (transferStyle != null) return transferStyle;
+                    awtColor = new Color(0x18, 0x90, 0xFF);
+                    break;
+                default:
+                    return null;
+            }
 
-        @Override
-        public void afterCellDispose(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder, List<CellData> list, Cell cell, Head head, Integer integer, Boolean aBoolean) {
-            CellStyle cellStyle = cell.getCellStyle();
-            cellStyle.setBorderBottom(BorderStyle.THIN);
-            cellStyle.setBorderLeft(BorderStyle.THIN);
-            cellStyle.setBorderRight(BorderStyle.THIN);
-            cellStyle.setBorderTop(BorderStyle.THIN);
-            cellStyle.setBottomBorderColor((short) 0);
-            cellStyle.setTopBorderColor((short) 0);
-            cellStyle.setLeftBorderColor((short) 0);
-            cellStyle.setRightBorderColor((short) 0);
-            cell.setCellStyle(cellStyle);
+            targetStyle = workbook.createCellStyle();
+            targetStyle.cloneStyleFrom(baseStyle);
+            // 设置边框
+            targetStyle.setBorderBottom(BorderStyle.THIN);
+            targetStyle.setBorderLeft(BorderStyle.THIN);
+            targetStyle.setBorderRight(BorderStyle.THIN);
+            targetStyle.setBorderTop(BorderStyle.THIN);
+
+            XSSFFont font = workbook.createFont();
+            XSSFColor xssfColor = new XSSFColor(awtColor, workbook.getStylesSource().getIndexedColors());
+            font.setColor(xssfColor);
+            targetStyle.setFont(font);
+
+            // 缓存
+            switch (handle) {
+                case 0: incomeStyle = targetStyle; break;
+                case 1: expenseStyle = targetStyle; break;
+                case 2: transferStyle = targetStyle; break;
+            }
+            return targetStyle;
         }
     }
 

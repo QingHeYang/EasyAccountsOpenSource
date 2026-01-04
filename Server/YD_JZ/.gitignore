@@ -56,3 +56,6 @@ logs/
 log
 temp/
 CLAUDE.md
+
+### Local config (contains sensitive data) ###
+**/application-local.properties

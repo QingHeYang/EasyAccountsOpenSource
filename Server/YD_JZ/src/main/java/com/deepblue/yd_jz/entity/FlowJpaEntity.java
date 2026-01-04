@@ -2,14 +2,14 @@ package com.deepblue.yd_jz.entity;
 
 import lombok.Data;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Data
 @Entity
 @Table(name = "flow")
 public class FlowJpaEntity {
     @Id
-    @GeneratedValue(strategy = javax.persistence.GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(name = "f_date", nullable = false)

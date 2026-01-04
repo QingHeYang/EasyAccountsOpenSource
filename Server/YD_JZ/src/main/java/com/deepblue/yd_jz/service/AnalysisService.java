@@ -30,10 +30,11 @@ public class AnalysisService {
     @Autowired
     FlowDao flowDao;
 
-    @Value("${baseAnalysisExcel}")
+    // 已废弃：分析Excel功能不再使用
+    @Value("${baseAnalysisExcel:}")
     private String baseExcelPath;
 
-    @Value("${excelAnalysisFolder}")
+    @Value("${excelAnalysisFolder:}")
     private String excelFolder;
 
     @Autowired
@@ -401,9 +402,13 @@ public class AnalysisService {
         }
     }
 
+    /**
+     * @deprecated 此方法已废弃，分析Excel模板已移除，不再使用
+     */
+    @Deprecated
     public void writeExcel(AnalysisExcelData excelBean){
-        String headerName =excelBean.getCurrentCircle().substring(6);
-        writeMonthExcel(headerName+"财务分析报表",excelBean);
+        // 已废弃：分析Excel功能不再使用，模板已删除
+        return;
     }
 
     private void writeMonthExcel(String excelDate, AnalysisExcelData excelBean) {

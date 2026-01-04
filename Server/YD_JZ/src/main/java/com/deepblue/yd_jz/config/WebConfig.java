@@ -31,15 +31,19 @@ public class WebConfig implements WebMvcConfigurer {
             registry.addInterceptor(tokenInterceptor())
                     .addPathPatterns("/**")
                     .excludePathPatterns(
+                            // SpringDoc OpenAPI 3 路径
+                            "/docs",
+                            "/docs/**",
                             "/swagger-ui.html",
                             "/swagger-ui/**",
-                            "/v2/api-docs",
-                            "/swagger-resources/**",
+                            "/v3/api-docs",
+                            "/v3/api-docs/**",
                             "/webjars/**",
+                            // 业务路径
                             "/auth/login",
                             "/auth/register",
-                            "/error", // 排除 /error 路径
-                            "/image/**" // 排除图片获取路径，允许无需鉴权访问
+                            "/error",
+                            "/image/**"
                     );
         }
     }

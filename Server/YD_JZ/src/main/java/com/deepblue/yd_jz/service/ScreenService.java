@@ -197,7 +197,14 @@ public class ScreenService {
             flow.setTypeName(item.getTName());
             flow.setNote(item.getNote());
             flow.setActionName(item.getHName());
-            flow.setMoney(item.getMoney());
+            // 支出显示为负数
+            Integer handle = item.getHandle();
+            if (handle != null && handle == 1) {
+                flow.setMoney("-" + item.getMoney());
+            } else {
+                flow.setMoney(item.getMoney());
+            }
+            flow.setHandle(handle);
             excelBean.getFlow().add(flow);
         });
         excelBean.setTotalIn(flowListDto.getTotalIn());
@@ -206,9 +213,9 @@ public class ScreenService {
         excelBean.setName(excelName);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
         String dateStr = sdf.format(new Date());
-        excelName = excelName + "_" + dateStr + ".xls";
+        excelName = excelName + "_" + dateStr + ".xlsx";
         String excelPath = doMakeExcel(excelBean, excelName);
-        return uploadExcel(excelPath, excelName + ".xls", excelBean.getName());
+        return uploadExcel(excelPath, excelName, excelBean.getName());
     }
 
     private String uploadExcel(String excelPath, String excelFileName, String title) {
@@ -223,7 +230,8 @@ public class ScreenService {
         String excelPath = excelFolder + excelName;
         ExcelWriter excelWriter = EasyExcel.write().file(excelPath)
                 .withTemplate(baseExcelPath)
-                .registerWriteHandler(new ExcelService.ExcelWriteHandler())
+                .inMemory(true)  // EasyExcel 4.x 大数据量模板填充需要
+                .registerWriteHandler(new ExcelService.ExcelWriteHandler(excelBean.getFlow(), 3))
                 .build();
         WriteSheet writeSheet = EasyExcel.writerSheet().build();
         excelWriter.fill(excelBean, writeSheet);

@@ -4,15 +4,15 @@ import com.deepblue.yd_jz.dto.*;
 import com.deepblue.yd_jz.service.ExcelService;
 import com.deepblue.yd_jz.service.FlowService;
 import com.deepblue.yd_jz.data.MonthExcelData;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/flow")
-@Api(value = "FlowController", tags = {"流水管理"})
+@Tag(name = "流水管理")
 public class FlowController {
 
     @Autowired
@@ -21,7 +21,7 @@ public class FlowController {
     @Autowired
     ExcelService excelService;
 
-    @ApiOperation(value = "添加流水")
+    @Operation(summary = "添加流水")
     @PostMapping("/addFlow")
     public BaseDto<FlowIdResponseDto> addFlow(@RequestBody FlowAddRequestDto flowAddRequestDto) throws Exception {
         int id = flowService.doAddFlow(flowAddRequestDto);
@@ -31,7 +31,7 @@ public class FlowController {
     }
 
 
-    @ApiOperation(value = "获取指定一笔流水")
+    @Operation(summary = "获取指定一笔流水")
     @GetMapping("/getFlow/{id}")
     public BaseDto<FlowSingleResponseDto> getFlowById(@PathVariable int id) {
         FlowSingleResponseDto flowSingleResponseDto = flowService.doQueryFlow(id);
@@ -45,7 +45,7 @@ public class FlowController {
         return baseDto;
     }
 
-    @ApiOperation(value = "更新流水")
+    @Operation(summary = "更新流水")
     @PutMapping("/updateFlow/{id}")
     public BaseDto<FlowIdResponseDto> updateFlow(@PathVariable int id, @RequestBody FlowAddRequestDto flowAddRequestDto) throws Exception {
         int flowId = flowService.doUpdateFlow(id, flowAddRequestDto);
@@ -54,22 +54,22 @@ public class FlowController {
         return baseDto;
     }
 
-    @ApiOperation(value = "收藏流水")
+    @Operation(summary = "收藏流水")
     @PutMapping("/collectFlow/{id}/{collect}")
     public BaseDto updateFlow(@PathVariable int id, @PathVariable int collect) throws Exception {
         flowService.doUpdateFlowCollect(id,collect);
         return BaseDto.setSuccessBean();
     }
 
-    @ApiOperation(value = "删除流水")
+    @Operation(summary = "删除流水")
     @DeleteMapping("/deleteFlow/{id}")
     public BaseDto deleteFlow(@PathVariable int id) throws Exception {
         flowService.doDeleteFlow(id);
         return BaseDto.setSuccessBean();
     }
 
-    @ApiOperation(value = "获取主业流水")
-    @ApiParam(name = "chooseHandle", value = "0:全部 1:支出 2:收入", required = true)
+    @Operation(summary = "获取主业流水")
+    @Parameter(name = "chooseHandle", description = "0:全部 1:支出 2:收入", required = true)
     @GetMapping("/getFlowListMain/{chooseHandle}/{chooseOrder}/{date}")
     public BaseDto<FlowListDto> getFlowListMain(@PathVariable int chooseHandle, @PathVariable int chooseOrder
             , @PathVariable String date ){
@@ -79,7 +79,7 @@ public class FlowController {
         return baseDto;
     }
 
-    @ApiOperation(value = "月度流水Excel")
+    @Operation(summary = "月度流水Excel")
     @GetMapping("/makeExcel/{date}")
     public BaseDto<ExcelDto> getExcel(@PathVariable String date){
         String  result =excelService.makeMonthExcel(date);

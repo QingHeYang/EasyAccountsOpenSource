@@ -1,7 +1,7 @@
 package com.deepblue.yd_jz.entity;
 
 import com.deepblue.yd_jz.entity.Action;
-import javax.persistence.*;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 

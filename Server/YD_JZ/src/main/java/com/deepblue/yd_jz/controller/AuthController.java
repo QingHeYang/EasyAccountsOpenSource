@@ -6,8 +6,8 @@ import com.deepblue.yd_jz.dto.AuthRequestDto;
 import com.deepblue.yd_jz.dto.BaseDto;
 import com.deepblue.yd_jz.entity.Auth;
 import com.deepblue.yd_jz.service.AuthService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,14 +17,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@Api(value = "AuthController", tags = {"登录注册"})
+@Tag(name = "登录注册")
 @RequestMapping("/auth")
 public class AuthController {
 
     @Autowired
     private AuthService authService;
 
-    @ApiOperation(value = "登录")
+    @Operation(summary = "登录")
     @PostMapping("/login")
     public BaseDto login(@RequestBody AuthRequestDto authRequestDto) {
         if (!authService.verfiyAuthFiles()) {
@@ -39,7 +39,7 @@ public class AuthController {
         return baseDto;
     }
 
-    @ApiOperation(value = "注册")
+    @Operation(summary = "注册")
     @PostMapping("/register")
     public BaseDto register(@RequestBody AuthRequestDto authRequestDto) {
         AuthDto authDto = authService.register(authRequestDto.getUsername(), authRequestDto.getPassword());

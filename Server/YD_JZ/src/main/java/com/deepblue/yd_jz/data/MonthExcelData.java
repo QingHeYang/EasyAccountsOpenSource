@@ -30,6 +30,7 @@ public class MonthExcelData {
         private String accountName;
         private String money;
         private String note;
+        private Integer handle;  // 0=收入(绿), 1=支出(红), 2=转账(蓝)
     }
 
 
