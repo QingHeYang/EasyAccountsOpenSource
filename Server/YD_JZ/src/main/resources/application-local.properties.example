@@ -102,8 +102,8 @@ spring.liquibase.change-log=classpath:/db/changelog/db.changelog-master.yaml
 # 版本信息
 # =====================================================
 version.release=2.6.0-local
-version.font_branch=dev
-version.backend_branch=dev
-version.mysql_branch=dev
-version.agent_branch=dev
-version.webhook_branch=dev
+version.font_branch=4.0.0-local
+version.backend_branch=2.5.1-local
+version.mysql_branch=2.5.0-local
+version.agent_branch=1.1.0-local
+version.webhook_branch=1.0.0-local
