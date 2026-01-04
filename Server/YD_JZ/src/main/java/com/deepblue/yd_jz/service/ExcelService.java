@@ -187,6 +187,11 @@ public class ExcelService {
         private XSSFCellStyle incomeStyle;   // 收入样式
         private XSSFCellStyle expenseStyle;  // 支出样式
         private XSSFCellStyle transferStyle; // 转账样式
+        // v2.5.1: I 列汇总区域背景色样式缓存
+        private XSSFCellStyle summaryIncomeStyle;   // 收入汇总 - 绿色背景
+        private XSSFCellStyle summaryExpenseStyle;  // 支出汇总 - 红色背景
+        private XSSFCellStyle summaryBalanceStyle;  // 结余汇总 - 蓝色背景
+        private XSSFCellStyle summaryTotalStyle;    // 总资产汇总 - 灰色背景
 
         public ExcelWriteHandler() {
             this.flowList = null;
@@ -229,6 +234,36 @@ public class ExcelService {
                                     context.getFirstCellData().setOriginCellStyle(colorStyle);
                                 }
                             }
+                        }
+                    }
+                }
+
+                // v2.5.1: I 列(columnIndex=8) 汇总区域设置背景颜色和白色字体
+                if (context.getRowIndex() != null && context.getColumnIndex() != null
+                        && context.getColumnIndex() == 8) {
+                    Integer rowIndex = context.getRowIndex();
+                    Cell cell = context.getCell();
+                    if (cell != null && cell.getSheet().getWorkbook() instanceof XSSFWorkbook) {
+                        XSSFWorkbook workbook = (XSSFWorkbook) cell.getSheet().getWorkbook();
+                        XSSFCellStyle summaryStyle = null;
+                        // 收入行 (5-6, rowIndex 4-5)
+                        if (rowIndex == 4 || rowIndex == 5) {
+                            summaryStyle = getOrCreateSummaryStyle(workbook, "income", cell.getCellStyle());
+                        }
+                        // 支出行 (7-8, rowIndex 6-7)
+                        else if (rowIndex == 6 || rowIndex == 7) {
+                            summaryStyle = getOrCreateSummaryStyle(workbook, "expense", cell.getCellStyle());
+                        }
+                        // 结余行 (9-10, rowIndex 8-9)
+                        else if (rowIndex == 8 || rowIndex == 9) {
+                            summaryStyle = getOrCreateSummaryStyle(workbook, "balance", cell.getCellStyle());
+                        }
+                        // 总资产行 (11-12, rowIndex 10-11)
+                        else if (rowIndex == 10 || rowIndex == 11) {
+                            summaryStyle = getOrCreateSummaryStyle(workbook, "total", cell.getCellStyle());
+                        }
+                        if (summaryStyle != null) {
+                            context.getFirstCellData().setOriginCellStyle(summaryStyle);
                         }
                     }
                 }
@@ -276,6 +311,66 @@ public class ExcelService {
                 case 2: transferStyle = targetStyle; break;
             }
             return targetStyle;
+        }
+
+        // v2.5.1: 创建汇总区域样式（背景色 + 白色字体）
+        private XSSFCellStyle getOrCreateSummaryStyle(XSSFWorkbook workbook, String type,
+                org.apache.poi.ss.usermodel.CellStyle baseStyle) {
+            // 检查缓存
+            switch (type) {
+                case "income": if (summaryIncomeStyle != null) return summaryIncomeStyle; break;
+                case "expense": if (summaryExpenseStyle != null) return summaryExpenseStyle; break;
+                case "balance": if (summaryBalanceStyle != null) return summaryBalanceStyle; break;
+                case "total": if (summaryTotalStyle != null) return summaryTotalStyle; break;
+            }
+
+            // v2.5.1: 使用淡色背景 + 黑字，更柔和
+            Color bgColor;
+            switch (type) {
+                case "income":   // 收入 - 淡绿色 #E6F7E9
+                    bgColor = new Color(0xE6, 0xF7, 0xE9);
+                    break;
+                case "expense":  // 支出 - 淡红色 #FFF0F0
+                    bgColor = new Color(0xFF, 0xF0, 0xF0);
+                    break;
+                case "balance":  // 结余 - 淡蓝色 #E6F4FF
+                    bgColor = new Color(0xE6, 0xF4, 0xFF);
+                    break;
+                case "total":    // 总资产 - 淡灰色 #F5F5F5
+                    bgColor = new Color(0xF5, 0xF5, 0xF5);
+                    break;
+                default:
+                    return null;
+            }
+
+            XSSFCellStyle style = workbook.createCellStyle();
+            style.cloneStyleFrom(baseStyle);
+
+            // 设置边框
+            style.setBorderBottom(BorderStyle.THIN);
+            style.setBorderLeft(BorderStyle.THIN);
+            style.setBorderRight(BorderStyle.THIN);
+            style.setBorderTop(BorderStyle.THIN);
+
+            // 设置背景颜色
+            XSSFColor xssfBgColor = new XSSFColor(bgColor, workbook.getStylesSource().getIndexedColors());
+            style.setFillForegroundColor(xssfBgColor);
+            style.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+
+            // 设置黑色字体
+            XSSFFont font = workbook.createFont();
+            font.setColor(new XSSFColor(Color.BLACK, workbook.getStylesSource().getIndexedColors()));
+            font.setBold(true);
+            style.setFont(font);
+
+            // 缓存
+            switch (type) {
+                case "income": summaryIncomeStyle = style; break;
+                case "expense": summaryExpenseStyle = style; break;
+                case "balance": summaryBalanceStyle = style; break;
+                case "total": summaryTotalStyle = style; break;
+            }
+            return style;
         }
     }
 

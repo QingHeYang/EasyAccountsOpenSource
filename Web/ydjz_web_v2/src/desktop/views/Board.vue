@@ -291,12 +291,23 @@ function isMaxBalance(month: string) {
 // 账户列表
 const accountList = computed(() => {
   if (!homeInfo.value?.accounts) return []
-  return homeInfo.value.accounts.map(acc => ({
-    ...acc,
-    realAsset: acc.exemptAsset
-      ? (parseFloat(acc.accountAsset) - parseFloat(acc.exemptAsset)).toFixed(2)
-      : null
-  }))
+  return homeInfo.value.accounts.map(acc => {
+    // exemptAsset 为 0 或 0.00 时不显示
+    const exempt = parseFloat(acc.exemptAsset || '0')
+    const hasExempt = exempt !== 0
+    return {
+      ...acc,
+      realAsset: hasExempt
+        ? (parseFloat(acc.accountAsset) - exempt).toFixed(2)
+        : null
+    }
+  })
+})
+
+// 是否显示净资产（netAsset 与 totalAsset 不相等时显示）
+const showNetAsset = computed(() => {
+  if (!homeInfo.value) return false
+  return homeInfo.value.netAsset !== homeInfo.value.totalAsset
 })
 
 // 跳转
@@ -322,6 +333,7 @@ onMounted(() => {
         <div class="asset-card">
           <div class="asset-label">总资产</div>
           <div class="asset-amount">¥ {{ homeInfo?.totalAsset || '0.00' }}</div>
+          <div class="asset-net" v-if="showNetAsset">净资产 ¥ {{ homeInfo?.netAsset || '0.00' }}</div>
         </div>
 
         <!-- 年度统计卡片 -->
@@ -500,6 +512,12 @@ onMounted(() => {
   font-size: 36px;
   font-weight: 700;
   word-break: break-all;
+}
+
+.asset-net {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-top: 8px;
 }
 
 /* 年度统计卡片 */

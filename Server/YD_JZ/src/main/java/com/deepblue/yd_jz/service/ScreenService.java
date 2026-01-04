@@ -209,6 +209,8 @@ public class ScreenService {
         });
         excelBean.setTotalIn(flowListDto.getTotalIn());
         excelBean.setTotalOut(flowListDto.getTotalOut());
+        // v2.5.1: 补充结余字段
+        excelBean.setTotalEarn(flowListDto.getTotalEarn());
         excelBean.setDate(screenFlowRequestDto.getStartDate() + " 至 " + screenFlowRequestDto.getEndDate());
         excelBean.setName(excelName);
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
@@ -231,6 +233,7 @@ public class ScreenService {
         ExcelWriter excelWriter = EasyExcel.write().file(excelPath)
                 .withTemplate(baseExcelPath)
                 .inMemory(true)  // EasyExcel 4.x 大数据量模板填充需要
+                // 筛选报表数据起始行为第4行（rowIndex=3）
                 .registerWriteHandler(new ExcelService.ExcelWriteHandler(excelBean.getFlow(), 3))
                 .build();
         WriteSheet writeSheet = EasyExcel.writerSheet().build();

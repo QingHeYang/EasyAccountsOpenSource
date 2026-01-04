@@ -124,21 +124,24 @@ public class FlowService {
         Flow lastFlow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(lastFlow.getActionId());
         Account lastAccount = accountService.getOriginAccountById(lastFlow.getAccountId() );
+        // v2.5.1: 使用 lastFlow.isExempt() 而非 lastAction.isExempt()
+        // 避免 Action 配置变更后导致还原操作使用错误的 exempt 状态
+        boolean lastExempt = lastFlow.isExempt();
         switch (lastAction.getHandle()) {
             case ContentValues.ACTION_ADD:
                 log = log+"金额增加\n";
-                lastAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastAccount, lastExempt);
                 break;
             case ContentValues.ACTION_SUB:
                 log = log+"金额减少\n";
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastExempt);
                 break;
             case ContentValues.ACTION_INNER:
                 log = log+"内部转账\n";
                 Account lastToAccount = accountService.getOriginAccountById(lastFlow.getAccountToId());
-                lastToAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastToAccount, lastAction.isExempt());
+                lastToAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastToAccount, lastExempt);
                 accountService.updateOriginAccount(lastToAccount);
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastExempt);
                 break;
         }
         LogUtils.log_print(log);
@@ -161,14 +164,20 @@ public class FlowService {
         String log = "账户操作日志\n"+"账户名称： "+account.getAName()+"\n原始金额： "+account.getMoney()+"\n操作金额： "+money+"\n当前操作： ";
         BigDecimal flowMoney = new BigDecimal(money);
         BigDecimal accountMoney = new BigDecimal(account.getMoney());
-        BigDecimal accountExemptMoney = isExempt ? new BigDecimal(account.getExemptMoney()) : null;
+        // v2.5.1: exemptMoney 可能为空字符串或 null，需要处理，避免 BigDecimal 解析异常
+        String exemptMoneyStr = account.getExemptMoney();
+        if (exemptMoneyStr == null || exemptMoneyStr.isEmpty()) {
+            exemptMoneyStr = "0";
+        }
+        BigDecimal accountExemptMoney = isExempt ? new BigDecimal(exemptMoneyStr) : null;
         switch (handle) {
             case ContentValues.ACTION_ADD:
                 log=log+"+\n";
                 accountMoney = accountMoney.add(flowMoney);
                 if (isExempt) {
                     accountExemptMoney = accountExemptMoney.add(flowMoney);
-                    account.setExemptMoney(accountExemptMoney.toString());
+                    // v2.5.1: 添加精度控制，与 money 字段保持一致
+                    account.setExemptMoney(accountExemptMoney.setScale(2, java.math.RoundingMode.HALF_UP).toString());
                 }
                 break;
             case ContentValues.ACTION_SUB:
@@ -176,7 +185,8 @@ public class FlowService {
                 accountMoney = accountMoney.subtract(flowMoney);
                 if (isExempt) {
                     accountExemptMoney = accountExemptMoney.subtract(flowMoney);
-                    account.setExemptMoney(accountExemptMoney.toString());
+                    // v2.5.1: 添加精度控制，与 money 字段保持一致
+                    account.setExemptMoney(accountExemptMoney.setScale(2, java.math.RoundingMode.HALF_UP).toString());
                 }
                 break;
         }
@@ -235,18 +245,21 @@ public class FlowService {
         Flow flow = flowDao.queryFlowById(id).get(0);
         Action lastAction = actionService.getAction(flow.getActionId());
         Account lastAccount = accountService.getOriginAccountById(flow.getAccountId() );
+        // v2.5.1: 使用 flow.isExempt() 而非 lastAction.isExempt()
+        // 避免 Action 配置变更后导致还原操作使用错误的 exempt 状态
+        boolean flowExempt = flow.isExempt();
         switch (lastAction.getHandle()) {
             case ContentValues.ACTION_ADD:
-                lastAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastAccount, flowExempt);
                 break;
             case ContentValues.ACTION_SUB:
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, flowExempt);
                 break;
             case ContentValues.ACTION_INNER:
                 Account lastToAccount = accountService.getOriginAccountById(flow.getAccountToId());
-                lastToAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastToAccount, lastAction.isExempt());
+                lastToAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastToAccount, flowExempt);
                 accountService.updateOriginAccount(lastToAccount);
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, lastAction.isExempt());
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, flowExempt);
                 break;
         }
 
