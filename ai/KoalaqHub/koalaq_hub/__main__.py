@@ -1,11 +1,54 @@
 import asyncio
 import json
 import logging
+import os
 import sys
+from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+
+def setup_logging():
+    """配置日志系统（控制台 + 按日期滚动的文件日志）"""
+    # 日志格式
+    log_format = "%(asctime)s - %(levelname)s - %(message)s"
+    formatter = logging.Formatter(log_format)
+
+    # 获取根日志记录器
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # 控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    # 文件处理器（如果配置了日志目录）
+    log_dir = os.environ.get("LOG_DIR", "")
+    if log_dir:
+        log_path = Path(log_dir)
+        log_path.mkdir(parents=True, exist_ok=True)
+
+        # 日志文件名格式：koalaq_YYYYMMDD.log
+        log_file = log_path / f"koalaq_{datetime.now().strftime('%Y%m%d')}.log"
+
+        # 按日期滚动（每天一个新文件，保留30天）
+        file_handler = TimedRotatingFileHandler(
+            filename=str(log_file),
+            when="midnight",
+            interval=1,
+            backupCount=30,
+            encoding="utf-8"
+        )
+        file_handler.setFormatter(formatter)
+        file_handler.suffix = "%Y%m%d.log"  # 备份文件后缀格式
+        root_logger.addHandler(file_handler)
+
+        print(f"日志文件: {log_file}")
+
+
 # 配置日志（在导入其他模块之前）
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+setup_logging()
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent

@@ -36,6 +36,10 @@ ENV PYTHONUNBUFFERED=1
 ENV API_PORT=8001
 ENV API_HOST=0.0.0.0
 
+# ===== 日志配置 =====
+# 日志目录，配合 docker-compose 挂载使用
+ENV LOG_DIR=/app/logs
+
 # ===== LLM 配置 =====
 ENV LLM_TIMEOUT=120.0
 # LLM 密钥等敏感配置通过 docker-compose 注入
