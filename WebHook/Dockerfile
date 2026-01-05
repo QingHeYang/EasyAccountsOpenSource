@@ -1,5 +1,5 @@
-# 使用python 3.10 作为基础镜像
-FROM python:3.10
+# 使用python 3.10 作为基础镜像（指定 amd64 平台以确保 orjson 等库有预编译 wheel）
+FROM --platform=linux/amd64 python:3.10
 
 # 设置工作目录
 WORKDIR /app
