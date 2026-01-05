@@ -376,6 +376,7 @@ function onMakeExcel() {
         collect: collectOnly.value || undefined,
         actions: chooseActions.value.length > 0 ? chooseActions.value : undefined,
         types: chooseTypes.value.length > 0 ? chooseTypes.value : undefined,
+        note: searchNote.value || undefined,
       }
 
       const res = await screenApi.makeExcel(value, params)
