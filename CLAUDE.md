@@ -19,7 +19,7 @@ EasyAccounts 是一个个人财务管理应用，包含以下模块：
 
 | 模块 | 技术栈 | 说明 |
 |------|--------|------|
-| **Server** | Spring Boot 2.4.11, Java 11, MySQL | 后端服务，双重数据访问（JPA + MyBatis） |
+| **Server** | Spring Boot 3.x, Java 17, MySQL | 后端服务，双重数据访问（JPA + MyBatis） |
 | **Web** | Vue 3 + TypeScript, Vant UI | 前端（移动端 + 桌面 Electron） |
 | **AI** | Python + MCP 架构 | AI 服务端 |
 | **WebHook** | FastAPI Python | 钩子服务，用户可自定义操作 |
@@ -133,13 +133,16 @@ main                    # 正式版 - 稳定发布
 ```bash
 cd Server/YD_JZ
 
-# Maven 构建（需要 Java 11）
+# Maven 构建（需要 Java 17）
 mvn clean package
 
-# 使用不同配置文件
-mvn clean package -P dev      # 开发环境
-mvn clean package -P server   # 生产服务器
-mvn clean package -P windows  # Windows 开发
+# 使用配置文件
+mvn clean package -P server   # 生产服务器（默认）
+
+# 本地开发
+# 1. 复制 application-local.properties.example 为 application-local.properties
+# 2. 修改数据库连接等配置
+# 3. 使用 spring.profiles.active=local 启动
 
 # 运行测试
 mvn test
@@ -245,16 +248,16 @@ python main.py
 - 重复交易模板
 - 身份验证和授权
 - AI 智能辅助
-- 多环境配置（dev/server/windows）
 
 ## 数据库和配置文件
 
-使用 MySQL 数据库，Liquibase 进行架构管理。三个 Maven 配置文件：
-- `dev`: 开发环境
-- `server`: 生产服务器
-- `windows`: Windows 开发环境
+使用 MySQL 数据库，Liquibase 进行架构管理。
 
-配置文件位于 `src/main/resources/application-{profile}.properties`
+配置文件：
+- `application-server.properties`: 生产服务器配置（Docker 环境）
+- `application-local.properties.example`: 本地开发配置示例
+
+本地开发时，复制 `application-local.properties.example` 为 `application-local.properties` 并修改配置。
 
 ## API 文档
 
@@ -268,10 +271,10 @@ python main.py
 - 使用 Jest 进行单元测试，配置文件：`jest.config.js`
 - 代码规范使用 ESLint + Prettier，配置在 `.eslintrc.js` 和 `prettier.config.js`
 
-### 后端开发  
-- 使用 Maven profiles 管理不同环境配置 (`dev`, `server`, `windows`)
+### 后端开发
+- 生产环境使用 `server` profile，本地开发使用 `local` profile
 - 数据库迁移通过 Liquibase 管理，配置文件在 `src/main/resources/db/changelog/`
-- Swagger UI 可用于 API 测试，运行后访问 `/swagger-ui.html`
+- API 文档使用 SpringDoc OpenAPI，运行后访问 `/swagger-ui.html`
 - 双重数据访问模式：JPA 用于简单 CRUD，MyBatis 用于复杂查询
 
 ### 测试策略
@@ -282,7 +285,7 @@ python main.py
 ## 重要说明
 
 ### 环境要求
-- **Server**: Java 11 + Maven
+- **Server**: Java 17 + Maven
 - **Web**: Node.js v16
 - **AI / WebHook**: Python 3.9+
 

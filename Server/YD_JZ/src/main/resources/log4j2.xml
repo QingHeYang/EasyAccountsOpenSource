@@ -15,10 +15,16 @@
         <RollingFile name="RollingFileLogger" fileName="${log-path}/app-rolling.log" filePattern="${log-path}/app-rolling-%d{yyyy-MM-dd}-%i.log">
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
             <Policies>
+                <OnStartupTriggeringPolicy/>
                 <TimeBasedTriggeringPolicy/>
                 <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="20"/>
+            <DefaultRolloverStrategy max="20">
+                <Delete basePath="${log-path}" maxDepth="1">
+                    <IfFileName glob="app-rolling-*.log"/>
+                    <IfLastModified age="P10D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
         </RollingFile>
     </Appenders>
 

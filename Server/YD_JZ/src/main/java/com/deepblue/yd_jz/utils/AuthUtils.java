@@ -15,6 +15,8 @@ import java.io.IOException;
 @Component
 public class AuthUtils {
 
+    private static final Object FILE_LOCK = new Object();
+
     @Value("${auth.enable}")
     private boolean authEnable;
 
@@ -48,27 +50,34 @@ public class AuthUtils {
 
     private int isTokenValid(String token) {
         File file = new File(authFolder + "/secret.key");
-        try {
-            //使用OKIO读取文件成为字符串
-            String key = Okio.buffer(Okio.source(file)).readUtf8();
-            Auth auth = Auth.decode(key);
-            if (auth==null) {
+        synchronized (FILE_LOCK) {
+            try {
+                //使用OKIO读取文件成为字符串
+                String key = Okio.buffer(Okio.source(file)).readUtf8();
+                Auth auth = Auth.decode(key);
+                if (auth == null) {
+                    return 418;
+                }
+                long currentTime = System.currentTimeMillis();
+                if (auth.getToken().equals(token) && auth.getExpireTime() > currentTime) {
+                    // 滑动刷新：只在剩余时间 < 50% 时才刷新
+                    long totalDuration = expired * 60 * 1000;
+                    long remainingTime = auth.getExpireTime() - currentTime;
+                    if (remainingTime < totalDuration / 2) {
+                        long newExpireTime = currentTime + totalDuration;
+                        auth.setExpireTime(newExpireTime);
+                        saveAuth(auth);
+                        log.info("Token 滑动刷新: 剩余{}分钟, 新过期时间 {}",
+                                remainingTime / 60000, new java.util.Date(newExpireTime));
+                    }
+                    return 200;
+                } else {
+                    return 401;
+                }
+            } catch (IOException e) {
+                log.error("Error reading key file: {}", e.getMessage());
                 return 418;
             }
-            long currentTime = System.currentTimeMillis();
-            if (auth.getToken().equals(token)&&auth.getExpireTime()>currentTime) {
-                // 滑动刷新：每次验证成功后延长过期时间
-                long newExpireTime = currentTime + expired * 60 * 1000;
-                auth.setExpireTime(newExpireTime);
-                saveAuth(auth);
-                log.info("Token 滑动刷新: 新过期时间 {}", new java.util.Date(newExpireTime));
-                return 200;
-            }else {
-                return 401;
-            }
-        } catch (IOException e) {
-            log.error("Error reading key file: {}", e.getMessage());
-            return 418;
         }
     }
 
