@@ -1,6 +1,7 @@
 package com.deepblue.yd_jz.controller;
 
 import com.deepblue.yd_jz.dto.*;
+import com.deepblue.yd_jz.service.AIAnalysisService;
 import com.deepblue.yd_jz.service.ExcelService;
 import com.deepblue.yd_jz.service.FlowService;
 import com.deepblue.yd_jz.data.MonthExcelData;
@@ -9,6 +10,16 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Random;
 
 @RestController
 @RequestMapping("/flow")
@@ -20,6 +31,9 @@ public class FlowController {
 
     @Autowired
     ExcelService excelService;
+
+    @Autowired
+    AIAnalysisService aiAnalyzeService;
 
     @Operation(summary = "添加流水")
     @PostMapping("/addFlow")
@@ -90,6 +104,54 @@ public class FlowController {
         excelDto.setSuccess(flag.contains("0"));
         BaseDto baseDto = BaseDto.setSuccessBean();
         baseDto.setData(excelDto);
+        return baseDto;
+    }
+
+    /**
+     * AI 分析截图账单 (PR #3 by rockyshen)
+     * 上传账单图片，通过阿里通义千问 OCR 识别后自动生成流水
+     */
+    @Operation(summary = "AI分析截图账单")
+    @PostMapping("/analyzeFlowByAi")
+    public BaseDto analyzeFlowByAi(@RequestParam("file") MultipartFile file){
+        // 从网页获取到图片文件后，存入当前工程的 /static/pic
+        String currentDir = System.getProperty("user.dir");
+        Path path = Paths.get(currentDir, "YD_JZ/src/main/resources/static/pic");
+        try {
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+            }
+
+            // 图片重命名，避免文件冲突
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmm");
+            String date = sdf.format(new Date());
+            Random random = new Random();
+            int randomNumber = 100000 + random.nextInt(900000);
+            String originalFilename = file.getOriginalFilename();
+            String extension = "";
+            int dotIndex = originalFilename.lastIndexOf('.');
+            if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+                extension = originalFilename.substring(dotIndex);
+            }
+            String baseName = originalFilename.substring(0, dotIndex);
+            String newFilename = baseName + "_" + date + "_" + randomNumber + extension;
+            String filePath = path + "/" + newFilename;
+            File destFile = new File(filePath);
+            file.transferTo(destFile);
+
+            // 调用AI服务
+            List<FlowAddRequestDto> flowAddRequestDtoList = aiAnalyzeService.analyzeFlowByAi(filePath);
+
+            // 获取到一组解析好的对象，挨个调用addFlow服务
+            for (FlowAddRequestDto flowAddRequestDto : flowAddRequestDtoList) {
+                flowService.doAddFlow(flowAddRequestDto);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        BaseDto baseDto = BaseDto.setSuccessBean();
         return baseDto;
     }
 }
