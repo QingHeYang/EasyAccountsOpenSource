@@ -1,162 +1,176 @@
-# 记账软件 开源文档说明  
+# EasyAccounts 开源版
+
 ## 项目简介
-这是这个项目是[EasyAccounts](https://github.com/QingHeYang/EasyAccounts)的源码  
-如果你有一定开发能力，可以根据这个源码进行二次开发，或者自己编译打包成docker文件  
-如果你只是想使用记账软件，可以直接下载[EasyAccounts](https://github.com/QingHeYang/EasyAccounts)  
+
+这是 [EasyAccounts](https://github.com/QingHeYang/EasyAccounts) 的源码。
+
+- 有开发能力：可根据源码二次开发或自行编译打包
+- 仅使用：直接下载 [EasyAccounts](https://github.com/QingHeYang/EasyAccounts)
 
 ## 版本
-v2.4.0   
-更新时间：2025.02.19  
+
+v2.6.0
+更新时间：2026.01.06
 项目说明：https://qingheyang.github.io/EasyAccounts/#/README
 
+## 主要目录结构
 
-## 主要目录结构(有删减)
 ```bash
 .
-├── CONTRIBUTING.md             # 贡献指南
-├── README.md                     
-├── Server                      # 服务端文件夹
-│   ├── Dockerfile                # Dockerfile
-│   ├── excel_template            # 账单模板
-│   │   ├── analysis_excel.xls    # 分析账单模板
-│   │   ├── auto_excel.xls        # 月度账单模板
-│   │   └── screen_excel.xls      # 筛选账单模板
-│   ├── make_jar.sh               # 打包脚本，制作jar&docker镜像
-│   └── YD_JZ                     # 服务端源码
+├── README.md
+├── CLAUDE.md                   # Claude Code 项目指南
+├── build.sh                    # 统一构建脚本
+├── versions.json               # 版本信息
 │
-├── Web                         # 前端文件夹
-│   ├── Dockerfile                # Dockerfile
-│   ├── make_nginx.sh             # 打包脚本，制作nginx镜像
-│   ├── nginx                     # nginx文件夹
-│   │   └── default.conf          # nginx配置文件
-│   └── ydjz_web                  # 前端源码
-│       └── public                # 公共文件夹
-│           └── config.js         # 配置文件，本地运行修改IP链接后台使用
+├── Server/                     # 后端服务
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── MySQL/                  # MySQL Docker 配置
+│   └── YD_JZ/                  # Spring Boot 源码
+│       ├── excel_template/     # Excel 模板 (.xlsx)
+│       └── src/
 │
-└── WebHook                      # WebHook文件夹
-    ├── Dockerfile                # Dockerfile
-    ├── make_webhook.sh           # 打包脚本，制作webhook镜像
-    ├── requirements.txt          # 依赖文件
-    └── webhook.py                # webhook源码
-```  
-
-## 项目说明
-
-### 服务端  
-- 服务端语言：Java
-- 服务端框架：SpringBoot
-- 服务端数据库：MySQL
-- 服务端日志：Log4j  
-- 服务端构建工具：Maven
-- 服务端运行环境：JDK11
-- 服务端部署方式：Docker  
-- swagger文档：http://{YOUR_IP}:8085/swagger-ui/index.html  
-  
-- 本地运行端口号：8085
-- docker运行端口号：10670
-- MySQL版本：8.0.31
-
-配置文件：
-- application.properties            # 本地运行配置文件
-- application-dev.properties        # 开发环境配置文件
-- application-server.properties     # 服务器环境配置文件
-- application-windows.properties    # 本地windows环境配置文件  
-
-本地运行指南：  
-- 选择本地运行配置文件：application-windows.properties
-- 修改数据库链接：
-```bash
-spring.datasource.url=jdbc:mysql://{YOUR_MYSQL_IP}:3306/easy_accounts?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
-spring.datasource.username={YOUR_MYSQL_USERNAME}
-spring.datasource.password={YOUR_MYSQL_PASSWORD}
+├── Web/                        # 前端服务
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── nginx/                  # Nginx 配置
+│   └── ydjz_web_v2/            # Vue 3 + TypeScript 源码
+│
+├── ai/                         # AI 服务
+│   ├── README.md
+│   └── KoalaqHub/              # AI Agent 服务
+│       ├── Dockerfile
+│       └── koalaq_hub/         # Python 源码
+│
+├── WebHook/                    # WebHook 服务
+│   ├── Dockerfile
+│   ├── README.md
+│   └── webhook.py              # FastAPI 源码
+│
+└── version/                    # 版本文档
+    └── README.md               # 分支合并记录
 ```
 
-制作镜像指南：  
-- 运行脚本：`./make_jar.sh`，如需更换tag，请自行修改
+## 技术栈
 
-### 前端
-- 前端语言：Vue
-- 前端框架：Vue3
-- 前端构建工具：VueCli
-- 前端组件：Vant4
-- 前端运行环境：Node.js 18-22版本均可
-- 前端部署方式：Docker
+| 模块 | 技术栈 | 运行环境 |
+|------|--------|----------|
+| **Server** | Spring Boot 3.x, JPA + MyBatis, MySQL | JDK 17 |
+| **Web** | Vue 3 + TypeScript, Vant UI | Node.js 16+ |
+| **AI** | Python, FastAPI, MCP 架构 | Python 3.10+ |
+| **WebHook** | Python, FastAPI | Python 3.10+ |
 
-- 本地运行端口号：8081
-- docker运行端口号：10669
+## 快速开始
 
-本地运行指南：
-- 修改后端链接：public/config.js  
-- 字段：`apiBaseUrl: "${YOUR_IP}:8085"`
+### 统一构建（推荐）
 
-制作镜像指南：  
-- 运行脚本：`./make_nginx.sh`，如需更换tag，请自行修改
+```bash
+./build.sh
+```
+
+交互式菜单，支持单模块或全部构建。
+
+### Server（后端）
+
+```bash
+cd Server/YD_JZ
+
+# 本地开发
+cp src/main/resources/application-local.properties.example \
+   src/main/resources/application-local.properties
+# 修改数据库配置后启动
+
+# 构建
+mvn clean package -P server
+
+# Docker
+docker build -t easyaccounts-server ../
+```
+
+**配置文件：**
+- `application-server.properties` - 生产环境（Docker）
+- `application-local.properties` - 本地开发
+
+**端口：** 本地 8085 / Docker 10670
+
+**API 文档：** http://{IP}:8085/swagger-ui/index.html
+
+### Web（前端）
+
+```bash
+cd Web/ydjz_web_v2
+
+npm install
+npm run serve        # 开发 http://localhost:8081
+npm run build        # 生产构建
+```
+
+**端口：** 本地 8081 / Docker 10669
+
+### AI（KoalaqHub）
+
+```bash
+cd ai/KoalaqHub
+
+pip install -r requirements.txt
+cp .env.example .env  # 配置 LLM API Key
+python -m koalaq_hub  # http://localhost:8001
+```
+
+**端口：** 本地 8001 / Docker 10672
 
 ### WebHook
-- 服务端语言：Python
-- 服务端框架：FastAPI
-- 服务端运行环境：Python3.10
-- 服务端部署方式：Docker
 
-- 本地运行端口号：8083
-- docker运行端口号：10671
+```bash
+cd WebHook
 
-本地运行指南：
-1. 安装requirements.txt依赖：`pip install -r requirements.txt`  
-2. 运行webhook.py：`uvicorn webhook:app --host 0.0.0.0 --port 8083`
+pip install -r requirements.txt
+# 配置 SMTP 环境变量
+uvicorn webhook:app --host 0.0.0.0 --port 8083
+```
 
-制作镜像指南：  
-- 运行脚本：`./make_webhook.sh`，如需更换tag，请自行修改  
+**端口：** 本地 8083 / Docker 10671
 
-## 项目开发建议  
-### 轻度开发  
-基于WebHook开发  
-1. 使用已有swagger文档，开发新功能，一般可以用查询、筛选等功能
-2. 在已有的webhook中调用对应的接口即可，使用python编码  
-3. 打包镜像：`./make_webhook.sh`，如需引用额外的python包，修改requirements.txt文件  
+## Docker 端口映射
 
-轻度开发适用场景：1. 创新性开发、2. 不变更主体逻辑、3. 映射文件后方便修改。
+| 模块 | 本地端口 | Docker 端口 |
+|------|----------|-------------|
+| Server | 8085 | 10670 |
+| Web | 8081 | 10669 |
+| AI | 8001 | 10672 |
+| WebHook | 8083 | 10671 |
+| MySQL | 3306 | 10668 |
 
-需要能力：  
-- 轻度python编码(AI辅助即可)
-- 使用docker
-- 阅读swagger文档
+## 2.6.0 主要更新
 
-### 中度开发  
-基于服务端、前端开发  
-1. 使用源码开发，开发对应功能，不变更数据库，例如修改登录等功能 
-2. 基于服务端、前端源码进行修改
-3. 打包镜像：`./make_nginx.sh`、`./make_jar.sh`  
+- **Server**: Spring Boot 3.x 升级，Java 17，API 错误处理优化
+- **Web**: Vue 3 + TypeScript 重构，移动端 + 桌面端双版本
+- **AI**: VL 多模态支持（图片识别记账），MCP 架构
+- **Excel**: 模板升级为 .xlsx 格式
 
-中度开发适用场景：1.原有记账逻辑不符合需求、2.有修改界面等需求
+## 开发建议
 
-需要能力：  
-- java编码(修改服务端)
-- 使用docker
-- vue编码(修改前端)
+### 轻度开发
+基于 WebHook 扩展，调用现有 API，Python 编码。
 
-### 重度开发  
-基于服务端、前端开发  
-1. 使用源码开发，开发对应功能，变更数据库，例如新增数据库表等 
-2. 打包镜像：`./make_jar.sh`  
+### 中度开发
+修改前端/后端源码，不变更数据库结构。
 
-重度开发适用场景：1. 原有记账逻辑不符合需求、2. 有新增数据库表等需求
-
-需要能力：  
-- java编码(修改服务端)
-- 使用docker
-- vue编码(修改前端)  
+### 重度开发
+变更数据库结构，需要 Liquibase 迁移脚本。
 
 ## 贡献指南
-[点击这里查看贡献指南](CONTRIBUTING.md)  
->Tips: 仅接受轻度、中度开发PR
 
-## 安全声明  
-本项目是开源项目，你可以自由使用，但是请不要将这个项目用于商业用途，无法支撑起商业用途   
-本项目没有上传任何使用者的数据，如果你发现有上传数据的行为，请及时联系我  
-欢迎审查代码  
+[CONTRIBUTING.md](CONTRIBUTING.md)
+
+> 仅接受轻度、中度开发 PR
+
+## 安全声明
+
+- 开源项目，禁止商业用途
+- 不上传任何用户数据
+- 欢迎代码审查
 
 ## 开发者的话
-这个项目是我业余时间开发的，可能会有很多不完善的地方  
-我本职是一个Android开发工程师，对于前端、后端、数据库等方面的知识了解不多  
-所以代码并不是很规范，还望谅解  
+
+业余时间开发，代码可能不够规范，还望谅解。
