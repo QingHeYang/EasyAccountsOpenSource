@@ -136,6 +136,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/setting/AiSettings.vue'),
     meta: { title: 'AI+ 设置' },
   },
+  // 系统信息
+  {
+    path: '/setting/system',
+    name: 'SettingSystem',
+    component: () => import('./views/setting/SystemInfo.vue'),
+    meta: { title: '系统信息' },
+  },
   // 流水记账
   {
     path: '/flow/add',

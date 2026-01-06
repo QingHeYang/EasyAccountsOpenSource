@@ -57,6 +57,33 @@ export interface VersionInfo {
   webhookBranch: string
 }
 
+/** 认证配置 */
+export interface AuthConfig {
+  /** 是否启用认证 */
+  enable: boolean
+  /** Token 过期时间（分钟） */
+  expiredMinutes: number
+  /** 是否单点登录 */
+  singleLogin: boolean
+}
+
+/** 备份配置 */
+export interface BackupConfig {
+  /** Cron 表达式 */
+  cron: string
+  /** 配置是否有效 */
+  valid: boolean
+  /** 描述信息 */
+  description: string
+}
+
+/** 系统配置（版本 + 认证 + 备份） */
+export interface SystemConfig {
+  versions: VersionInfo
+  auth: AuthConfig
+  backup: BackupConfig
+}
+
 /** 首页 API */
 export const homeApi = {
   /** 获取首页信息 */
@@ -69,8 +96,8 @@ export const homeApi = {
     return getRequest().get<ApiResponse<HomeInfo>>(`/home/getHomeInfoV2/${year}`)
   },
 
-  /** 获取版本信息 */
-  getVersion() {
-    return getRequest().get<ApiResponse<VersionInfo>>('/home/getVersion')
+  /** 获取系统配置（版本 + 认证） */
+  getSystemConfig() {
+    return getRequest().get<ApiResponse<SystemConfig>>('/home/getVersion')
   },
 }

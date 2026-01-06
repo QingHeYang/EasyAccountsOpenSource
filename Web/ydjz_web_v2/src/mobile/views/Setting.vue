@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useThemeStore } from '@shared/stores/theme'
-import { homeApi, type VersionInfo } from '@shared/api/home'
+import { homeApi, type VersionInfo, type AuthConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import { showConfirmDialog } from 'vant'
 import logoUrl from '@shared/assets/logo.png'
@@ -30,7 +30,6 @@ function onThemeChange() {
 
 // 关于弹窗
 const showAbout = ref(false)
-const showVersionDetail = ref(false)
 const versions = ref<VersionInfo>({
   release: '',
   fontBranch: '',
@@ -39,20 +38,29 @@ const versions = ref<VersionInfo>({
   agentBranch: '',
   webhookBranch: '',
 })
+const authConfig = ref<AuthConfig | null>(null)
 
-async function loadVersion() {
+async function loadSystemConfig() {
   try {
-    const res = await homeApi.getVersion()
-    versions.value = res.data.data
+    const res = await homeApi.getSystemConfig()
+    versions.value = res.data.data.versions
+    authConfig.value = res.data.data.auth
+    // 如果不需要认证，清除 token
+    if (authConfig.value && !authConfig.value.enable) {
+      localStorage.removeItem('token')
+    }
   } catch (err) {
-    console.error('获取版本信息失败', err)
+    console.error('获取系统配置失败', err)
   }
 }
+
+// 是否显示退出登录（需要认证才显示）
+const showLogout = computed(() => authConfig.value?.enable !== false)
 
 function openAbout() {
   showAbout.value = true
   if (!versions.value.release) {
-    loadVersion()
+    loadSystemConfig()
   }
 }
 
@@ -89,8 +97,8 @@ function onAiClick() {
 }
 
 onMounted(() => {
-  // 预加载版本信息
-  loadVersion()
+  // 预加载系统配置
+  loadSystemConfig()
   // 检测 AI 服务
   checkAiService()
 })
@@ -130,6 +138,10 @@ onMounted(() => {
           is-link
           to="/setting/template"
         />
+      </van-cell-group>
+
+      <!-- 系统管理 -->
+      <van-cell-group inset title="系统管理">
         <!-- AI+ 设置（仅在 AI 服务可用时显示） -->
         <van-cell
           v-if="aiServiceAvailable"
@@ -143,16 +155,11 @@ onMounted(() => {
             <van-tag v-if="!aiConfigured" type="warning">未配置</van-tag>
           </template>
         </van-cell>
-      </van-cell-group>
-
-      <!-- 外观设置 -->
-      <van-cell-group inset title="外观">
         <van-cell
-          title="主题模式"
-          icon="brush-o"
-          :value="themeText"
+          title="系统信息"
+          icon="setting-o"
           is-link
-          @click="onThemeChange"
+          to="/setting/system"
         />
       </van-cell-group>
 
@@ -165,6 +172,7 @@ onMounted(() => {
           @click="openAbout"
         />
         <van-cell
+          v-if="showLogout"
           title="退出登录"
           icon="revoke"
           is-link
@@ -197,35 +205,10 @@ onMounted(() => {
         <!-- 副标题 -->
         <div class="about-slogan">认真生活, 好好记账</div>
 
-        <!-- 版本标签（可点击展开） -->
-        <div class="about-version-tag" @click="showVersionDetail = !showVersionDetail">
+        <!-- 版本标签 -->
+        <div class="about-version-tag">
           <span class="version-label">Version</span>
           <span class="version-value">{{ versions.release || '...' }}</span>
-          <van-icon :name="showVersionDetail ? 'arrow-up' : 'arrow-down'" class="version-arrow" />
-        </div>
-
-        <!-- 版本详情 -->
-        <div v-if="showVersionDetail" class="version-detail">
-          <div class="version-item">
-            <span class="item-label">前端</span>
-            <span class="item-value">{{ versions.fontBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">后端</span>
-            <span class="item-value">{{ versions.backendBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">数据库</span>
-            <span class="item-value">{{ versions.mysqlBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">AI Agent</span>
-            <span class="item-value">{{ versions.agentBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">WebHook</span>
-            <span class="item-value">{{ versions.webhookBranch || '-' }}</span>
-          </div>
         </div>
 
         <!-- 分隔线 -->
@@ -358,12 +341,6 @@ onMounted(() => {
   background: var(--color-bg-page);
   border-radius: 20px;
   font-size: 13px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.about-version-tag:active {
-  background: var(--color-border);
 }
 
 .version-label {
@@ -373,44 +350,6 @@ onMounted(() => {
 .version-value {
   color: var(--color-transfer);
   font-weight: 600;
-}
-
-.version-arrow {
-  color: var(--color-text-tertiary);
-  font-size: 12px;
-  margin-left: 2px;
-}
-
-/* 版本详情 */
-.version-detail {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: var(--color-bg-page);
-  border-radius: 12px;
-  text-align: left;
-}
-
-.version-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-}
-
-.version-item:not(:last-child) {
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.version-item .item-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.version-item .item-value {
-  font-size: 13px;
-  color: var(--color-text-primary);
-  font-weight: 500;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* 分隔线 */

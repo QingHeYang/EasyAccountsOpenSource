@@ -167,8 +167,8 @@ function testGetHomeInfoByYear() {
   handleRequest('getHomeInfoByYear', () => homeApi.getHomeInfoByYear(yearInput.value))
 }
 
-function testGetVersion() {
-  handleRequest('getVersion', () => homeApi.getVersion())
+function testGetSystemConfig() {
+  handleRequest('getSystemConfig', () => homeApi.getSystemConfig())
 }
 
 // Account API
@@ -384,8 +384,8 @@ function testUploadImage() {
           </el-button>
         </div>
 
-        <el-button type="primary" @click="testGetVersion" :loading="loading">
-          getVersion - 获取版本信息
+        <el-button type="primary" @click="testGetSystemConfig" :loading="loading">
+          getSystemConfig - 获取系统配置
         </el-button>
       </div>
     </el-card>

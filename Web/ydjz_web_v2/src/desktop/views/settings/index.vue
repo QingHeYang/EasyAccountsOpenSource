@@ -3,9 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Sunny,
-  Moon,
-  Monitor,
   SwitchButton,
   CreditCard,
   Wallet,
@@ -13,13 +10,11 @@ import {
   DocumentCopy,
   InfoFilled,
   ArrowRight,
-  ArrowDown,
-  ArrowUp,
   Close,
-  MagicStick
+  MagicStick,
+  Setting
 } from '@element-plus/icons-vue'
-import { useThemeStore } from '@shared/stores/theme'
-import { homeApi, type VersionInfo } from '@shared/api/home'
+import { homeApi, type VersionInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import logoUrl from '@shared/assets/logo.png'
 import './styles.css'
@@ -30,30 +25,17 @@ import AccountManager from './AccountManager.vue'
 import TypeManager from './TypeManager.vue'
 import TemplateManager from './TemplateManager.vue'
 import AiSettings from './AiSettings.vue'
+import SystemInfo from './SystemInfo.vue'
 
 const router = useRouter()
-const themeStore = useThemeStore()
 
 // AI 服务状态
 const aiHealth = ref<AiHealthResponse | null>(null)
 const aiServiceAvailable = computed(() => aiHealth.value !== null)
 const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === true)
 
-// 主题相关
-const themeOptions = [
-  { value: 'light', label: '浅色', icon: Sunny },
-  { value: 'dark', label: '深色', icon: Moon },
-  { value: 'system', label: '跟随系统', icon: Monitor },
-] as const
-
-const currentTheme = computed({
-  get: () => themeStore.mode,
-  set: (val) => themeStore.set(val as 'light' | 'dark' | 'system')
-})
-
 // 关于弹窗
 const showAbout = ref(false)
-const showVersionDetail = ref(false)
 const versions = ref<VersionInfo>({
   release: '',
   fontBranch: '',
@@ -62,20 +44,34 @@ const versions = ref<VersionInfo>({
   agentBranch: '',
   webhookBranch: '',
 })
+const authConfig = ref<AuthConfig | null>(null)
+const backupConfig = ref<BackupConfig | null>(null)
 
-async function loadVersion() {
+// 系统信息抽屉
+const showSystemInfo = ref(false)
+
+async function loadSystemConfig() {
   try {
-    const res = await homeApi.getVersion()
-    versions.value = res.data.data
+    const res = await homeApi.getSystemConfig()
+    versions.value = res.data.data.versions
+    authConfig.value = res.data.data.auth
+    backupConfig.value = res.data.data.backup
+    // 如果不需要认证，清除 token
+    if (authConfig.value && !authConfig.value.enable) {
+      localStorage.removeItem('token')
+    }
   } catch (err) {
-    console.error('获取版本信息失败', err)
+    console.error('获取系统配置失败', err)
   }
 }
+
+// 是否显示退出登录（需要认证才显示）
+const showLogout = computed(() => authConfig.value?.enable !== false)
 
 function openAbout() {
   showAbout.value = true
   if (!versions.value.release) {
-    loadVersion()
+    loadSystemConfig()
   }
 }
 
@@ -92,7 +88,7 @@ function onLogout() {
   }).catch(() => {})
 }
 
-// 数据管理项（不含 AI，AI 单独处理）
+// 数据管理项
 const dataItems = [
   { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: CreditCard },
   { key: 'account', title: '账户管理', desc: '管理银行卡、现金等账户', icon: Wallet },
@@ -100,8 +96,11 @@ const dataItems = [
   { key: 'template', title: '快记模板', desc: '快速记账模板', icon: DocumentCopy },
 ]
 
-// AI 设置项
-const aiItem = { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick }
+// 系统管理项
+const systemItems = [
+  { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick },
+  { key: 'systemInfo', title: '系统信息', desc: '版本、认证与备份信息', icon: Setting },
+]
 
 // 检测 AI 服务
 async function checkAiService() {
@@ -173,11 +172,13 @@ function openDrawer(key: string) {
       return
     }
     showAiDrawer.value = true
+  } else if (key === 'systemInfo') {
+    showSystemInfo.value = true
   }
 }
 
 onMounted(() => {
-  loadVersion()
+  loadSystemConfig()
   checkAiService()
 })
 </script>
@@ -206,6 +207,13 @@ onMounted(() => {
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
+        </div>
+      </div>
+
+      <!-- 系统管理 -->
+      <div class="setting-section">
+        <h2 class="section-title">系统管理</h2>
+        <div class="data-grid">
           <!-- AI 设置卡片 (仅在 AI 服务可用时显示) -->
           <div
             v-if="aiServiceAvailable"
@@ -214,38 +222,28 @@ onMounted(() => {
             @click="openDrawer('ai')"
           >
             <div class="card-icon ai-icon">
-              <el-icon :size="24"><component :is="aiItem.icon" /></el-icon>
+              <el-icon :size="24"><MagicStick /></el-icon>
             </div>
             <div class="card-info">
               <div class="card-title">
-                {{ aiItem.title }}
+                AI+ 设置
                 <el-tag v-if="!aiConfigured" size="small" type="warning" style="margin-left: 8px;">未配置</el-tag>
               </div>
-              <div class="card-desc">{{ aiItem.desc }}</div>
+              <div class="card-desc">Token 统计与 MCP 状态</div>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
-        </div>
-      </div>
-
-      <!-- 外观设置 -->
-      <div class="setting-section">
-        <h2 class="section-title">外观</h2>
-        <div class="appearance-card">
-          <div class="appearance-label">
-            <el-icon :size="20"><Monitor /></el-icon>
-            <span>主题模式</span>
+          <!-- 系统信息卡片 -->
+          <div class="data-card" @click="openDrawer('systemInfo')">
+            <div class="card-icon system-icon">
+              <el-icon :size="24"><Setting /></el-icon>
+            </div>
+            <div class="card-info">
+              <div class="card-title">系统信息</div>
+              <div class="card-desc">版本、认证与备份信息</div>
+            </div>
+            <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
-          <el-radio-group v-model="currentTheme" class="theme-radio-group">
-            <el-radio-button
-              v-for="opt in themeOptions"
-              :key="opt.value"
-              :value="opt.value"
-            >
-              <el-icon><component :is="opt.icon" /></el-icon>
-              <span>{{ opt.label }}</span>
-            </el-radio-button>
-          </el-radio-group>
         </div>
       </div>
 
@@ -257,7 +255,7 @@ onMounted(() => {
             <el-icon><InfoFilled /></el-icon>
             <span>关于</span>
           </el-button>
-          <el-button size="large" type="danger" plain @click="onLogout">
+          <el-button v-if="showLogout" size="large" type="danger" plain @click="onLogout">
             <el-icon><SwitchButton /></el-icon>
             <span>退出登录</span>
           </el-button>
@@ -291,35 +289,10 @@ onMounted(() => {
         <!-- 副标题 -->
         <div class="about-slogan">认真生活, 好好记账</div>
 
-        <!-- 版本标签（可点击展开） -->
-        <div class="about-version-tag" @click="showVersionDetail = !showVersionDetail">
+        <!-- 版本标签 -->
+        <div class="about-version-tag">
           <span class="version-label">Version</span>
           <span class="version-value">{{ versions.release || '...' }}</span>
-          <el-icon class="version-arrow"><component :is="showVersionDetail ? ArrowUp : ArrowDown" /></el-icon>
-        </div>
-
-        <!-- 版本详情 -->
-        <div v-if="showVersionDetail" class="version-detail">
-          <div class="version-item">
-            <span class="item-label">前端</span>
-            <span class="item-value">{{ versions.fontBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">后端</span>
-            <span class="item-value">{{ versions.backendBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">数据库</span>
-            <span class="item-value">{{ versions.mysqlBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">AI Agent</span>
-            <span class="item-value">{{ versions.agentBranch || '-' }}</span>
-          </div>
-          <div class="version-item">
-            <span class="item-label">WebHook</span>
-            <span class="item-value">{{ versions.webhookBranch || '-' }}</span>
-          </div>
         </div>
 
         <!-- 分隔线 -->
@@ -359,6 +332,12 @@ onMounted(() => {
     <TypeManager v-model:visible="showTypeDrawer" />
     <TemplateManager v-model:visible="showTemplateDrawer" />
     <AiSettings v-model:visible="showAiDrawer" />
+    <SystemInfo
+      v-model:visible="showSystemInfo"
+      :versions="versions"
+      :auth-config="authConfig"
+      :backup-config="backupConfig"
+    />
   </div>
 </template>
 
@@ -466,49 +445,9 @@ onMounted(() => {
   background: var(--color-text-tertiary);
 }
 
-/* 外观设置 */
-.appearance-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.appearance-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-}
-
-.theme-radio-group {
-  display: flex;
-  gap: 8px;
-}
-
-.theme-radio-group :deep(.el-radio-button__inner) {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 10px !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.theme-radio-group :deep(.el-radio-button:first-child .el-radio-button__inner) {
-  border-radius: 10px !important;
-}
-
-.theme-radio-group :deep(.el-radio-button:last-child .el-radio-button__inner) {
-  border-radius: 10px !important;
+/* 系统信息卡片样式 */
+.card-icon.system-icon {
+  background: var(--color-transfer);
 }
 
 /* 其他操作 */
@@ -600,12 +539,6 @@ onMounted(() => {
   background: var(--color-bg-page);
   border-radius: 20px;
   font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.about-version-tag:hover {
-  background: var(--color-border);
 }
 
 .version-label {
@@ -615,45 +548,6 @@ onMounted(() => {
 .version-value {
   color: var(--color-transfer);
   font-weight: 600;
-}
-
-.version-arrow {
-  color: var(--color-text-tertiary);
-  font-size: 12px;
-  margin-left: 2px;
-}
-
-/* 版本详情 */
-.version-detail {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--color-bg-page);
-  border-radius: 12px;
-  text-align: left;
-  width: 100%;
-}
-
-.version-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-}
-
-.version-item:not(:last-child) {
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.version-item .item-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.version-item .item-value {
-  font-size: 13px;
-  color: var(--color-text-primary);
-  font-weight: 500;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .developer-card {
@@ -749,11 +643,6 @@ html.dark .data-card {
 
 html.dark .data-card:hover {
   background: rgba(50, 50, 50, 0.8);
-}
-
-html.dark .appearance-card {
-  background: rgba(40, 40, 40, 0.6);
-  border-color: rgba(255, 255, 255, 0.1);
 }
 
 html.dark .developer-card:hover {
