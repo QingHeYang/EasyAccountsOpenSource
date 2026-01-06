@@ -1,6 +1,0 @@
-curl --location --request GET 'http://localhost:8001/api/v1/conversations/conv_1ad2420d-1bb2-45b6-b8e9-924461ff5183/messages' \
---header 'user_id: user_67ce21d6-a11c-4340-851b-7a8949906aa3' \
---header 'User-Agent: Apifox/1.0.0 (https://apifox.com)' \
---header 'Accept: */*' \
---header 'Host: localhost:8001' \
---header 'Connection: keep-alive'
