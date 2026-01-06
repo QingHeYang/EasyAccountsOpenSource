@@ -11,6 +11,8 @@ import com.deepblue.yd_jz.entity.FlowImage;
 import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.dao.jpa.TypeRepository;
 import com.deepblue.yd_jz.entity.Type;
+import com.deepblue.yd_jz.exception.BusinessException;
+import com.deepblue.yd_jz.exception.ErrorCode;
 import com.deepblue.yd_jz.utils.ContentValues;
 import com.deepblue.yd_jz.utils.LogUtils;
 import com.deepblue.yd_jz.utils.MoneyUtils;
@@ -58,7 +60,7 @@ public class FlowService {
         // 校验分类：有子分类的父分类不允许直接记账
         List<Type> subTypes = typeRepository.findByParent(flowAddRequestDto.getTypeId());
         if (subTypes != null && !subTypes.isEmpty()) {
-            throw new Exception("该分类有子分类，请选择子分类记账");
+            throw new BusinessException(ErrorCode.TYPE_HAS_CHILDREN, "该分类有子分类，请选择子分类记账");
         }
 
         String log = "新增flow\n"+"金额： "+ flowAddRequestDto.getMoney()+"";
@@ -90,13 +92,13 @@ public class FlowService {
                 break;
             case ContentValues.ACTION_SUB:
                 if (accountMoney.compareTo(flowMoney) < 0) {
-                    throw new Exception("减少金额不允许大于账户金额");
+                    throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
                 }
                 account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account, action.isExempt());
                 break;
             case ContentValues.ACTION_INNER:
                 if (accountMoney.compareTo(flowMoney) < 0) {
-                    throw new Exception("减少金额不允许大于账户金额");
+                    throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
                 }
                 toAccount = accountService.getOriginAccountById(flowAddRequestDto.getAccountToId());
                 toAccount = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), toAccount, action.isExempt());
@@ -128,7 +130,7 @@ public class FlowService {
         // 校验分类：有子分类的父分类不允许直接记账
         List<Type> subTypes = typeRepository.findByParent(flowAddRequestDto.getTypeId());
         if (subTypes != null && !subTypes.isEmpty()) {
-            throw new Exception("该分类有子分类，请选择子分类记账");
+            throw new BusinessException(ErrorCode.TYPE_HAS_CHILDREN, "该分类有子分类，请选择子分类记账");
         }
 
         // 处理from字段：如果没有传入from字段，则置空
