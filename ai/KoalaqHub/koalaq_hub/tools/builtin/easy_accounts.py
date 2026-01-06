@@ -590,23 +590,27 @@ class AddFlowTool(BaseTool):
                     json=payload
                 )
 
-                if response.status_code == 200:
-                    resp_data = response.json()
-                    # data 是对象 {"id": 123}
-                    flow_id = None
-                    if isinstance(resp_data, dict) and isinstance(resp_data.get("data"), dict):
-                        flow_id = resp_data["data"].get("id")
-
-                    return self._success(result=json.dumps({
-                        "success": True,
-                        "message": "流水添加成功",
-                        "flowId": flow_id  # 前端可直接用于查看详情
-                    }, ensure_ascii=False))
-                elif response.status_code == 401:
+                if response.status_code == 401:
                     return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
-                else:
-                    error_msg = response.json().get('msg', response.text) if response.text else "未知错误"
-                    return self._error(error=f"添加流水失败: {error_msg}")
+
+                resp_data = response.json()
+
+                # 检查业务错误码（HTTP 200 但 code 不为 0）
+                if resp_data.get("code") != 0:
+                    error_code = resp_data.get("code")
+                    error_msg = resp_data.get("msg", "未知错误")
+                    return self._error(error=f"记账失败[{error_code}]: {error_msg}")
+
+                # 成功：data 是对象 {"id": 123}
+                flow_id = None
+                if isinstance(resp_data.get("data"), dict):
+                    flow_id = resp_data["data"].get("id")
+
+                return self._success(result=json.dumps({
+                    "success": True,
+                    "message": "流水添加成功",
+                    "flowId": flow_id  # 前端可直接用于查看详情
+                }, ensure_ascii=False))
         except Exception as e:
             return self._error(error=f"添加流水失败: {str(e)}")
 
@@ -655,17 +659,22 @@ class UpdateFlowTool(BaseTool):
                     json=payload
                 )
 
-                if response.status_code == 200:
-                    return self._success(result=json.dumps({
-                        "success": True,
-                        "message": f"流水ID={flow_id}更新成功",
-                        "flowId": flow_id  # 前端可直接用于查看详情
-                    }, ensure_ascii=False))
-                elif response.status_code == 401:
+                if response.status_code == 401:
                     return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
-                else:
-                    error_msg = response.json().get('msg', response.text) if response.text else "未知错误"
-                    return self._error(error=f"更新流水失败: {error_msg}")
+
+                resp_data = response.json()
+
+                # 检查业务错误码（HTTP 200 但 code 不为 0）
+                if resp_data.get("code") != 0:
+                    error_code = resp_data.get("code")
+                    error_msg = resp_data.get("msg", "未知错误")
+                    return self._error(error=f"更新失败[{error_code}]: {error_msg}")
+
+                return self._success(result=json.dumps({
+                    "success": True,
+                    "message": f"流水ID={flow_id}更新成功",
+                    "flowId": flow_id  # 前端可直接用于查看详情
+                }, ensure_ascii=False))
         except Exception as e:
             return self._error(error=f"更新流水失败: {str(e)}")
 

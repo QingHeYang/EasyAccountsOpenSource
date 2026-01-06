@@ -59,7 +59,3 @@ CLAUDE.md
 
 ### Local config (contains sensitive data) ###
 **/application-local.properties
-
-### Outputs (generated files, keep structure only) ###
-outputs/**/*
-!outputs/**/.gitkeep

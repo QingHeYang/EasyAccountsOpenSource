@@ -27,28 +27,28 @@ server.port=8085
 spring.main.allow-circular-references=true
 
 # =====================================================
-# 文件路径配置
+# 文件路径配置（必须使用绝对路径）
 # =====================================================
-# Excel 模板路径（相对路径，相对于 YD_JZ 目录）
-baseAutoExcel=./excel_template/auto_excel.xlsx
-baseScreenExcel=./excel_template/screen_excel.xlsx
+# Excel 模板路径（指向 YD_JZ/excel_template 目录）
+baseAutoExcel=D:/你的项目路径/Server/YD_JZ/excel_template/auto_excel.xlsx
+baseScreenExcel=D:/你的项目路径/Server/YD_JZ/excel_template/screen_excel.xlsx
 
-# Excel 输出路径（相对路径，相对于 YD_JZ 目录）
-excelAutoFolder=./outputs/excel/month/
-excelScreenFolder=./outputs/excel/screen/
-excelAnalysisFolder=./outputs/excel/analysis/
+# Excel 输出路径（自行创建目录）
+excelAutoFolder=D:/你的输出路径/excel/month/
+excelScreenFolder=D:/你的输出路径/excel/screen/
+excelAnalysisFolder=D:/你的输出路径/excel/analysis/
 
 # 图片上传路径
-image.upload.path=./outputs/images/
+image.upload.path=D:/你的输出路径/images/
 
 # 认证文件路径
-auth.folder=./outputs/auth/
+auth.folder=D:/你的输出路径/auth/
 
 # =====================================================
 # SQL 备份配置
 # =====================================================
 # 备份文件路径
-sqlBackUpFolder=./outputs/backup/
+sqlBackUpFolder=D:/你的输出路径/backup/
 
 # 备份命令（Windows 需配置 mysqldump 路径）
 sqldumpCmd=mysqldump -h localhost -P 3306 -uroot -p你的数据库密码 --databases yd_jz >
