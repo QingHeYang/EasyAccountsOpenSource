@@ -34,8 +34,18 @@ public class QwenBean {
         this.apiKey = apiKey;
     }
 
+    /**
+     * 检查 API Key 是否已配置
+     */
+    private void checkApiKey() {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new IllegalStateException("通义千问 API Key 未配置，请在配置文件中设置 qwen.client.api-key");
+        }
+    }
+
     public String ocrConversationCall(String filePath)
             throws ApiException, NoApiKeyException, UploadFileException {
+        checkApiKey();
         MultiModalConversation conv = new MultiModalConversation();
         Map<String, Object> map = new HashMap<>();
         map.put("image", filePath);

@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import Vant, { showNotify } from 'vant'
+import Vant, { showFailToast } from 'vant'
 import 'vant/lib/index.css'
 import '@shared/styles/theme.css'
 import './mobile/styles/base.css'
@@ -26,8 +26,7 @@ setupRequest({
     router.replace({ path: '/auth', query: { redirect, mode: '1' } })
   },
   onError: (_code, msg) => {
-    // Mobile 使用 Vant 通知（只显示消息，不显示错误码）
-    showNotify({ type: 'warning', message: msg })
+    showFailToast(msg)
   },
 })
 

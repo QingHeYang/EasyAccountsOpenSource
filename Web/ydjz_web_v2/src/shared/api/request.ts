@@ -60,10 +60,10 @@ export function isHandledError(error: unknown): boolean {
 }
 
 /**
- * 认证相关错误码
+ * 需要跳转登录页的错误码
+ * 注意：不含 401，因为登录接口用 401 表示密码错误
  */
 const AUTH_ERROR_CODES = [
-  ApiCode.UNAUTHORIZED,    // 401
   ApiCode.NOT_REGISTERED,  // 418
   ApiCode.NEED_VERIFY,     // 4010
   ApiCode.NEED_VERIFY_2,   // 4011
@@ -109,10 +109,10 @@ function createAxiosInstance(baseURL: string, timeout: number): AxiosInstance {
         return response
       }
 
-      // 认证相关错误（401/418/4010/4011）
+      // 认证相关错误（418/4010/4011）- 需要跳转登录页
       if (AUTH_ERROR_CODES.includes(code)) {
-        // 清除 token（401/418 需要重新登录）
-        if (code === ApiCode.UNAUTHORIZED || code === ApiCode.NOT_REGISTERED) {
+        // 418 未注册时清除 token
+        if (code === ApiCode.NOT_REGISTERED) {
           localStorage.removeItem('token')
         }
         // 调用认证错误回调（跳转登录页等）

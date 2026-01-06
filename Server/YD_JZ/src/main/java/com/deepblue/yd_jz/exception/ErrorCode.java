@@ -20,6 +20,7 @@ public enum ErrorCode {
     SUCCESS(0, "操作成功"),
 
     // ==================== 参数校验错误 40xxx ====================
+    PARAM_ERROR(40000, "参数错误"),
     PARAM_REQUIRED(40001, "参数不能为空"),
     PARAM_FORMAT_ERROR(40002, "参数格式错误"),
     PARAM_INVALID(40003, "参数值非法"),
