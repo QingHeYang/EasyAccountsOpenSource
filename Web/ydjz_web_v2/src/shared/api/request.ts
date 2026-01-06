@@ -25,6 +25,50 @@ export interface RequestOptions {
   onError?: ErrorHandler
 }
 
+/**
+ * API 错误类型
+ */
+export class ApiError extends Error {
+  /** 错误码 */
+  code: number
+  /** 是否为认证错误（已由拦截器处理，业务代码可忽略） */
+  isAuthError: boolean
+  /** 是否已全局处理（业务代码可忽略） */
+  handled: boolean
+
+  constructor(code: number, message: string, isAuthError = false, handled = false) {
+    super(message)
+    this.name = 'ApiError'
+    this.code = code
+    this.isAuthError = isAuthError
+    this.handled = handled
+  }
+}
+
+/**
+ * 判断是否为认证错误（业务代码可用此判断是否需要显示错误提示）
+ */
+export function isAuthError(error: unknown): boolean {
+  return error instanceof ApiError && error.isAuthError
+}
+
+/**
+ * 判断错误是否已被全局处理
+ */
+export function isHandledError(error: unknown): boolean {
+  return error instanceof ApiError && error.handled
+}
+
+/**
+ * 认证相关错误码
+ */
+const AUTH_ERROR_CODES = [
+  ApiCode.UNAUTHORIZED,    // 401
+  ApiCode.NOT_REGISTERED,  // 418
+  ApiCode.NEED_VERIFY,     // 4010
+  ApiCode.NEED_VERIFY_2,   // 4011
+]
+
 /** 全局请求实例 */
 let requestInstance: AxiosInstance | null = null
 
@@ -65,50 +109,38 @@ function createAxiosInstance(baseURL: string, timeout: number): AxiosInstance {
         return response
       }
 
-      // 未登录/token过期
-      if (code === ApiCode.UNAUTHORIZED) {
-        localStorage.removeItem('token')
+      // 认证相关错误（401/418/4010/4011）
+      if (AUTH_ERROR_CODES.includes(code)) {
+        // 清除 token（401/418 需要重新登录）
+        if (code === ApiCode.UNAUTHORIZED || code === ApiCode.NOT_REGISTERED) {
+          localStorage.removeItem('token')
+        }
+        // 调用认证错误回调（跳转登录页等）
         globalHandlers.onUnauthorized?.(code)
-        return response
+        // 抛出认证错误，标记为已处理，业务代码可忽略
+        return Promise.reject(new ApiError(code, '登录已过期，请重新登录', true, true))
       }
 
-      // 未注册
-      if (code === ApiCode.NOT_REGISTERED) {
-        localStorage.removeItem('token')
-        globalHandlers.onUnauthorized?.(code)
-        return response
-      }
-
-      // 需要验证
-      if (code === ApiCode.NEED_VERIFY || code === ApiCode.NEED_VERIFY_2) {
-        globalHandlers.onUnauthorized?.(code)
-        return response
-      }
-
-      // 其他业务错误
+      // 其他业务错误 - 调用全局错误回调
       globalHandlers.onError?.(code, msg)
-      return response
+      // 抛出业务错误，标记为已全局处理
+      return Promise.reject(new ApiError(code, msg, false, true))
     },
     (error) => {
       const status = error.response?.status
-      const msg = error.response?.statusText || error.message
+      const data = error.response?.data as ApiResponse | undefined
+      const msg = data?.msg || error.response?.statusText || error.message || '网络错误'
 
-      // HTTP 401
-      if (status === 401) {
+      // HTTP 401/418 - 认证错误
+      if (status === 401 || status === 418) {
         localStorage.removeItem('token')
-        globalHandlers.onUnauthorized?.(401)
+        globalHandlers.onUnauthorized?.(status)
+        return Promise.reject(new ApiError(status, '登录已过期，请重新登录', true, true))
       }
-      // HTTP 418
-      else if (status === 418) {
-        localStorage.removeItem('token')
-        globalHandlers.onUnauthorized?.(418)
-      }
+
       // 其他 HTTP 错误
-      else {
-        globalHandlers.onError?.(status || 0, msg)
-      }
-
-      return Promise.reject(error)
+      globalHandlers.onError?.(status || 0, msg)
+      return Promise.reject(new ApiError(status || 0, msg, false, true))
     }
   )
 

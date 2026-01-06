@@ -1,5 +1,5 @@
 // 请求工具
-export { setupRequest, getRequest } from './request'
+export { setupRequest, getRequest, ApiError, isAuthError, isHandledError } from './request'
 export type { RequestOptions } from './request'
 
 // AI 请求工具

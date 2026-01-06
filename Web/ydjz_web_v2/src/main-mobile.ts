@@ -25,9 +25,9 @@ setupRequest({
     // 未登录/过期 -> 登录模式（使用 replace，不留历史记录）
     router.replace({ path: '/auth', query: { redirect, mode: '1' } })
   },
-  onError: (code, msg) => {
-    // Mobile 使用 Vant 通知
-    showNotify({ type: 'warning', message: `${code}\n${msg}` })
+  onError: (_code, msg) => {
+    // Mobile 使用 Vant 通知（只显示消息，不显示错误码）
+    showNotify({ type: 'warning', message: msg })
   },
 })
 

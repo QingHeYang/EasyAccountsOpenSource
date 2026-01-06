@@ -38,10 +38,10 @@ setupRequest({
     // 未登录/过期 -> 登录页 (mode=1)
     router.push({ path: '/auth', query: { redirect: currentPath, mode: '1' } })
   },
-  onError: (code, msg) => {
-    // Desktop 使用 Element Plus 消息提示
+  onError: (_code, msg) => {
+    // Desktop 使用 Element Plus 消息提示（只显示消息，不显示错误码）
     import('element-plus').then(({ ElMessage }) => {
-      ElMessage.error(`${code}: ${msg}`)
+      ElMessage.error(msg)
     })
   },
 })

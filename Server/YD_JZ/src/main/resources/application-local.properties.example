@@ -29,26 +29,26 @@ spring.main.allow-circular-references=true
 # =====================================================
 # 文件路径配置
 # =====================================================
-# Excel 模板路径
-baseAutoExcel=D:/EasyAccounts/excel_template/auto_excel.xlsx
-baseScreenExcel=D:/EasyAccounts/excel_template/screen_excel.xlsx
+# Excel 模板路径（相对路径，相对于 YD_JZ 目录）
+baseAutoExcel=./excel_template/auto_excel.xlsx
+baseScreenExcel=./excel_template/screen_excel.xlsx
 
-# Excel 输出路径
-excelAutoFolder=D:/EasyAccounts/excel/month/
-excelScreenFolder=D:/EasyAccounts/excel/screen/
-excelAnalysisFolder=D:/EasyAccounts/excel/analysis/
+# Excel 输出路径（相对路径，相对于 YD_JZ 目录）
+excelAutoFolder=./outputs/excel/month/
+excelScreenFolder=./outputs/excel/screen/
+excelAnalysisFolder=./outputs/excel/analysis/
 
 # 图片上传路径
-image.upload.path=D:/EasyAccounts/images/
+image.upload.path=./outputs/images/
 
 # 认证文件路径
-auth.folder=D:/EasyAccounts/auth/
+auth.folder=./outputs/auth/
 
 # =====================================================
 # SQL 备份配置
 # =====================================================
 # 备份文件路径
-sqlBackUpFolder=D:/EasyAccounts/backup/
+sqlBackUpFolder=./outputs/backup/
 
 # 备份命令（Windows 需配置 mysqldump 路径）
 sqldumpCmd=mysqldump -h localhost -P 3306 -uroot -p你的数据库密码 --databases yd_jz >

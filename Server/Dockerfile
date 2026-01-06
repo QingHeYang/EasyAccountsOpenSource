@@ -26,7 +26,7 @@ RUN mkdir -p /Ledger/config/ /Ledger/excel/month/ /Ledger/excel/screen/ /Ledger/
     && chmod -R 777 /Ledger
 
 # 复制 excel_template 目录下的 xlsx 文件到容器内的 /Ledger/excel_template/ 目录
-COPY excel_template/*.xlsx /Ledger/excel_template/
+COPY YD_JZ/excel_template/*.xlsx /Ledger/excel_template/
 
 # 复制编译好的 JAR 文件到容器内的 /Ledger/app/ 目录
 COPY YD_JZ/target/YD_JZ-SNAPSHOT.jar /Ledger/app/
