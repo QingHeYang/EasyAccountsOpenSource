@@ -1,6 +1,5 @@
 {
   "namespace": "775495797",
-  "aliyun_registry": "registry.cn-beijing.aliyuncs.com/easy_accounts",
   "components": {
     "server": {
       "version": "2.5.1",

@@ -31,7 +31,6 @@ check_jq() {
 # 读取配置
 read_config() {
     NAMESPACE=$(jq -r '.namespace' "$CONFIG_FILE")
-    ALIYUN_REGISTRY=$(jq -r '.aliyun_registry' "$CONFIG_FILE")
 }
 
 # 获取组件信息
@@ -170,53 +169,15 @@ push_dockerhub() {
     echo -e "${GREEN}✓ Docker Hub 推送成功${NC}"
 }
 
-# 上传单个组件到阿里云
-push_aliyun() {
-    local component=$1
-    local version=$(get_component_info "$component" "version")
-    local image=$(get_component_info "$component" "image")
-    local source_image="${NAMESPACE}/${image}"
-    local aliyun_image="${ALIYUN_REGISTRY}/${image}"
-
-    echo -e "${YELLOW}推送到阿里云: ${aliyun_image}${NC}"
-
-    # 打阿里云标签
-    docker tag "${source_image}:${version}" "${aliyun_image}:${version}"
-    docker tag "${source_image}:latest" "${aliyun_image}:latest"
-
-    # 推送（禁用代理）
-    env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker push "${aliyun_image}:${version}"
-    env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker push "${aliyun_image}:latest"
-
-    echo -e "${GREEN}✓ 阿里云推送成功${NC}"
-}
-
 # 上传菜单
 upload_menu() {
     echo ""
     echo -e "${CYAN}========================================${NC}"
-    echo -e "${CYAN}       上传镜像${NC}"
+    echo -e "${CYAN}       上传镜像到 Docker Hub${NC}"
     echo -e "${CYAN}========================================${NC}"
     echo ""
     echo -e "  Docker Hub:  ${BLUE}${NAMESPACE}${NC}"
-    echo -e "  阿里云:      ${BLUE}${ALIYUN_REGISTRY}${NC}"
     echo ""
-    echo -e "${YELLOW}选择上传目标:${NC}"
-    echo ""
-    echo "  1) 上传到 Docker Hub"
-    echo "  2) 上传到阿里云"
-    echo "  3) 上传到两个平台"
-    echo "  0) 返回"
-    echo ""
-    read -p "请选择: " platform_choice
-
-    case $platform_choice in
-        1) upload_platform="dockerhub" ;;
-        2) upload_platform="aliyun" ;;
-        3) upload_platform="both" ;;
-        0) return ;;
-        *) echo -e "${RED}无效选择${NC}"; sleep 1; return ;;
-    esac
 
     echo ""
     echo -e "${YELLOW}选择要上传的组件:${NC}"
@@ -251,19 +212,7 @@ upload_menu() {
         echo -e "${BLUE}----------------------------------------${NC}"
         echo -e "${BLUE}  上传: ${comp}${NC}"
         echo -e "${BLUE}----------------------------------------${NC}"
-
-        case $upload_platform in
-            dockerhub)
-                push_dockerhub "$comp"
-                ;;
-            aliyun)
-                push_aliyun "$comp"
-                ;;
-            both)
-                push_dockerhub "$comp"
-                push_aliyun "$comp"
-                ;;
-        esac
+        push_dockerhub "$comp"
         echo ""
     done
 
