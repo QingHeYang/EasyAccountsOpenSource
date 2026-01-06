@@ -72,7 +72,7 @@ show_versions() {
     printf "  %-12s %-20s %s\n" "组件" "镜像名" "版本"
     echo "  ----------------------------------------"
 
-    for component in server web webhook ai; do
+    for component in server web webhook ai mysql; do
         local version=$(get_component_info "$component" "version")
         local image=$(get_component_info "$component" "image")
         printf "  %-12s %-20s ${GREEN}%s${NC}\n" "$component" "$image" "$version"
@@ -225,7 +225,8 @@ upload_menu() {
     echo "  2) Web"
     echo "  3) WebHook"
     echo "  4) AI"
-    echo "  5) 全部"
+    echo "  5) MySQL"
+    echo "  6) 全部"
     echo "  0) 返回"
     echo ""
     read -p "请选择: " component_choice
@@ -236,7 +237,8 @@ upload_menu() {
         2) components=("web") ;;
         3) components=("webhook") ;;
         4) components=("ai") ;;
-        5) components=("server" "web" "webhook" "ai") ;;
+        5) components=("mysql") ;;
+        6) components=("server" "web" "webhook" "ai" "mysql") ;;
         0) return ;;
         *) echo -e "${RED}无效选择${NC}"; sleep 1; return ;;
     esac
@@ -289,15 +291,16 @@ show_menu() {
     echo "  2) 构建 Web     (前端)"
     echo "  3) 构建 WebHook (通知服务)"
     echo "  4) 构建 AI      (AI服务)"
-    echo "  5) 构建全部"
+    echo "  5) 构建 MySQL   (数据库镜像)"
+    echo "  6) 构建全部 (不含MySQL)"
     echo ""
     echo -e "  ${BLUE}[上传]${NC}"
-    echo "  6) 上传镜像"
+    echo "  7) 上传镜像"
     echo ""
     echo -e "  ${BLUE}[管理]${NC}"
-    echo "  7) 修改版本号"
-    echo "  8) 查看镜像列表"
-    echo "  9) 查看版本历史"
+    echo "  8) 修改版本号"
+    echo "  9) 查看镜像列表"
+    echo "  h) 查看版本历史"
     echo ""
     echo "  0) 退出"
     echo ""
@@ -312,7 +315,8 @@ modify_version_menu() {
     echo "  2) Web"
     echo "  3) WebHook"
     echo "  4) AI"
-    echo "  5) 全部修改"
+    echo "  5) MySQL"
+    echo "  6) 全部修改"
     echo "  0) 返回"
     echo ""
     read -p "请选择: " choice
@@ -335,6 +339,10 @@ modify_version_menu() {
             [ -n "$ver" ] && update_version "ai" "$ver"
             ;;
         5)
+            read -p "输入 MySQL 新版本: " ver
+            [ -n "$ver" ] && update_version "mysql" "$ver"
+            ;;
+        6)
             read -p "输入 Server 新版本: " ver
             [ -n "$ver" ] && update_version "server" "$ver"
             read -p "输入 Web 新版本: " ver
@@ -343,6 +351,8 @@ modify_version_menu() {
             [ -n "$ver" ] && update_version "webhook" "$ver"
             read -p "输入 AI 新版本: " ver
             [ -n "$ver" ] && update_version "ai" "$ver"
+            read -p "输入 MySQL 新版本: " ver
+            [ -n "$ver" ] && update_version "mysql" "$ver"
             ;;
         0)
             return
@@ -423,11 +433,12 @@ main() {
             2) build_single "web" ;;
             3) build_single "webhook" ;;
             4) build_single "ai" ;;
-            5) build_all ;;
-            6) upload_menu ;;
-            7) modify_version_menu ;;
-            8) show_images ;;
-            9) show_history ;;
+            5) build_single "mysql" ;;
+            6) build_all ;;
+            7) upload_menu ;;
+            8) modify_version_menu ;;
+            9) show_images ;;
+            h|H) show_history ;;
             0)
                 echo ""
                 echo -e "${GREEN}再见!${NC}"

@@ -25,6 +25,12 @@
       "image": "easyaccounts-ai",
       "context": "ai",
       "pre_build": null
+    },
+    "mysql": {
+      "version": "1.0.0",
+      "image": "easyaccounts-mysql",
+      "context": "Server/MySQL",
+      "pre_build": null
     }
   }
 }
