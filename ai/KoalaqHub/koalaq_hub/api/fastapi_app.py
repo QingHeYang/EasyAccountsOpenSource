@@ -222,10 +222,24 @@ class FastAPIServer:
             llm_url = os.getenv("LLM_EASY_ACCOUNTS_URL", "")
             llm_model = os.getenv("LLM_EASY_ACCOUNTS_MODEL", "")
 
-            llm_configured = bool(llm_api_key and llm_url and llm_model)
+            # 占位符值列表（用户可能直接复制 .env.example 而不修改）
+            placeholder_values = [
+                "sk-your-openai-key-here",
+                "your_api_key",
+                "your-api-key",
+                "sk-xxx",
+                "sk-xxxxxxxx",
+            ]
+
+            # 检测是否为占位符值
+            api_key_valid = bool(llm_api_key) and llm_api_key.lower() not in [p.lower() for p in placeholder_values]
+
+            llm_configured = bool(api_key_valid and llm_url and llm_model)
             missing_configs = []
             if not llm_api_key:
                 missing_configs.append("LLM_EASY_ACCOUNTS_API_KEY")
+            elif not api_key_valid:
+                missing_configs.append("LLM_EASY_ACCOUNTS_API_KEY (当前为占位符值，请配置真实密钥)")
             if not llm_url:
                 missing_configs.append("LLM_EASY_ACCOUNTS_URL")
             if not llm_model:
