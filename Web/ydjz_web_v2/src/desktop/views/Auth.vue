@@ -131,8 +131,8 @@ function handleKeyEnter(e: KeyboardEvent) {
             <img :src="logoUrl" alt="Logo" class="logo-img" />
             <span class="app-name">EasyAccounts</span>
           </div>
-          <p class="slogan">Live slow, track flow.</p>
-          <p class="description">简洁高效的个人记账工具，帮助您轻松管理每一笔收支。</p>
+          <p class="slogan">Where flow goes, life shows</p>
+          <p class="slogan-cn">流水知去处，岁月自成诗</p>
         </div>
       </div>
 
@@ -321,10 +321,9 @@ function handleKeyEnter(e: KeyboardEvent) {
   font-style: italic;
 }
 
-.description {
-  margin-top: 24px;
+.slogan-cn {
+  margin-top: 8px;
   font-size: 16px;
-  line-height: 1.8;
   color: var(--color-text-secondary);
 }
 
