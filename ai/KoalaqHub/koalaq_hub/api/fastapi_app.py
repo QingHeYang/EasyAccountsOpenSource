@@ -222,9 +222,10 @@ class FastAPIServer:
             llm_url = os.getenv("LLM_EASY_ACCOUNTS_URL", "")
             llm_model = os.getenv("LLM_EASY_ACCOUNTS_MODEL", "")
 
-            # 占位符值列表（用户可能直接复制 .env.example 而不修改）
+            # 占位符值列表（用户可能直接复制 .env.example 或 docker-compose.yml 而不修改）
             placeholder_values = [
                 "sk-your-openai-key-here",
+                "sk-your-api-key-here",  # docker-compose.yml 中的默认值
                 "your_api_key",
                 "your-api-key",
                 "sk-xxx",
