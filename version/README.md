@@ -12,7 +12,7 @@
 |--------|------|----------|------|
 | `2.6.0-server-upgrade` | ✅ 已合并 | 2026-01-05 | Spring Boot 3.x 框架升级 |
 | `2.6.0-VL` | ✅ 已合并 | 2026-01-01 | VL 多模态图片识别记账 |
-| `2.6.0-EH` | 🔄 开发中 | - | API 错误处理优化 |
+| `2.6.0-EH` | ✅ 已合并 | 2026-01-06 | API 错误处理优化 |
 
 ### 2.6.0-server-upgrade 分支内容
 
@@ -63,6 +63,28 @@ f6fad03 revert(ai): 移除 add_flow/update_flow 的 images 参数
 **相关文档：**
 - `ai/KoalaqHub/docs/feature-guide/VL_改动方案.md`
 - `ai/KoalaqHub/docs/dev-guide/VL_运行流程.md`
+
+### 2.6.0-EH 分支内容
+
+**功能说明：** API 错误处理优化，统一业务异常返回格式，避免 HTTP 500 误报。
+
+**核心改动：**
+- 新增 `BusinessException` 业务异常类
+- 新增 `ErrorCode` 错误码枚举
+- 新增 `GlobalExceptionHandler` 全局异常处理器
+- `BaseDto` 添加 errorCode 字段
+
+**错误码规范：**
+| 范围 | 说明 |
+|------|------|
+| 1xxx | 通用错误 |
+| 2xxx | 账户相关 |
+| 3xxx | 流水相关 |
+| 4xxx | 分类相关 |
+
+**相关文档：**
+- `Server/docs/dev-guide/error-handling-guide.md`
+- `Server/docs/feature-guide/api-error-handling-design.md`
 
 ---
 
