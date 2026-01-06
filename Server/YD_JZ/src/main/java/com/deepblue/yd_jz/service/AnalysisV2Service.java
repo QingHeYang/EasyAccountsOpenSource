@@ -239,11 +239,12 @@ public class AnalysisV2Service {
             flows = flowRepository.findByFDateBetweenAndType(startDate, endDate, type.getId());
         } else {
             responseDto.setTypeName(type.getTName());
-            List<Type> types = typeRepository.findByParent(type.getId());
-            if (types == null || types.isEmpty()) {
-                flows = flowRepository.findByFDateBetweenAndType(startDate, endDate, type.getId());
-            } else {
-                for (Type subType : types) {
+            // 先查父分类自己的流水
+            flows = flowRepository.findByFDateBetweenAndType(startDate, endDate, type.getId());
+            // 再查子分类的流水
+            List<Type> subTypes = typeRepository.findByParent(type.getId());
+            if (subTypes != null && !subTypes.isEmpty()) {
+                for (Type subType : subTypes) {
                     List<FlowJpaEntity> subFlows = flowRepository.findByFDateBetweenAndType(startDate, endDate, subType.getId());
                     flows.addAll(subFlows);
                 }

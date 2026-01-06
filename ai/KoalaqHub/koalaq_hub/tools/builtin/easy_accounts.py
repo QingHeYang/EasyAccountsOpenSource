@@ -239,7 +239,7 @@ MAKE_EXCEL_PARAMS = [
 
 ACCOUNTS_DESC = "查询用户的资金账户列表。返回所有账户的ID、名称和余额信息。如果用户需要查询特定账户或需要账户ID，请使用该工具。"
 
-TYPES_DESC = "获取所有账单分类(标签)信息。返回分类的层级结构，包含分类ID、名称、父子关系和对应的actionId。如果用户需要查询分类ID或了解有哪些分类，请使用该工具。"
+TYPES_DESC = "获取所有账单分类(标签)信息。返回分类的层级结构，包含分类ID、名称、父子关系和对应的actionId。每个分类标注'可用'或'不可用'：有子分类的一级分类不可用，需使用其子分类；无子分类的一级分类和所有二级分类都可用。"
 
 CURRENT_DATE_DESC = "获取当前服务器日期。如果用户询问的问题涉及日期、周期、时间段，请使用该工具获取当前日期作为参考。返回yyyy-MM-dd格式的日期。"
 
@@ -253,10 +253,10 @@ FLOWS_DESC = (
 
 ADD_FLOW_DESC = (
     "添加一条流水记录。可以记录收入、支出或内部转账。"
-    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId 3.用current_date获取日期"
+    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId（只能使用标注为'可用'的分类） 3.用current_date获取日期"
 )
 
-UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。"
+UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。分类只能使用标注为'可用'的分类。"
 
 MAKE_EXCEL_DESC = (
     "根据流水查询条件生成Excel报表。参数与flows工具类似，输出为Excel文件下载链接。"
@@ -373,16 +373,20 @@ class TypesTool(BaseTool):
                 raw = response.json()
                 data = raw.get("data", []) if isinstance(raw, dict) and "data" in raw else (raw if isinstance(raw, list) else [])
 
-                def format_desc(cat):
+                def format_desc(cat, usable: bool):
                     action = cat.get("action")
+                    usable_str = "可用" if usable else "不可用"
                     if action:
-                        return f"id={cat.get('id')},name={cat.get('tname')},actionId={action.get('id')},handle={action.get('handle')},handleName={action.get('hname')}"
-                    return f"id={cat.get('id')},name={cat.get('tname')},actionId=null"
+                        return f"id={cat.get('id')},name={cat.get('tname')},actionId={action.get('id')},handle={action.get('handle')},handleName={action.get('hname')},{usable_str}"
+                    return f"id={cat.get('id')},name={cat.get('tname')},actionId=null,{usable_str}"
 
                 result = []
                 for cat in data:
-                    children = [format_desc(child) for child in cat.get("childrenTypes") or []]
-                    result.append({"description": format_desc(cat), "children": children})
+                    children_data = cat.get("childrenTypes") or []
+                    has_children = len(children_data) > 0
+                    # 一级分类有子分类则不可用，二级分类都可用
+                    children = [format_desc(child, usable=True) for child in children_data]
+                    result.append({"description": format_desc(cat, usable=not has_children), "children": children})
 
                 return self._success(result=json.dumps(result, ensure_ascii=False))
         except Exception as e:

@@ -583,6 +583,35 @@ function addMoney(...moneyList: (string | number)[]): number {
   }, 0)
 }
 
+// ==================== 删除 ====================
+async function onDelete() {
+  if (!flowId.value) return
+
+  try {
+    await showConfirmDialog({
+      title: '确认删除',
+      message: '删除后无法恢复，确定要删除这条账单吗？',
+      confirmButtonText: '删除',
+      confirmButtonColor: 'var(--color-expense)',
+    })
+  } catch {
+    return
+  }
+
+  showLoadingToast({ message: '删除中...', forbidClick: true })
+
+  try {
+    await flowApi.delete(flowId.value)
+    closeToast()
+    showToast('删除成功')
+    smartBack('/flow')
+  } catch (err) {
+    closeToast()
+    showToast('删除失败')
+    console.error(err)
+  }
+}
+
 // ==================== 提交 ====================
 async function onSubmit() {
   if (!validateForm()) return
@@ -893,13 +922,31 @@ watch(selectedTag, () => {
           <van-icon name="plus" size="16" />
           追加分账单
         </button>
+        <!-- 编辑模式：删除 + 保存 平分 -->
+        <div v-if="isEdit" class="button-row">
+          <button
+            class="delete-btn"
+            :disabled="flowNotFound"
+            @click="onDelete"
+          >
+            删除
+          </button>
+          <button
+            class="submit-btn"
+            :class="{ disabled: flowNotFound }"
+            :disabled="flowNotFound"
+            @click="onSubmit"
+          >
+            {{ flowNotFound ? '流水已删除' : '保存修改' }}
+          </button>
+        </div>
+        <!-- 新增模式：单独提交按钮 -->
         <button
-          class="submit-btn"
-          :class="{ disabled: flowNotFound }"
-          :disabled="flowNotFound"
+          v-else
+          class="submit-btn full"
           @click="onSubmit"
         >
-          {{ flowNotFound ? '流水已删除' : (isEdit ? '保存修改' : '提交账单') }}
+          提交账单
         </button>
       </div>
     </div>
@@ -1458,8 +1505,39 @@ watch(selectedTag, () => {
   opacity: 0.8;
 }
 
+/* 按钮行（平分布局） */
+.button-row {
+  display: flex;
+  gap: 12px;
+}
+
+.button-row .delete-btn,
+.button-row .submit-btn {
+  flex: 1;
+}
+
+.delete-btn {
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-expense);
+  background: var(--color-expense-bg);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.delete-btn:active {
+  opacity: 0.9;
+}
+
+.delete-btn:disabled {
+  background: var(--color-text-quaternary);
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
 .submit-btn {
-  width: 100%;
   padding: 16px;
   font-size: 16px;
   font-weight: 600;
@@ -1468,6 +1546,10 @@ watch(selectedTag, () => {
   border: none;
   border-radius: 14px;
   cursor: pointer;
+}
+
+.submit-btn.full {
+  width: 100%;
 }
 
 .submit-btn:active {

@@ -9,6 +9,7 @@ import com.deepblue.yd_jz.entity.Action;
 import com.deepblue.yd_jz.entity.Flow;
 import com.deepblue.yd_jz.entity.FlowImage;
 import com.deepblue.yd_jz.dao.mybatis.FlowDao;
+import com.deepblue.yd_jz.dao.jpa.TypeRepository;
 import com.deepblue.yd_jz.entity.Type;
 import com.deepblue.yd_jz.utils.ContentValues;
 import com.deepblue.yd_jz.utils.LogUtils;
@@ -41,7 +42,10 @@ public class FlowService {
 
     @Autowired
     TypeService typeService;
-    
+
+    @Autowired
+    TypeRepository typeRepository;
+
     @Autowired
     ImageService imageService;
 
@@ -50,6 +54,12 @@ public class FlowService {
     public int doAddFlow(FlowAddRequestDto flowAddRequestDto) throws Exception {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
+
+        // 校验分类：有子分类的父分类不允许直接记账
+        List<Type> subTypes = typeRepository.findByParent(flowAddRequestDto.getTypeId());
+        if (subTypes != null && !subTypes.isEmpty()) {
+            throw new Exception("该分类有子分类，请选择子分类记账");
+        }
 
         String log = "新增flow\n"+"金额： "+ flowAddRequestDto.getMoney()+"";
         LogUtils.log_print(log);
@@ -114,6 +124,12 @@ public class FlowService {
     public int doUpdateFlow(int id, FlowAddRequestDto flowAddRequestDto) throws Exception {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
+
+        // 校验分类：有子分类的父分类不允许直接记账
+        List<Type> subTypes = typeRepository.findByParent(flowAddRequestDto.getTypeId());
+        if (subTypes != null && !subTypes.isEmpty()) {
+            throw new Exception("该分类有子分类，请选择子分类记账");
+        }
 
         // 处理from字段：如果没有传入from字段，则置空
         if (flowAddRequestDto.getFrom() == null) {

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, Grid, List } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Grid, List, InfoFilled, View, Hide } from '@element-plus/icons-vue'
 import { homeApi, type HomeInfo } from '@shared/api/home'
 import { init, type EChartsOption } from '@shared/utils/echarts'
 import type { ECharts } from 'echarts/core'
@@ -18,6 +18,42 @@ const minYear = 2021
 
 // 布局模式：list | grid
 const layoutMode = ref<'list' | 'grid'>('list')
+
+// 图例说明弹窗
+const showLegendTip = ref(false)
+
+// 隐私模式
+const privacyMode = ref(false)
+
+function togglePrivacy() {
+  privacyMode.value = !privacyMode.value
+}
+
+// 隐私金额显示（不同区域不同星号数量）
+const PRIVACY_TOTAL = '*******'   // 总资产 7个
+const PRIVACY_ACCOUNT = '******'  // 账户明细 6个
+const PRIVACY_YEAR = '******'     // 年度收支 6个
+const PRIVACY_MONTH = '*****'     // 月度概览 5个
+
+function privacyTotal(amount: string | undefined): string {
+  if (privacyMode.value) return PRIVACY_TOTAL
+  return amount || '0.00'
+}
+
+function privacyAccount(amount: string | undefined): string {
+  if (privacyMode.value) return PRIVACY_ACCOUNT
+  return amount || '0.00'
+}
+
+function privacyYear(amount: string | number | undefined): string {
+  if (privacyMode.value) return PRIVACY_YEAR
+  return formatAmount(amount)
+}
+
+function privacyMonth(amount: string | number | undefined): string {
+  if (privacyMode.value) return PRIVACY_MONTH
+  return formatAmount(amount)
+}
 
 function toggleLayout() {
   layoutMode.value = layoutMode.value === 'list' ? 'grid' : 'list'
@@ -331,9 +367,17 @@ onMounted(() => {
       <div class="left-column">
         <!-- 总资产卡片 -->
         <div class="asset-card">
-          <div class="asset-label">总资产</div>
-          <div class="asset-amount">¥ {{ homeInfo?.totalAsset || '0.00' }}</div>
-          <div class="asset-net" v-if="showNetAsset">净资产 ¥ {{ homeInfo?.netAsset || '0.00' }}</div>
+          <div class="asset-header">
+            <div class="asset-label">总资产</div>
+            <button class="privacy-btn" @click="togglePrivacy">
+              <el-icon :size="18">
+                <Hide v-if="privacyMode" />
+                <View v-else />
+              </el-icon>
+            </button>
+          </div>
+          <div class="asset-amount">¥ {{ privacyTotal(homeInfo?.totalAsset) }}</div>
+          <div class="asset-net" v-if="showNetAsset">净资产 ¥ {{ privacyTotal(homeInfo?.netAsset) }}</div>
         </div>
 
         <!-- 年度统计卡片 -->
@@ -346,17 +390,17 @@ onMounted(() => {
           <div class="year-stats">
             <div class="stat-item">
               <span class="stat-label">收入</span>
-              <span class="stat-value income">{{ formatAmount(homeInfo?.yearIncome) }}</span>
+              <span class="stat-value income">{{ privacyYear(homeInfo?.yearIncome) }}</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
               <span class="stat-label">支出</span>
-              <span class="stat-value expense">{{ formatAmount(homeInfo?.yearOutCome) }}</span>
+              <span class="stat-value expense">{{ privacyYear(homeInfo?.yearOutCome) }}</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
               <span class="stat-label">结余</span>
-              <span class="stat-value balance">{{ formatAmount(homeInfo?.yearBalance) }}</span>
+              <span class="stat-value balance">{{ privacyYear(homeInfo?.yearBalance) }}</span>
             </div>
           </div>
         </div>
@@ -365,12 +409,20 @@ onMounted(() => {
         <div class="month-section">
           <div class="section-header">
             <h2 class="section-title">月度概览</h2>
-            <el-button
-              :icon="layoutMode === 'list' ? Grid : List"
-              circle
-              size="small"
-              @click="toggleLayout"
-            />
+            <div class="header-actions">
+              <el-button
+                :icon="InfoFilled"
+                circle
+                size="small"
+                @click="showLegendTip = true"
+              />
+              <el-button
+                :icon="layoutMode === 'list' ? Grid : List"
+                circle
+                size="small"
+                @click="toggleLayout"
+              />
+            </div>
           </div>
 
           <!-- List 布局 -->
@@ -383,14 +435,14 @@ onMounted(() => {
             >
               <span class="month-label">{{ item.month }}月</span>
               <span class="stat-num income">
-                <span :class="{ 'tag-max': isMaxIncome(item.month) }">+{{ formatAmount(item.income) }}</span>
+                <span :class="{ 'tag-max': isMaxIncome(item.month) && !privacyMode }">{{ privacyMode ? '' : '+' }}{{ privacyMonth(item.income) }}</span>
               </span>
               <span class="stat-num expense">
-                <span :class="{ 'tag-max': isMaxExpense(item.month) }">-{{ formatAmount(item.outcome) }}</span>
+                <span :class="{ 'tag-max': isMaxExpense(item.month) && !privacyMode }">{{ privacyMode ? '' : '-' }}{{ privacyMonth(item.outcome) }}</span>
               </span>
               <span class="stat-num balance">
-                <span :class="{ 'tag-max': isMaxBalance(item.month), 'tag-negative': isNegativeBalance(item.balance) }">
-                  {{ formatAmount(item.balance) }}
+                <span :class="{ 'tag-max': isMaxBalance(item.month) && !privacyMode, 'tag-negative': isNegativeBalance(item.balance) && !privacyMode }">
+                  {{ privacyMonth(item.balance) }}
                 </span>
               </span>
             </div>
@@ -409,20 +461,20 @@ onMounted(() => {
                 <div class="grid-stat income">
                   <span class="grid-label">收入</span>
                   <span class="grid-value">
-                    <span :class="{ 'tag-max': isMaxIncome(item.month) }">+{{ formatAmount(item.income) }}</span>
+                    <span :class="{ 'tag-max': isMaxIncome(item.month) && !privacyMode }">{{ privacyMode ? '' : '+' }}{{ privacyMonth(item.income) }}</span>
                   </span>
                 </div>
                 <div class="grid-stat expense">
                   <span class="grid-label">支出</span>
                   <span class="grid-value">
-                    <span :class="{ 'tag-max': isMaxExpense(item.month) }">-{{ formatAmount(item.outcome) }}</span>
+                    <span :class="{ 'tag-max': isMaxExpense(item.month) && !privacyMode }">{{ privacyMode ? '' : '-' }}{{ privacyMonth(item.outcome) }}</span>
                   </span>
                 </div>
                 <div class="grid-stat balance">
                   <span class="grid-label">结余</span>
                   <span class="grid-value">
-                    <span :class="{ 'tag-max': isMaxBalance(item.month), 'tag-negative': isNegativeBalance(item.balance) }">
-                      {{ formatAmount(item.balance) }}
+                    <span :class="{ 'tag-max': isMaxBalance(item.month) && !privacyMode, 'tag-negative': isNegativeBalance(item.balance) && !privacyMode }">
+                      {{ privacyMonth(item.balance) }}
                     </span>
                   </span>
                 </div>
@@ -439,6 +491,11 @@ onMounted(() => {
         <!-- 年度趋势图表（与左侧总资产+年度卡片对齐） -->
         <div class="chart-card">
           <div ref="chartRef" class="chart-container"></div>
+          <!-- 隐私蒙版 -->
+          <div v-if="privacyMode" class="chart-privacy-mask">
+            <el-icon :size="48"><Hide /></el-icon>
+            <span>隐私模式已开启</span>
+          </div>
         </div>
 
         <!-- 账户明细 -->
@@ -455,8 +512,8 @@ onMounted(() => {
                 <div class="account-note" v-if="acc.note">{{ acc.note }}</div>
               </div>
               <div class="account-amount">
-                <div class="account-asset">¥ {{ acc.accountAsset }}</div>
-                <div class="account-real" v-if="acc.realAsset">净 ¥ {{ acc.realAsset }}</div>
+                <div class="account-asset">¥ {{ privacyAccount(acc.accountAsset) }}</div>
+                <div class="account-real" v-if="acc.realAsset">净 ¥ {{ privacyMode ? PRIVACY_ACCOUNT : acc.realAsset }}</div>
               </div>
             </div>
           </div>
@@ -464,6 +521,36 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 图例说明弹窗 -->
+    <el-dialog
+      v-model="showLegendTip"
+      title="标记说明"
+      width="400px"
+      align-center
+    >
+      <div class="legend-dialog">
+        <div class="legend-item">
+          <span class="legend-sample max-income">+1,234.56</span>
+          <span class="legend-text">收入最高的月份</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-sample max-expense">-1,234.56</span>
+          <span class="legend-text">支出最高的月份</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-sample max-balance">1,234.56</span>
+          <span class="legend-text">结余最高的月份</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-sample negative-balance">-500.00</span>
+          <span class="legend-text">支出大于收入（负结余）</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showLegendTip = false">知道了</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -502,10 +589,34 @@ onMounted(() => {
   color: #fff;
 }
 
+.asset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
 .asset-label {
   font-size: 14px;
   opacity: 0.9;
-  margin-bottom: 12px;
+}
+
+.privacy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.privacy-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .asset-amount {
@@ -588,6 +699,7 @@ onMounted(() => {
 
 /* 图表卡片 - 高度与左侧总资产+年度卡片对齐 */
 .chart-card {
+  position: relative;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -597,12 +709,29 @@ onMounted(() => {
   height: calc(116px + 166px + 20px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .chart-container {
   flex: 1;
   width: 100%;
   min-height: 0;
+}
+
+/* 图表隐私蒙版 */
+.chart-privacy-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+  z-index: 10;
 }
 
 /* 月度概览 */
@@ -628,6 +757,11 @@ onMounted(() => {
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* 月度列表 */
@@ -860,6 +994,57 @@ onMounted(() => {
   color: var(--color-text-tertiary);
   margin-top: 2px;
 }
+
+/* 图例说明弹窗 */
+.legend-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--color-bg-page);
+  border-radius: 10px;
+}
+
+.legend-sample {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 100px;
+  text-align: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.legend-sample.max-income {
+  background: var(--color-income);
+  color: #fff;
+}
+
+.legend-sample.max-expense {
+  background: var(--color-expense);
+  color: #fff;
+}
+
+.legend-sample.max-balance {
+  background: var(--color-transfer);
+  color: #fff;
+}
+
+.legend-sample.negative-balance {
+  background: transparent;
+  border: 1.5px solid var(--color-expense);
+  color: var(--color-expense);
+}
+
+.legend-text {
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
 </style>
 
 <!-- 暗色模式 -->
@@ -883,5 +1068,13 @@ html.dark .grid-item:hover {
 
 html.dark .month-row:hover {
   background: rgba(50, 50, 50, 0.6);
+}
+
+html.dark .legend-item {
+  background: rgba(50, 50, 50, 0.6);
+}
+
+html.dark .chart-privacy-mask {
+  background: rgba(30, 30, 30, 0.9);
 }
 </style>

@@ -9,6 +9,7 @@ import { screenApi, type ScreenFlowParams } from '@shared/api/screen'
 import { flowApi, type Flow } from '@shared/api/flow'
 import FlowEditor from '@desktop/components/flow/FlowEditor.vue'
 import FlowItem from '@desktop/components/FlowItem.vue'
+import YearLineChartDialog from '@desktop/components/YearLineChartDialog.vue'
 
 const router = useRouter()
 
@@ -53,6 +54,11 @@ const currentFlowMonth = ref(0)
 // FlowEditor
 const flowEditorVisible = ref(false)
 const editingFlowId = ref<number | null>(null)
+
+// 年度图表
+const yearChartVisible = ref(false)
+const chartYear = ref(0)
+const chartMonthData = ref<MonthData[]>([])
 
 // ==================== 计算属性 ====================
 const typeName = computed(() => selectedTypeName.value || '请选择分类')
@@ -293,6 +299,13 @@ function isLowest(yearData: { year: number; monthData: MonthData[] }, month: num
   return getYearStats(yearData).lowest === month
 }
 
+// 打开年度图表
+function openYearChart(year: number, monthData: MonthData[]) {
+  chartYear.value = year
+  chartMonthData.value = monthData
+  yearChartVisible.value = true
+}
+
 // ==================== 月份点击 ====================
 function onMonthItemClick(year: number, month: MonthData) {
   const total = getMonthTotal(month)
@@ -460,7 +473,7 @@ function formatFlowTime(dateStr: string): string {
                         <span v-if="parseFloat(year.outcome) > 0" class="expense" @click="toggleYearExpand(year.year)">
                           -{{ formatYearAmount(year.year, year.outcome) }}
                         </span>
-                        <button class="chart-btn" title="查看图表">
+                        <button class="chart-btn" title="查看图表" @click="openYearChart(year.year, year.monthData)">
                           <el-icon :size="16"><TrendCharts /></el-icon>
                         </button>
                       </div>
@@ -695,6 +708,14 @@ function formatFlowTime(dateStr: string): string {
       v-model:visible="flowEditorVisible"
       :flow-id="editingFlowId"
       @success="onFlowEditorSuccess"
+    />
+
+    <!-- 年度图表对话框 -->
+    <YearLineChartDialog
+      v-model:visible="yearChartVisible"
+      :year="chartYear"
+      :type-name="selectedTypeName"
+      :month-data="chartMonthData"
     />
   </div>
 </template>
