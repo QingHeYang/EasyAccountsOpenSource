@@ -163,9 +163,27 @@ class AgentConfig:
             return {}
     
     @property
-    def task_instructions_file(self) -> str:
-        """任务指导文件名（核心配置，包含详细的工具使用指南）"""
-        return self._data.get("task_instructions_file", "")
+    def task_instructions_file(self) -> List[str]:
+        """任务指导文件列表（核心配置，包含详细的工具使用指南）
+
+        支持两种格式：
+        1. 字符串格式（向后兼容）: "file.prompt"
+        2. 数组格式: ["inner.prompt", "user.prompt"]
+        """
+        task_file_str = self._data.get("task_instructions_file", "")
+        if not task_file_str:
+            return []
+        try:
+            # 尝试解析为JSON数组
+            files_list = json.loads(task_file_str)
+            if isinstance(files_list, list):
+                return files_list
+            else:
+                # 如果不是数组，包装为单元素列表
+                return [str(files_list)]
+        except json.JSONDecodeError:
+            # 解析失败，当作单个文件名处理（向后兼容）
+            return [task_file_str]
 
     @property
     def inner_tools(self) -> List[str]:

@@ -63,8 +63,9 @@ class Agent:
     # 内部工具列表（配置该Agent可用的内部工具）
     inner_tools: List[str] = field(default_factory=list)
 
-    # 任务指导文件（核心配置，包含详细的工具使用指南）
-    task_instructions_file: str = ""
+    # 任务指导文件列表（核心配置，包含详细的工具使用指南）
+    # 支持多个文件，按顺序加载：先内部指导，后用户自定义指导
+    task_instructions_file: List[str] = field(default_factory=list)
     
     # LLM 对象（从 llm_builder 获取）
     main_llm: Optional[LLM] = None

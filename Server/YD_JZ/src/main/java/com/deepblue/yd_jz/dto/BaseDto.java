@@ -1,5 +1,6 @@
 package com.deepblue.yd_jz.dto;
 
+import com.deepblue.yd_jz.exception.ErrorCode;
 import lombok.Data;
 
 @Data
@@ -27,5 +28,15 @@ public class BaseDto<T> {
         baseDto.setMsg(errorMessage);
         baseDto.setCode(errorCode);
         return baseDto;
+    }
+
+    // 使用 ErrorCode 枚举设置错误响应
+    public static <T> BaseDto<T> error(ErrorCode errorCode) {
+        return setErrorBean(errorCode.getMessage(), errorCode.getCode());
+    }
+
+    // 使用 ErrorCode 枚举 + 自定义消息设置错误响应
+    public static <T> BaseDto<T> error(ErrorCode errorCode, String customMessage) {
+        return setErrorBean(customMessage, errorCode.getCode());
     }
 }

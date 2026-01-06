@@ -1,0 +1,82 @@
+package com.deepblue.yd_jz.exception;
+
+import lombok.Getter;
+
+/**
+ * 统一错误码枚举
+ * <p>
+ * 错误码规范：
+ * - 0: 成功
+ * - 40xxx: 参数校验错误
+ * - 41xxx: 认证授权错误（401/418 保持不变）
+ * - 42xxx: 业务规则错误
+ * - 44xxx: 资源不存在错误
+ * - 50xxx: 系统错误
+ */
+@Getter
+public enum ErrorCode {
+
+    // ==================== 成功 ====================
+    SUCCESS(0, "操作成功"),
+
+    // ==================== 参数校验错误 40xxx ====================
+    PARAM_REQUIRED(40001, "参数不能为空"),
+    PARAM_FORMAT_ERROR(40002, "参数格式错误"),
+    PARAM_INVALID(40003, "参数值非法"),
+    FILE_VALIDATION_ERROR(40004, "文件校验失败"),
+
+    // ==================== 认证授权错误 41xxx ====================
+    // 注意：HTTP 状态码保持 401/418 不变
+    UNAUTHORIZED(401, "未登录或Token已过期"),
+    LOGIN_FAILED(401, "用户名或密码错误"),
+    NEED_REGISTER(418, "需要注册"),
+
+    // ==================== 业务规则错误 42xxx ====================
+    INSUFFICIENT_BALANCE(42001, "余额不足"),
+    TYPE_HAS_CHILDREN(42002, "该分类有子分类，请选择子分类"),
+    OPERATION_NOT_ALLOWED(42003, "操作不允许"),
+    DATA_CONFLICT(42004, "数据冲突"),
+    INVALID_STATE(42005, "状态不正确"),
+    TYPE_CANNOT_DELETE(42006, "该分类下有流水记录，无法删除"),
+    ACCOUNT_CANNOT_DELETE(42007, "该账户下有流水记录，无法删除"),
+
+    // ==================== 资源不存在错误 44xxx ====================
+    ACCOUNT_NOT_FOUND(44001, "账户不存在"),
+    TYPE_NOT_FOUND(44002, "分类不存在"),
+    FLOW_NOT_FOUND(44003, "流水不存在"),
+    TEMPLATE_NOT_FOUND(44004, "模板不存在"),
+    FILE_NOT_FOUND(44005, "文件不存在"),
+    ACTION_NOT_FOUND(44006, "操作类型不存在"),
+
+    // ==================== 系统错误 50xxx ====================
+    SYSTEM_ERROR(50001, "系统内部错误"),
+    DATABASE_ERROR(50002, "数据库错误"),
+    FILE_OPERATION_ERROR(50003, "文件操作错误"),
+    EXTERNAL_SERVICE_ERROR(50004, "外部服务调用失败");
+
+    private final int code;
+    private final String message;
+
+    ErrorCode(int code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    /**
+     * 获取对应的 HTTP 状态码
+     * - 401: 认证失败
+     * - 418: 需要注册
+     * - 500: 系统错误
+     * - 200: 其他（业务错误）
+     */
+    public int getHttpStatus() {
+        if (code == 401) {
+            return 401;
+        } else if (code == 418) {
+            return 418;
+        } else if (code >= 50000) {
+            return 500;
+        }
+        return 200;
+    }
+}

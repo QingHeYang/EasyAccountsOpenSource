@@ -162,7 +162,7 @@ class AgentRegistry:
             agent_guide=config.agent_guide,  # Agent指南文件名
             agent_list=list(config.agent_list),  # 复制子Agent列表
             inner_tools=list(config.inner_tools),  # 复制内部工具列表
-            task_instructions_file=config.task_instructions_file,
+            task_instructions_file=list(config.task_instructions_file),  # 复制任务指导文件列表
             # LLM 对象
             main_llm=main_llm,
             think_llm=think_llm,
@@ -274,7 +274,7 @@ class AgentRegistry:
             agent_guide=config.agent_guide,
             agent_list=[],  # 子Agent不能再调用其他Agent，避免无限递归
             inner_tools=list(config.inner_tools),  # 复制内部工具列表
-            task_instructions_file=config.task_instructions_file,
+            task_instructions_file=list(config.task_instructions_file),  # 复制任务指导文件列表
             
             # LLM 对象：只设置主 LLM
             main_llm=main_llm,

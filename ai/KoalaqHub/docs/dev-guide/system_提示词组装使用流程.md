@@ -61,13 +61,37 @@ resource/
 ### 3.1 任务层 (Task Layer) - 核心
 
 **目录**: `prompts/layers/task/`
-**配置项**: `task_instructions_file`
+**配置项**: `task_instructions_file`（支持数组格式）
 
 任务层是每个Agent的**核心指导**，必须包含：
 - 具体业务规则
 - **工具使用指南**（什么情况用什么工具）
 - 回复规范
 - 注意事项
+
+#### 多文件支持
+
+`task_instructions_file` 支持配置多个文件，按顺序加载并拼接：
+
+```ini
+# 单文件（向后兼容）
+task_instructions_file = my_instructions.prompt
+
+# 多文件（推荐）
+task_instructions_file = ["inner_instructions.prompt", "user_instructions.prompt"]
+```
+
+**典型使用场景**：
+- `inner_instructions.prompt` - 内部核心指导（由开发者维护）
+- `user_instructions.prompt` - 用户自定义指导（可通过 Docker 映射覆盖）
+
+**Docker 映射示例**：
+```yaml
+volumes:
+  - ./AI/task.prompt:/app/koalaq_hub_python/resource/prompts/layers/task/user_instructions.prompt
+```
+
+这样用户可以自定义特殊指导，而不会覆盖核心的内部指导。
 
 **示例文件**: `workorder_instructions.prompt`
 ```markdown
@@ -190,8 +214,9 @@ description = 工单查询分析
 # 角色配置
 role = 恒银科技.role
 
-# 任务指导文件（核心配置）
-task_instructions_file = workorder_instructions.prompt
+# 任务指导文件列表（核心配置）
+# 支持数组格式，按顺序加载并拼接
+task_instructions_file = ["workorder_instructions_inner.prompt", "workorder_instructions.prompt"]
 
 # 其他配置...
 llm_use = moonshot-k2
@@ -210,8 +235,9 @@ class Agent:
     role_file: str = ""           # 角色文件名
     role_context: str = ""        # 角色文件内容（JSON格式）
 
-    # 任务指导（核心）
-    task_instructions_file: str = ""
+    # 任务指导文件列表（核心）
+    # 支持多个文件，按顺序加载：先内部指导，后用户自定义指导
+    task_instructions_file: List[str] = field(default_factory=list)
 
     # 运行时组装结果
     system_prompt: str = ""

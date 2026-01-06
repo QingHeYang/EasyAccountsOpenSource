@@ -89,15 +89,30 @@ class SystemPromptAssembler:
         - 具体业务规则
         - 工具使用指南（什么情况用什么工具）
         - 回复规范
+
+        支持多个文件按顺序加载并拼接：
+        - 先加载内部核心指导（inner）
+        - 再加载用户自定义指导（可通过Docker映射覆盖，会加上特殊提示）
         """
-        task_path = self.layers_dir / "task" / agent.task_instructions_file
-        if task_path.exists():
-            try:
-                with open(task_path, 'r', encoding='utf-8') as f:
-                    return f.read()
-            except Exception as e:
-                self.logger.error(f"加载任务指导文件失败: {e}")
-        return ""
+        if not agent.task_instructions_file:
+            return ""
+
+        contents = []
+        for task_file in agent.task_instructions_file:
+            task_path = self.layers_dir / "task" / task_file
+            if task_path.exists():
+                try:
+                    with open(task_path, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if content:
+                            # 用户自定义文件加上特殊提示
+                            if task_file == "easy_accounts_instructions.prompt":
+                                content = f"## 用户自定义规则（重要，必须遵守）\n\n{content}"
+                            contents.append(content)
+                except Exception as e:
+                    self.logger.error(f"加载任务指导文件失败 {task_file}: {e}")
+
+        return "\n\n".join(contents)
 
     def _build_role_layer(self, agent: Agent) -> str:
         """构建角色层提示词"""

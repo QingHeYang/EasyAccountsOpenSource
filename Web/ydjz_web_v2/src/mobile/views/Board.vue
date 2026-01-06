@@ -30,6 +30,39 @@ function toggleLayout() {
   layoutMode.value = layoutMode.value === 'list' ? 'grid' : 'list'
 }
 
+// 隐私模式
+const privacyMode = ref(false)
+
+function togglePrivacy() {
+  privacyMode.value = !privacyMode.value
+}
+
+// 隐私金额显示（不同区域不同星号数量）
+const PRIVACY_TOTAL = '*******'   // 总资产 7个
+const PRIVACY_ACCOUNT = '******'  // 账户明细 6个
+const PRIVACY_YEAR = '******'     // 年度收支 6个
+const PRIVACY_MONTH = '*****'     // 月度概览 5个
+
+function privacyTotal(amount: string | undefined): string {
+  if (privacyMode.value) return PRIVACY_TOTAL
+  return amount || '0.00'
+}
+
+function privacyAccount(amount: string | undefined): string {
+  if (privacyMode.value) return PRIVACY_ACCOUNT
+  return amount || '0.00'
+}
+
+function privacyYear(amount: string | number | undefined): string {
+  if (privacyMode.value) return PRIVACY_YEAR
+  return formatAmount(amount)
+}
+
+function privacyMonth(amount: string | number | undefined): string {
+  if (privacyMode.value) return PRIVACY_MONTH
+  return formatMonthAmount(amount)
+}
+
 // 滚动状态：是否显示总资产在头部
 const showAssetInHeader = ref(false)
 const assetCardRef = ref<HTMLElement | null>(null)
@@ -249,16 +282,13 @@ function toAI() {
         <template v-if="showAssetInHeader">
           <div class="header-asset-group">
             <span class="header-asset-label">总资产</span>
-            <span class="header-asset-value">¥ {{ homeInfo?.totalAsset || '0.00' }}</span>
+            <span class="header-asset-value">¥ {{ privacyTotal(homeInfo?.totalAsset) }}</span>
           </div>
         </template>
         <template v-else>
           <img :src="logoUrl" alt="Logo" class="title-logo" />
           <span class="title-text">EasyAccounts</span>
         </template>
-      </div>
-      <div v-if="aiServiceAvailable" class="header-action ai-btn" @click="toAI">
-        <span class="ai-text">AI+</span>
       </div>
     </div>
 
@@ -268,11 +298,20 @@ function toAI() {
       <div class="asset-card" ref="assetCardRef">
         <div class="asset-top">
           <div class="asset-info">
-            <div class="asset-label">总资产</div>
-            <div class="asset-amount">¥ {{ homeInfo?.totalAsset || '0.00' }}</div>
-            <div class="asset-net" v-if="showNetAsset">净资产 ¥ {{ homeInfo?.netAsset || '0.00' }}</div>
+            <div class="asset-label-row">
+              <span class="asset-label">总资产</span>
+              <div class="privacy-btn" @click="togglePrivacy">
+                <van-icon :name="privacyMode ? 'closed-eye' : 'eye-o'" size="18" />
+              </div>
+            </div>
+            <div class="asset-amount">¥ {{ privacyTotal(homeInfo?.totalAsset) }}</div>
+            <div class="asset-net" v-if="showNetAsset">净资产 ¥ {{ privacyTotal(homeInfo?.netAsset) }}</div>
           </div>
-          <div class="asset-action" @click="showAccountSheet = true">
+          <div
+            class="asset-action"
+            :class="{ disabled: privacyMode }"
+            @click="!privacyMode && (showAccountSheet = true)"
+          >
             <van-icon name="apps-o" size="20" />
             <span>账户</span>
           </div>
@@ -299,19 +338,19 @@ function toAI() {
           <van-button size="mini" icon="plus" round plain @click="onYearNext" />
         </div>
         <div class="year-stats">
-          <div class="stat-item" @click="showFullAmount('收入', homeInfo?.yearIncome)">
+          <div class="stat-item" @click="!privacyMode && showFullAmount('收入', homeInfo?.yearIncome)">
             <span class="stat-label">收入</span>
-            <span class="stat-value income">{{ formatAmount(homeInfo?.yearIncome) }}</span>
+            <span class="stat-value income">{{ privacyYear(homeInfo?.yearIncome) }}</span>
           </div>
           <div class="stat-divider"></div>
-          <div class="stat-item" @click="showFullAmount('支出', homeInfo?.yearOutCome)">
+          <div class="stat-item" @click="!privacyMode && showFullAmount('支出', homeInfo?.yearOutCome)">
             <span class="stat-label">支出</span>
-            <span class="stat-value expense">{{ formatAmount(homeInfo?.yearOutCome) }}</span>
+            <span class="stat-value expense">{{ privacyYear(homeInfo?.yearOutCome) }}</span>
           </div>
           <div class="stat-divider"></div>
-          <div class="stat-item" @click="showFullAmount('结余', homeInfo?.yearBalance)">
+          <div class="stat-item" @click="!privacyMode && showFullAmount('结余', homeInfo?.yearBalance)">
             <span class="stat-label">结余</span>
-            <span class="stat-value balance">{{ formatAmount(homeInfo?.yearBalance) }}</span>
+            <span class="stat-value balance">{{ privacyYear(homeInfo?.yearBalance) }}</span>
           </div>
         </div>
       </div>
@@ -324,7 +363,11 @@ function toAI() {
             <div class="action-btn" @click="showLegendTip = true">
               <van-icon name="info-o" size="18" />
             </div>
-            <div class="action-btn" @click="showChartOverlay = true">
+            <div
+              class="action-btn"
+              :class="{ disabled: privacyMode }"
+              @click="!privacyMode && (showChartOverlay = true)"
+            >
               <van-icon name="chart-trending-o" size="18" />
             </div>
             <div class="action-btn" @click="toggleLayout">
@@ -346,18 +389,18 @@ function toAI() {
             </div>
             <div class="month-right">
               <div class="month-stat income">
-                <span class="stat-num" :class="{ 'max-tag income': isMaxIncome(item.month) }">
-                  +{{ formatMonthAmount(item.income) }}
+                <span class="stat-num" :class="{ 'max-tag income': isMaxIncome(item.month) && !privacyMode }">
+                  <template v-if="!privacyMode">+</template>{{ privacyMonth(item.income) }}
                 </span>
               </div>
               <div class="month-stat expense">
-                <span class="stat-num" :class="{ 'max-tag expense': isMaxExpense(item.month) }">
-                  -{{ formatMonthAmount(item.outcome) }}
+                <span class="stat-num" :class="{ 'max-tag expense': isMaxExpense(item.month) && !privacyMode }">
+                  <template v-if="!privacyMode">-</template>{{ privacyMonth(item.outcome) }}
                 </span>
               </div>
-              <div class="month-stat balance" :class="{ negative: isNegativeBalance(item.balance) }">
-                <span class="stat-num" :class="{ 'max-tag balance': isMaxBalance(item.month) }">
-                  {{ formatMonthAmount(item.balance) }}
+              <div class="month-stat balance" :class="{ negative: isNegativeBalance(item.balance) && !privacyMode }">
+                <span class="stat-num" :class="{ 'max-tag balance': isMaxBalance(item.month) && !privacyMode }">
+                  {{ privacyMonth(item.balance) }}
                 </span>
               </div>
             </div>
@@ -379,20 +422,20 @@ function toAI() {
             <div class="grid-stats">
               <div class="grid-stat income">
                 <span class="grid-label">收入</span>
-                <span class="grid-value" :class="{ 'max-tag income': isMaxIncome(item.month) }">
-                  +{{ item.income }}
+                <span class="grid-value" :class="{ 'max-tag income': isMaxIncome(item.month) && !privacyMode }">
+                  <template v-if="!privacyMode">+</template>{{ privacyMonth(item.income) }}
                 </span>
               </div>
               <div class="grid-stat expense">
                 <span class="grid-label">支出</span>
-                <span class="grid-value" :class="{ 'max-tag expense': isMaxExpense(item.month) }">
-                  -{{ item.outcome }}
+                <span class="grid-value" :class="{ 'max-tag expense': isMaxExpense(item.month) && !privacyMode }">
+                  <template v-if="!privacyMode">-</template>{{ privacyMonth(item.outcome) }}
                 </span>
               </div>
-              <div class="grid-stat balance" :class="{ negative: isNegativeBalance(item.balance) }">
+              <div class="grid-stat balance" :class="{ negative: isNegativeBalance(item.balance) && !privacyMode }">
                 <span class="grid-label">结余</span>
-                <span class="grid-value" :class="{ 'max-tag balance': isMaxBalance(item.month) }">
-                  {{ item.balance }}
+                <span class="grid-value" :class="{ 'max-tag balance': isMaxBalance(item.month) && !privacyMode }">
+                  {{ privacyMonth(item.balance) }}
                 </span>
               </div>
             </div>
@@ -422,8 +465,8 @@ function toAI() {
             <div class="account-note" v-if="acc.note">{{ acc.note }}</div>
           </div>
           <div class="account-amount">
-            <div class="account-asset">¥ {{ acc.accountAsset }}</div>
-            <div class="account-real" v-if="acc.realAsset">净 ¥ {{ acc.realAsset }}</div>
+            <div class="account-asset">¥ {{ privacyAccount(acc.accountAsset) }}</div>
+            <div class="account-real" v-if="acc.realAsset">净 ¥ {{ privacyAccount(acc.realAsset) }}</div>
           </div>
           <van-icon name="arrow" class="account-arrow" />
         </div>
@@ -437,6 +480,11 @@ function toAI() {
       :month-details="homeInfo?.monthDetails || []"
       :accounts="homeInfo?.accounts || []"
     />
+
+    <!-- 浮动 AI+ 按钮 -->
+    <div v-if="aiServiceAvailable" class="fab" @click="toAI">
+      <span class="ai-fab-text">AI+</span>
+    </div>
 
     <!-- 图例说明弹窗 -->
     <van-dialog
@@ -525,29 +573,28 @@ function toAI() {
   letter-spacing: -0.5px;
 }
 
-.header-action {
-  width: 40px;
-  height: 40px;
+/* 浮动 AI+ 按钮 */
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: 100px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
-}
-
-.header-action.ai-btn {
-  width: auto;
-  padding: 0 14px;
   background: var(--color-transfer);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  z-index: 50;
 }
 
-.header-action.ai-btn:active {
-  opacity: 0.8;
+.fab:active {
+  transform: scale(0.95);
 }
 
-.ai-text {
+.ai-fab-text {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -577,10 +624,28 @@ function toAI() {
   flex: 1;
 }
 
+.asset-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .asset-label {
   font-size: 14px;
   opacity: 0.9;
-  margin-bottom: 8px;
+}
+
+.privacy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+  padding: 4px;
+}
+
+.privacy-btn:active {
+  opacity: 0.6;
 }
 
 .asset-amount {
@@ -609,6 +674,11 @@ function toAI() {
 
 .asset-action:active {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.asset-action.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* 年度卡片 */
@@ -725,6 +795,11 @@ function toAI() {
 
 .action-btn:active {
   opacity: 0.7;
+}
+
+.action-btn.disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .month-list {
