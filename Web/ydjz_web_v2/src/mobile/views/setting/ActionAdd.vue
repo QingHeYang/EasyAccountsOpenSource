@@ -50,22 +50,15 @@ async function onSubmit() {
   })
 
   try {
+    const params = {
+      hname: actionName.value.trim(),
+      handle: parseInt(handleType.value) as ActionHandle,
+      exempt: exempt.value,
+    }
+
     if (isEdit.value && actionId.value) {
-      // 编辑模式：需要包含 id (integer)
-      const params = {
-        id: actionId.value,
-        hname: actionName.value.trim(),
-        handle: parseInt(handleType.value) as ActionHandle,
-        exempt: exempt.value,
-      }
       await actionApi.update(actionId.value, params)
     } else {
-      // 新增模式
-      const params = {
-        hname: actionName.value.trim(),
-        handle: parseInt(handleType.value) as ActionHandle,
-        exempt: exempt.value,
-      }
       await actionApi.add(params)
     }
 

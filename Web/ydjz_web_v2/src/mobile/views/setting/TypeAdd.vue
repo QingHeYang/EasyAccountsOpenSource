@@ -221,11 +221,12 @@ async function onSubmit() {
 
   try {
     if (isEdit.value && typeId.value) {
-      // 编辑模式
+      // 编辑模式（id 必须传，否则后端会创建新分类）
       await typeApi.update(typeId.value, {
+        id: typeId.value,
         tname: tname.value.trim(),
         parent: parentId.value === -1 ? undefined : parentId.value,
-        actionId: actionId.value,  // undefined 时 JSON 不传此字段
+        actionId: actionId.value,
         analysisDisable: analysisDisable.value,
       })
     } else {

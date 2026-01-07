@@ -31,9 +31,11 @@ export interface TypeWithChildren extends Type {
 
 /** 添加/更新分类参数 */
 export interface TypeParams {
+  /** 分类ID（更新时必传） */
+  id?: number
   tname: string
-  actionId: number
-  /** 父级分类ID，0表示一级分类 */
+  actionId?: number
+  /** 父级分类ID，-1表示一级分类 */
   parent?: number
   analysisDisable?: boolean
   archive?: boolean

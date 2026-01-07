@@ -277,7 +277,8 @@ async function onSubmit() {
     }
 
     if (editingType.value) {
-      await typeApi.update(editingType.value.id, params)
+      // 编辑模式：id 必须传，否则后端 JPA 会创建新分类
+      await typeApi.update(editingType.value.id, { ...params, id: editingType.value.id })
       ElMessage.success('保存成功')
     } else {
       await typeApi.add(params)
