@@ -485,6 +485,8 @@ function onSelectTemplate(template: Template) {
       chooseDate.value = formatDate(lastMonth)
     }
   }
+  // 设置备注来源
+  note.value = `账单来源：${template.name}`
 }
 
 function showTemplateInfo(template: Template) {

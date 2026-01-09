@@ -127,6 +127,11 @@ const datePanelVisible = ref(false)
 const datePanelKey = ref(0) // 用于强制日历重新渲染
 const templatePanelVisible = ref(false)
 
+// 面板 body ref（用于重置滚动位置）
+const accountPanelBody = ref<HTMLElement | null>(null)
+const typePanelBody = ref<HTMLElement | null>(null)
+const templatePanelBody = ref<HTMLElement | null>(null)
+
 // 模板相关
 const selectedTag = ref<Tag | null>(null)
 const expandedTemplateIds = ref<number[]>([])
@@ -192,6 +197,8 @@ watch(drawerVisible, (val) => {
 
 // ==================== 初始化 ====================
 async function initData() {
+  // 每次打开时重置面板状态
+  closeAllPanels()
   loading.value = true
   try {
     // 并行加载基础数据
@@ -325,6 +332,9 @@ function openAccountPanel(type: 1 | 2) {
   closeAllPanels()
   accountPanelType.value = type
   accountPanelVisible.value = true
+  nextTick(() => {
+    if (accountPanelBody.value) accountPanelBody.value.scrollTop = 0
+  })
 }
 
 function onSelectAccount(account: Account) {
@@ -343,6 +353,9 @@ function openTypePanel() {
   }
   closeAllPanels()
   typePanelVisible.value = true
+  nextTick(() => {
+    if (typePanelBody.value) typePanelBody.value.scrollTop = 0
+  })
 }
 
 function onSelectType(type: TypeWithChildren, parent?: TypeWithChildren) {
@@ -368,6 +381,9 @@ function openTemplatePanel() {
   closeAllPanels()
   templatePanelVisible.value = true
   loadTagsAndTemplates()
+  nextTick(() => {
+    if (templatePanelBody.value) templatePanelBody.value.scrollTop = 0
+  })
 }
 
 // ==================== 金额处理 ====================
@@ -1129,7 +1145,7 @@ function onClose() {
             <el-button text :icon="ArrowLeft" @click="accountPanelVisible = false">返回</el-button>
             <span class="sub-panel-title">{{ accountPanelType === 1 ? '选择账户' : '选择目标账户' }}</span>
           </div>
-          <div class="panel-body">
+          <div ref="accountPanelBody" class="panel-body">
             <div class="account-list">
               <div
                 v-for="account in accounts"
@@ -1165,7 +1181,7 @@ function onClose() {
             <el-button text :icon="ArrowLeft" @click="typePanelVisible = false">返回</el-button>
             <span class="sub-panel-title">选择分类</span>
           </div>
-          <div class="panel-body">
+          <div ref="typePanelBody" class="panel-body">
             <div class="type-list">
               <div v-for="parent in types" :key="parent.id" class="type-group">
                 <div
@@ -1240,7 +1256,7 @@ function onClose() {
             <el-button text :icon="ArrowLeft" @click="templatePanelVisible = false">返回</el-button>
             <span class="sub-panel-title">快记模板</span>
           </div>
-          <div class="panel-body">
+          <div ref="templatePanelBody" class="panel-body">
             <!-- 标签筛选 -->
             <div class="tag-filter">
               <el-tag
