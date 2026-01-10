@@ -86,10 +86,15 @@ public class HomeService {
             hab.setExemptAsset(account.getExemptMoney());
             hab.setNote(account.getNote());
             BigDecimal accountAsset = new BigDecimal(account.getMoney());
-            BigDecimal percent = accountAsset.divide(totalAsset, 3, RoundingMode.HALF_DOWN);
-            nf.setMaximumFractionDigits(2);
-            String percentStr = nf.format(percent.doubleValue());
-            hab.setPercent(percentStr.substring(0, percentStr.length() - 1));
+            // v2.6.0: 防止除零错误，当总资产为0时百分比显示为0
+            if (totalAsset.compareTo(BigDecimal.ZERO) == 0) {
+                hab.setPercent("0");
+            } else {
+                BigDecimal percent = accountAsset.divide(totalAsset, 3, RoundingMode.HALF_DOWN);
+                nf.setMaximumFractionDigits(2);
+                String percentStr = nf.format(percent.doubleValue());
+                hab.setPercent(percentStr.substring(0, percentStr.length() - 1));
+            }
             homeAccounts.add(hab);
         }
         homeDto.setAccounts(homeAccounts);

@@ -136,6 +136,12 @@ function resetForm() {
   }
 }
 
+// 判断账户余额是否为负数（负债类账户）
+const isNegativeBalance = computed(() => {
+  const m = parseFloat(accountForm.value.money || '0')
+  return m < 0
+})
+
 async function onSubmit() {
   if (!accountForm.value.name.trim()) {
     ElMessage.warning('请输入账户名称')
@@ -147,10 +153,13 @@ async function onSubmit() {
   }
 
   try {
+    // 负数账户（负债类）不允许设置不计入金额
+    const exemptMoney = isNegativeBalance.value ? '' : (accountForm.value.exemptMoney || '')
+
     const params = {
       name: accountForm.value.name.trim(),
       money: accountForm.value.money,
-      exemptMoney: accountForm.value.exemptMoney || '',
+      exemptMoney,
       card: accountForm.value.card || '',
       note: accountForm.value.note || '',
     }
@@ -269,6 +278,9 @@ async function onDelete() {
                 >
                   <template #prefix>¥</template>
                 </el-input>
+                <div v-if="isNegativeBalance" class="input-hint warning">
+                  负数余额通常表示信用卡或负债账户
+                </div>
               </div>
 
               <!-- 不计入金额 -->
@@ -279,10 +291,14 @@ async function onDelete() {
                   @input="(val: string) => accountForm.exemptMoney = formatMoneyInput(val)"
                   placeholder="0.00"
                   size="large"
+                  :disabled="isNegativeBalance"
                 >
                   <template #prefix>¥</template>
                 </el-input>
-                <div class="input-hint">此金额不计入资产统计</div>
+                <div v-if="isNegativeBalance" class="input-hint warning">
+                  负债类账户不支持设置不计入金额
+                </div>
+                <div v-else class="input-hint">此金额不计入资产统计</div>
               </div>
 
               <!-- 卡号 -->
@@ -546,5 +562,9 @@ async function onDelete() {
   margin-top: 8px;
   font-size: 12px;
   color: var(--color-text-tertiary);
+}
+
+.input-hint.warning {
+  color: var(--color-expense);
 }
 </style>

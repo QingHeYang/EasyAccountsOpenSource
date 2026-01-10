@@ -23,6 +23,12 @@ const exemptMoney = ref('')
 const card = ref('')
 const note = ref('')
 
+// 判断账户余额是否为负数（负债类账户）
+const isNegativeBalance = computed(() => {
+  const m = parseFloat(money.value || '0')
+  return m < 0
+})
+
 // 金额输入格式化（允许负数，最多两位小数）
 function formatMoneyInput(value: string): string {
   // 检查是否以负号开头
@@ -96,12 +102,15 @@ async function onSubmit() {
   })
 
   try {
+    // 负数账户（负债类）不允许设置不计入金额
+    const submitExemptMoney = isNegativeBalance.value ? '' : (exemptMoney.value || '')
+
     // Account 的 id 只在 URL 中，body 不需要
     const params = {
       name: accountName.value.trim(),
       money: String(money.value),
       card: card.value || '',
-      exemptMoney: exemptMoney.value || '',
+      exemptMoney: submitExemptMoney,
       note: note.value || '',
     }
 
@@ -171,12 +180,15 @@ onMounted(() => {
               placeholder="0.00"
             />
           </div>
+          <p v-if="isNegativeBalance" class="form-hint warning">
+            负数余额通常表示信用卡或负债账户
+          </p>
         </div>
 
         <!-- 不计入金额 -->
         <div class="form-item">
           <label class="form-label">不计入金额</label>
-          <div class="input-with-prefix">
+          <div class="input-with-prefix" :class="{ disabled: isNegativeBalance }">
             <span class="input-prefix">¥</span>
             <input
               :value="exemptMoney"
@@ -185,9 +197,13 @@ onMounted(() => {
               inputmode="decimal"
               class="form-input"
               placeholder="不计入总资产的金额"
+              :disabled="isNegativeBalance"
             />
           </div>
-          <p class="form-hint">该金额包含在账户余额中，但不计入总资产</p>
+          <p v-if="isNegativeBalance" class="form-hint warning">
+            负债类账户不支持设置不计入金额
+          </p>
+          <p v-else class="form-hint">该金额包含在账户余额中，但不计入总资产</p>
         </div>
 
         <!-- 卡号 -->
@@ -324,6 +340,10 @@ onMounted(() => {
   padding-left: 16px;
 }
 
+.input-with-prefix.disabled {
+  opacity: 0.5;
+}
+
 .input-prefix {
   font-size: 16px;
   font-weight: 500;
@@ -340,6 +360,10 @@ onMounted(() => {
   color: var(--color-text-tertiary);
   margin-top: 8px;
   padding-left: 4px;
+}
+
+.form-hint.warning {
+  color: var(--color-expense);
 }
 
 /* 文本域 */
