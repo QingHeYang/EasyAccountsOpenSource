@@ -70,8 +70,10 @@ function formatMoney(money: string | undefined) {
   return `¥${money}`
 }
 
-// 金额输入格式化
+// 金额输入格式化（允许负数）
 function formatMoneyInput(value: string): string {
+  // 检查是否以负号开头
+  const isNegative = value.startsWith('-')
   let result = value.replace(/[^\d.]/g, '')
   const parts = result.split('.')
   if (parts.length > 2) {
@@ -79,6 +81,10 @@ function formatMoneyInput(value: string): string {
   }
   if (parts.length === 2 && parts[1].length > 2) {
     result = parts[0] + '.' + parts[1].slice(0, 2)
+  }
+  // 恢复负号
+  if (isNegative && result) {
+    result = '-' + result
   }
   return result
 }

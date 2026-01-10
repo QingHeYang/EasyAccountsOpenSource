@@ -91,15 +91,19 @@ public class FlowService {
                 account = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), account, action.isExempt());
                 break;
             case ContentValues.ACTION_SUB:
-                if (accountMoney.compareTo(flowMoney) < 0) {
-                    throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
-                }
+                // v2.6.0: 注释余额检查，允许账户余额为负数
+                // 场景：信用卡等负债账户，消费后余额为负表示欠款
+                // if (accountMoney.compareTo(flowMoney) < 0) {
+                //     throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
+                // }
                 account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account, action.isExempt());
                 break;
             case ContentValues.ACTION_INNER:
-                if (accountMoney.compareTo(flowMoney) < 0) {
-                    throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
-                }
+                // v2.6.0: 注释余额检查，允许账户余额为负数
+                // 场景：支持从负债账户转账（如信用卡还款：银行卡 → 信用卡）
+                // if (accountMoney.compareTo(flowMoney) < 0) {
+                //     throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
+                // }
                 toAccount = accountService.getOriginAccountById(flowAddRequestDto.getAccountToId());
                 toAccount = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), toAccount, action.isExempt());
                 accountService.updateOriginAccount(toAccount);

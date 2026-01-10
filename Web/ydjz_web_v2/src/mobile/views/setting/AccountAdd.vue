@@ -23,8 +23,10 @@ const exemptMoney = ref('')
 const card = ref('')
 const note = ref('')
 
-// 金额输入格式化（只允许数字和小数点，最多两位小数）
+// 金额输入格式化（允许负数，最多两位小数）
 function formatMoneyInput(value: string): string {
+  // 检查是否以负号开头
+  const isNegative = value.startsWith('-')
   // 只保留数字和小数点
   let result = value.replace(/[^\d.]/g, '')
   // 只保留第一个小数点
@@ -35,6 +37,10 @@ function formatMoneyInput(value: string): string {
   // 限制小数点后两位
   if (parts.length === 2 && parts[1].length > 2) {
     result = parts[0] + '.' + parts[1].slice(0, 2)
+  }
+  // 恢复负号
+  if (isNegative && result) {
+    result = '-' + result
   }
   return result
 }
@@ -167,9 +173,9 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 豁免金额（仅编辑模式显示） -->
-        <div class="form-item" v-if="isEdit && exemptMoney">
-          <label class="form-label">豁免金额</label>
+        <!-- 不计入金额 -->
+        <div class="form-item">
+          <label class="form-label">不计入金额</label>
           <div class="input-with-prefix">
             <span class="input-prefix">¥</span>
             <input

@@ -17,6 +17,7 @@ import {
   CreditCard,
   ArrowLeft,
   Loading,
+  Warning,
 } from '@element-plus/icons-vue'
 import alipayIcon from '@shared/assets/icons/alipay.svg'
 import wechatIcon from '@shared/assets/icons/wechat.svg'
@@ -156,6 +157,14 @@ function closeAllPanels() {
 
 // ==================== 计算属性 ====================
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
+
+// 转账可用账户（排除有不计入金额的账户）
+const transferableAccounts = computed(() => {
+  return accounts.value.filter(acc => {
+    const exempt = parseFloat(acc.exemptMoney || '0')
+    return exempt === 0
+  })
+})
 
 // 普通 action 和 不计入的 action 分开
 const normalActions = computed(() => actions.value.filter(a => !a.exempt))
@@ -1146,9 +1155,14 @@ function onClose() {
             <span class="sub-panel-title">{{ accountPanelType === 1 ? '选择账户' : '选择目标账户' }}</span>
           </div>
           <div ref="accountPanelBody" class="panel-body">
+            <!-- 转账模式提示 -->
+            <div v-if="isTransfer" class="transfer-hint">
+              <el-icon><Warning /></el-icon>
+              <span>转账不支持选择含有"不计入金额"的账户，负债类账户请分两笔记录</span>
+            </div>
             <div class="account-list">
               <div
-                v-for="account in accounts"
+                v-for="account in (isTransfer ? transferableAccounts : accounts)"
                 :key="account.id"
                 class="account-item"
                 :class="{
@@ -1168,7 +1182,7 @@ function onClose() {
                 </div>
                 <div class="account-money">{{ formatMoneyDisplay(account.money) }}</div>
               </div>
-              <el-empty v-if="accounts.length === 0" description="暂无账户" />
+              <el-empty v-if="(isTransfer ? transferableAccounts : accounts).length === 0" description="暂无可用账户" />
             </div>
           </div>
         </div>
@@ -1994,6 +2008,25 @@ function onClose() {
 .add-child-btn:hover {
   border-color: var(--color-transfer);
   background: var(--color-transfer-bg);
+}
+
+/* 转账提示 */
+.transfer-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--color-transfer-bg);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--color-transfer);
+  line-height: 1.5;
+}
+
+.transfer-hint .el-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* 账户列表 - 参考 AccountManager */

@@ -107,6 +107,14 @@ const maxDate = new Date()
 // ==================== 计算属性 ====================
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
 
+// 转账可用账户（排除有不计入金额的账户）
+const transferableAccounts = computed(() => {
+  return accounts.value.filter(acc => {
+    const exempt = parseFloat(acc.exemptMoney || '0')
+    return exempt === 0
+  })
+})
+
 // 获取收支样式类
 function getActionClass(handle: number | undefined): string {
   if (handle === 0) return 'income'
@@ -983,8 +991,13 @@ watch(selectedTag, () => {
     <!-- 账户选择器 -->
     <van-action-sheet v-model:show="showAccountSheet" :title="accountSheetType === 1 ? '选择账户' : '选择目标账户'" teleport="body">
       <div class="sheet-list">
+        <!-- 转账模式提示 -->
+        <div v-if="isTransfer" class="transfer-hint">
+          <van-icon name="warning-o" size="16" />
+          <span>转账不支持选择含有"不计入金额"的账户，负债类账户请分两笔记录</span>
+        </div>
         <div
-          v-for="account in accounts"
+          v-for="account in (isTransfer ? transferableAccounts : accounts)"
           :key="account.id"
           class="sheet-item"
           :class="{
@@ -999,6 +1012,9 @@ watch(selectedTag, () => {
             <span v-if="account.note" class="sheet-item-note">{{ account.note }}</span>
           </div>
           <span class="account-balance">¥{{ account.money }}</span>
+        </div>
+        <div v-if="(isTransfer ? transferableAccounts : accounts).length === 0" class="empty-accounts">
+          暂无可用账户
         </div>
       </div>
     </van-action-sheet>
@@ -1572,6 +1588,33 @@ watch(selectedTag, () => {
   padding: 16px;
   max-height: 50vh;
   overflow-y: auto;
+}
+
+/* 转账提示 */
+.transfer-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--color-transfer-bg);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--color-transfer);
+  line-height: 1.5;
+}
+
+.transfer-hint .van-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* 空账户提示 */
+.empty-accounts {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
 }
 
 .sheet-item {
