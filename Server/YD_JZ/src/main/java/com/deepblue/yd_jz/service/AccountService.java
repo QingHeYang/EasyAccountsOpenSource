@@ -39,6 +39,8 @@ public class AccountService {
         account.setExemptMoney(postBean.getExemptMoney());
         account.setDisable(false);
         account.setCreateTime(new Date());
+        // v2.6.0: 设置账户类型，默认为0（资产账户）
+        account.setAccountType(postBean.getAccountType() != null ? postBean.getAccountType() : 0);
         accountRepository.save(account);
     }
 
@@ -49,6 +51,10 @@ public class AccountService {
         if (account != null) {
             BeanUtils.copyProperties(postBean, account);
             account.setAName(postBean.getName());
+            // v2.6.0: 更新账户类型
+            if (postBean.getAccountType() != null) {
+                account.setAccountType(postBean.getAccountType());
+            }
             accountRepository.save(account);
         }
     }
@@ -60,6 +66,8 @@ public class AccountService {
             AccountResponseDto accountResponseDto = new AccountResponseDto();
             BeanUtils.copyProperties(account, accountResponseDto);
             accountResponseDto.setName(account.getAName());
+            // v2.6.0: 设置账户类型
+            accountResponseDto.setAccountType(account.getAccountType());
             return accountResponseDto;
         }
         return null;

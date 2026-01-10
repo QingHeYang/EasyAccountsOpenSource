@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Close, ArrowRight } from '@element-plus/icons-vue'
-import { actionApi, type Action, ActionHandle } from '@shared/api/action'
+import { Plus, Close, ArrowRight, QuestionFilled } from '@element-plus/icons-vue'
+import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 
 const props = defineProps<{
   visible: boolean
@@ -26,6 +26,7 @@ const actionForm = ref({
   hname: '',
   handle: ActionHandle.IN,
   exempt: false,
+  exemptMode: ExemptMode.NONE as ExemptMode,
 })
 
 // 监听外部 visible 变化
@@ -83,6 +84,7 @@ function onEdit(action: Action) {
     hname: action.hname,
     handle: action.handle,
     exempt: action.exempt,
+    exemptMode: action.exemptMode ?? ExemptMode.NONE,
   }
   showDetail.value = true
 }
@@ -98,8 +100,49 @@ function resetForm() {
     hname: '',
     handle: ActionHandle.IN,
     exempt: false,
+    exemptMode: ExemptMode.NONE,
   }
 }
+
+// 是否为转账类型
+const isTransfer = computed(() => actionForm.value.handle === ActionHandle.TRANSFER)
+
+// 帮助对话框
+const showHelpDialog = ref(false)
+
+// 转出账户是否不计入
+const fromExempt = computed({
+  get: () => actionForm.value.exemptMode === ExemptMode.FROM_EXEMPT || actionForm.value.exemptMode === ExemptMode.BOTH_EXEMPT,
+  set: (val: boolean) => {
+    const toExempt = actionForm.value.exemptMode === ExemptMode.TO_EXEMPT || actionForm.value.exemptMode === ExemptMode.BOTH_EXEMPT
+    if (val && toExempt) {
+      actionForm.value.exemptMode = ExemptMode.BOTH_EXEMPT
+    } else if (val) {
+      actionForm.value.exemptMode = ExemptMode.FROM_EXEMPT
+    } else if (toExempt) {
+      actionForm.value.exemptMode = ExemptMode.TO_EXEMPT
+    } else {
+      actionForm.value.exemptMode = ExemptMode.NONE
+    }
+  }
+})
+
+// 转入账户是否不计入
+const toExempt = computed({
+  get: () => actionForm.value.exemptMode === ExemptMode.TO_EXEMPT || actionForm.value.exemptMode === ExemptMode.BOTH_EXEMPT,
+  set: (val: boolean) => {
+    const fromExemptVal = actionForm.value.exemptMode === ExemptMode.FROM_EXEMPT || actionForm.value.exemptMode === ExemptMode.BOTH_EXEMPT
+    if (val && fromExemptVal) {
+      actionForm.value.exemptMode = ExemptMode.BOTH_EXEMPT
+    } else if (val) {
+      actionForm.value.exemptMode = ExemptMode.TO_EXEMPT
+    } else if (fromExemptVal) {
+      actionForm.value.exemptMode = ExemptMode.FROM_EXEMPT
+    } else {
+      actionForm.value.exemptMode = ExemptMode.NONE
+    }
+  }
+})
 
 async function onSubmit() {
   if (!actionForm.value.hname.trim()) {
@@ -108,19 +151,19 @@ async function onSubmit() {
   }
 
   try {
+    const params = {
+      hname: actionForm.value.hname.trim(),
+      handle: actionForm.value.handle,
+      exempt: actionForm.value.exempt,
+      // exemptMode 仅对转账类型生效
+      exemptMode: isTransfer.value ? actionForm.value.exemptMode : undefined,
+    }
+
     if (editingAction.value) {
-      await actionApi.update(editingAction.value.id, {
-        hname: actionForm.value.hname.trim(),
-        handle: actionForm.value.handle,
-        exempt: actionForm.value.exempt,
-      })
+      await actionApi.update(editingAction.value.id, params)
       ElMessage.success('保存成功')
     } else {
-      await actionApi.add({
-        hname: actionForm.value.hname.trim(),
-        handle: actionForm.value.handle,
-        exempt: actionForm.value.exempt,
-      })
+      await actionApi.add(params)
       ElMessage.success('添加成功')
     }
     onCloseDetail()
@@ -239,6 +282,34 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
                 </div>
               </div>
 
+              <!-- 转账不计入设置（仅转账时显示） -->
+              <div v-if="isTransfer && actionForm.exempt" class="form-item">
+                <label class="form-label">
+                  不计入设置
+                  <el-icon class="help-icon" @click="showHelpDialog = true"><QuestionFilled /></el-icon>
+                </label>
+                <div class="transfer-exempt-card">
+                  <div class="transfer-account from" :class="{ active: fromExempt }">
+                    <div class="transfer-account-label">转出账户</div>
+                    <div class="transfer-account-switch">
+                      <span class="switch-label">不计入总金额</span>
+                      <el-switch v-model="fromExempt" size="small" />
+                    </div>
+                  </div>
+                  <div class="transfer-arrow">
+                    <el-icon :size="20"><ArrowRight /></el-icon>
+                  </div>
+                  <div class="transfer-account to" :class="{ active: toExempt }">
+                    <div class="transfer-account-label">转入账户</div>
+                    <div class="transfer-account-switch">
+                      <span class="switch-label">不计入总金额</span>
+                      <el-switch v-model="toExempt" size="small" />
+                    </div>
+                  </div>
+                </div>
+                <div class="input-hint">选择哪个账户的金额变动不计入净资产统计</div>
+              </div>
+
               <!-- 不计入开关 -->
               <div class="form-item switch-item">
                 <div class="switch-info">
@@ -258,6 +329,37 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
         </div>
       </Transition>
     </div>
+
+    <!-- 帮助对话框 -->
+    <el-dialog
+      v-model="showHelpDialog"
+      title="不计入设置说明"
+      width="400px"
+      :z-index="4000"
+    >
+      <div class="help-content">
+        <p><strong>不计入总金额</strong>一般用于资金代管、借钱还钱等场景。</p>
+        <div class="help-item">
+          <div class="help-item-title">转出不计入</div>
+          <div class="help-item-desc">转出账户的金额变动不计入净资产</div>
+        </div>
+        <div class="help-item">
+          <div class="help-item-title">转入不计入</div>
+          <div class="help-item-desc">转入账户的金额变动不计入净资产</div>
+        </div>
+        <div class="help-item">
+          <div class="help-item-title">都不计入</div>
+          <div class="help-item-desc">两个账户的金额变动都不计入净资产</div>
+        </div>
+        <div class="help-warning">
+          <el-icon><QuestionFilled /></el-icon>
+          <span>注意：信用卡等负债账户无法选择此项</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showHelpDialog = false">我知道了</el-button>
+      </template>
+    </el-dialog>
   </el-drawer>
 </template>
 
@@ -455,13 +557,68 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
 }
 
 .form-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-secondary);
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.help-icon {
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  cursor: help;
+}
+
+.help-icon:hover {
+  color: var(--color-transfer);
+}
+
+/* 帮助对话框 */
+.help-content p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.help-item {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--color-bg-page);
+  border-radius: 10px;
+}
+
+.help-item:last-child {
+  margin-bottom: 0;
+}
+
+.help-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.help-item-desc {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.help-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: var(--color-expense-bg);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-expense);
 }
 
 /* 单选组 */
@@ -586,5 +743,83 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
 .form-hint {
   font-size: 13px;
   color: var(--color-text-tertiary);
+}
+
+.input-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+/* 转账不计入卡片 */
+.transfer-exempt-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+}
+
+.transfer-account {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.25s ease;
+}
+
+.transfer-account.from {
+  background: rgba(245, 34, 45, 0.04);
+}
+
+.transfer-account.to {
+  background: rgba(82, 196, 26, 0.04);
+}
+
+.transfer-account.active.from {
+  background: rgba(245, 34, 45, 0.12);
+}
+
+.transfer-account.active.to {
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.transfer-account-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.transfer-account.from .transfer-account-label {
+  color: var(--color-expense);
+}
+
+.transfer-account.to .transfer-account-label {
+  color: var(--color-income);
+}
+
+.transfer-account-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.switch-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.transfer-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: var(--color-transfer);
+  background: rgba(24, 144, 255, 0.08);
 }
 </style>

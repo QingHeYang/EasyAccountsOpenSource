@@ -1,6 +1,14 @@
 import { getRequest } from './request'
 import type { ApiResponse } from '../types'
 
+/** 账户类型 */
+export enum AccountType {
+  /** 资产账户 */
+  ASSET = 0,
+  /** 负债账户 */
+  LIABILITY = 1,
+}
+
 /** 账户信息（响应） */
 export interface Account {
   id: number
@@ -14,6 +22,8 @@ export interface Account {
   card?: string
   /** 备注 */
   note?: string
+  /** 账户类型：0=资产账户，1=负债账户 */
+  accountType?: AccountType
   /** 创建时间 */
   createTime?: string
 }
@@ -30,6 +40,8 @@ export interface AccountParams {
   card?: string
   /** 备注 */
   note?: string
+  /** 账户类型：0=资产账户（默认），1=负债账户 */
+  accountType?: AccountType
 }
 
 /** @deprecated 使用 AccountParams */

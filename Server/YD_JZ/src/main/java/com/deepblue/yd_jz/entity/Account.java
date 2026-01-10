@@ -36,4 +36,8 @@ public class Account {
 
     @Column(name = "note", length = 100)
     private String note;
+
+    // v2.6.0: 账户类型，0=资产账户，1=负债账户
+    @Column(name = "account_type", nullable = false)
+    private Integer accountType = 0;
 }

@@ -38,9 +38,11 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Action (操作类型)                                        │
-│  ├─ exempt: boolean  ← 配置层：定义默认行为               │
+│  ├─ exempt: boolean     ← 配置层：定义默认行为            │
 │  │    例如："理财收入" exempt=true                        │
 │  │         "工资收入" exempt=false                       │
+│  ├─ exemptMode: int     ← v2.6.0: 内部转账精细控制       │
+│  │    0=都不exempt, 1=转出exempt, 2=转入exempt, 3=都exempt│
 └─────────────────────────────────────────────────────────┘
                          ↓ 继承
 ┌─────────────────────────────────────────────────────────┐
@@ -53,6 +55,7 @@
 │  Account (账户)                                          │
 │  ├─ money: String        ← 账户总金额（含所有交易）       │
 │  ├─ exemptMoney: String  ← 不计入的累积值（冗余存储）     │
+│  ├─ accountType: int     ← v2.6.0: 0=资产账户, 1=负债账户│
 │  │                                                       │
 │  │  净资产 = money - exemptMoney                         │
 └─────────────────────────────────────────────────────────┘
@@ -67,9 +70,19 @@ CREATE TABLE action (
     id INT PRIMARY KEY AUTO_INCREMENT,
     h_name VARCHAR(50) NOT NULL,     -- 操作名称
     exempt BIT,                       -- 是否不计入总金额
-    handle INT NOT NULL               -- 操作类型：0=增加，1=减少，2=转账
+    handle INT NOT NULL,              -- 操作类型：0=增加，1=减少，2=转账
+    exempt_mode INT NOT NULL DEFAULT 0 -- v2.6.0: 内部转账exempt模式
 );
 ```
+
+**exempt_mode 说明（v2.6.0）：**
+
+| 值 | 含义 | 转出账户 | 转入账户 |
+|----|------|----------|----------|
+| 0 | 都不 exempt | false | false |
+| 1 | 转出账户 exempt | true | false |
+| 2 | 转入账户 exempt | false | true |
+| 3 | 两边都 exempt | true | true |
 
 #### flow 表
 
@@ -91,8 +104,9 @@ CREATE TABLE flow (
 CREATE TABLE account (
     id INT PRIMARY KEY AUTO_INCREMENT,
     a_name VARCHAR(50) NOT NULL,
-    money VARCHAR(20) NOT NULL,       -- 账户总金额
+    money VARCHAR(20) NOT NULL,        -- 账户总金额
     exempt_money VARCHAR(20) NOT NULL, -- 不计入总金额的累积值
+    account_type INT NOT NULL DEFAULT 0, -- v2.6.0: 账户类型 0=资产,1=负债
     -- 其他字段...
 );
 ```
@@ -307,17 +321,109 @@ homeDto.setNetAsset(totalAsset.subtract(exemptAsset).toString());
 
 ---
 
-## 7. 相关代码
+## 7. v2.6.0 内部转账 exemptMode
+
+### 7.1 需求背景
+
+原有设计中，内部转账的 exempt 是「一刀切」的：两个账户统一使用 `action.isExempt()`。
+
+实际场景需要更精细控制：
+
+| 场景 | 操作 | 期望 |
+|------|------|------|
+| 还信用卡 | 银行卡 → 信用卡 | 只有信用卡的 exemptMoney 变化 |
+| 转入理财 | 活期 → 理财账户 | 只有理财账户的 exemptMoney 变化 |
+| 借款转账 | A账户 → B账户 | 两边都变化（或都不变） |
+
+### 7.2 exemptMode 定义
+
+| 值 | 含义 | 转出账户 exempt | 转入账户 exempt | 典型场景 |
+|----|------|-----------------|-----------------|----------|
+| 0 | 都不 exempt | false | false | 普通转账 |
+| 1 | 转出账户 exempt | true | false | 从理财账户转出 |
+| 2 | 转入账户 exempt | false | true | 还信用卡、转入理财 |
+| 3 | 两边都 exempt | true | true | 借入借出内部流转 |
+
+### 7.3 代码实现
+
+```java
+// FlowService.setNewFlow() - ACTION_INNER 分支
+case ContentValues.ACTION_INNER:
+    toAccount = accountService.getOriginAccountById(flowAddRequestDto.getAccountToId());
+
+    // v2.6.0: 根据 exemptMode 决定哪个账户 exempt
+    int exemptMode = action.getExemptMode() != null ? action.getExemptMode() : 0;
+    boolean toAccountExempt = (exemptMode == 2 || exemptMode == 3);
+    boolean fromAccountExempt = (exemptMode == 1 || exemptMode == 3);
+
+    toAccount = handleAccount(ACTION_ADD, money, toAccount, toAccountExempt);
+    accountService.updateOriginAccount(toAccount);
+    account = handleAccount(ACTION_SUB, money, account, fromAccountExempt);
+    break;
+```
+
+### 7.4 还原操作
+
+删除/更新流水时，同样根据 exemptMode 还原：
+
+```java
+// FlowService.doDeleteFlow() - ACTION_INNER 分支
+case ContentValues.ACTION_INNER:
+    Account lastToAccount = accountService.getOriginAccountById(flow.getAccountToId());
+
+    // v2.6.0: 根据 exemptMode 还原内部转账
+    int delExemptMode = lastAction.getExemptMode() != null ? lastAction.getExemptMode() : 0;
+    boolean delToAccountExempt = (delExemptMode == 2 || delExemptMode == 3);
+    boolean delFromAccountExempt = (delExemptMode == 1 || delExemptMode == 3);
+
+    lastToAccount = handleAccount(ACTION_SUB, flow.getMoney(), lastToAccount, delToAccountExempt);
+    accountService.updateOriginAccount(lastToAccount);
+    lastAccount = handleAccount(ACTION_ADD, flow.getMoney(), lastAccount, delFromAccountExempt);
+    break;
+```
+
+### 7.5 设计决策
+
+**Q: 为什么 exemptMode 在 Action 表而不是 Flow 表？**
+
+A: 用户决定接受「Action 配置变更可能影响还原操作」的风险：
+- Action 配置很少变化
+- 保持 Flow 表简洁
+- 与现有 exempt 字段的处理逻辑保持一致
+
+### 7.6 还信用卡场景示例
+
+**配置：** Action「还信用卡」，handle=2，exemptMode=2
+
+**操作：** 从银行卡转 1000 元到信用卡
+
+```
+银行卡（转出账户）:
+├─ money: 5000 → 4000
+├─ exemptMoney: 0 → 0 (不变，因为 fromAccountExempt=false)
+└─ 净资产 = 4000 - 0 = 4000
+
+信用卡（转入账户）:
+├─ money: -2000 → -1000 (负数表示欠款)
+├─ exemptMoney: -2000 → -1000 (增加1000，因为 toAccountExempt=true)
+└─ 净资产 = -1000 - (-1000) = 0
+
+总净资产 = 4000 + 0 = 4000 ✓ 正确
+```
+
+---
+
+## 8. 相关代码
 
 | 文件 | 说明 |
 |------|------|
-| `entity/Account.java` | exemptMoney 字段定义 |
+| `entity/Account.java` | exemptMoney, accountType 字段定义 |
 | `entity/Flow.java` | exempt 字段定义 |
-| `entity/Action.java` | exempt 配置字段 |
-| `service/FlowService.java` | handleAccount() 核心逻辑 |
+| `entity/Action.java` | exempt, exemptMode 配置字段 |
+| `service/FlowService.java` | handleAccount() 核心逻辑，内部转账 exemptMode 处理 |
 | `service/HomeService.java` | 首页资产计算 |
 
 ---
 
-*文档版本：v2.5.1*
-*更新时间：2026-01-04*
+*文档版本：v2.6.0*
+*更新时间：2026-01-11*

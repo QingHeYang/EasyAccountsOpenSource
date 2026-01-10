@@ -14,6 +14,8 @@ public class AccountResponseDto {
     private String card;
     private String createTime;
     private String note;
+    // v2.6.0: 账户类型，0=资产账户，1=负债账户
+    private Integer accountType;
 
     public AccountResponseDto convertToDto(Account account) {
         if (account == null) {
@@ -32,6 +34,8 @@ public class AccountResponseDto {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         accountResponseDto.setCreateTime(sdf.format(account.getCreateTime()));
         accountResponseDto.setNote(account.getNote());
+        // v2.6.0: 设置账户类型
+        accountResponseDto.setAccountType(account.getAccountType());
         return accountResponseDto;
     }
 }

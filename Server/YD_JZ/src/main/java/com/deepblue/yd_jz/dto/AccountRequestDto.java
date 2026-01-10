@@ -10,4 +10,6 @@ public class AccountRequestDto {
     private String exemptMoney;
     private String card;
     private String note;
+    // v2.6.0: 账户类型，0=资产账户，1=负债账户
+    private Integer accountType;
 }

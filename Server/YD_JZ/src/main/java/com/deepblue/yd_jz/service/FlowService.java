@@ -105,9 +105,14 @@ public class FlowService {
                 //     throw new BusinessException(ErrorCode.INSUFFICIENT_BALANCE, "减少金额不允许大于账户金额");
                 // }
                 toAccount = accountService.getOriginAccountById(flowAddRequestDto.getAccountToId());
-                toAccount = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), toAccount, action.isExempt());
+                // v2.6.0: 根据 exemptMode 决定哪个账户 exempt
+                // 0=都不exempt，1=转出exempt，2=转入exempt，3=都exempt
+                int exemptMode = action.getExemptMode() != null ? action.getExemptMode() : 0;
+                boolean toAccountExempt = (exemptMode == 2 || exemptMode == 3);
+                boolean fromAccountExempt = (exemptMode == 1 || exemptMode == 3);
+                toAccount = handleAccount(ContentValues.ACTION_ADD, flowAddRequestDto.getMoney(), toAccount, toAccountExempt);
                 accountService.updateOriginAccount(toAccount);
-                account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account, action.isExempt());
+                account = handleAccount(ContentValues.ACTION_SUB, flowAddRequestDto.getMoney(), account, fromAccountExempt);
                 break;
         }
         accountService.updateOriginAccount(account);
@@ -161,9 +166,13 @@ public class FlowService {
             case ContentValues.ACTION_INNER:
                 log = log+"内部转账\n";
                 Account lastToAccount = accountService.getOriginAccountById(lastFlow.getAccountToId());
-                lastToAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastToAccount, lastExempt);
+                // v2.6.0: 根据 exemptMode 还原内部转账
+                int lastExemptMode = lastAction.getExemptMode() != null ? lastAction.getExemptMode() : 0;
+                boolean lastToAccountExempt = (lastExemptMode == 2 || lastExemptMode == 3);
+                boolean lastFromAccountExempt = (lastExemptMode == 1 || lastExemptMode == 3);
+                lastToAccount = handleAccount(ContentValues.ACTION_SUB, lastFlow.getMoney(), lastToAccount, lastToAccountExempt);
                 accountService.updateOriginAccount(lastToAccount);
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastExempt);
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, lastFlow.getMoney(), lastAccount, lastFromAccountExempt);
                 break;
         }
         LogUtils.log_print(log);
@@ -279,9 +288,13 @@ public class FlowService {
                 break;
             case ContentValues.ACTION_INNER:
                 Account lastToAccount = accountService.getOriginAccountById(flow.getAccountToId());
-                lastToAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastToAccount, flowExempt);
+                // v2.6.0: 根据 exemptMode 还原内部转账
+                int delExemptMode = lastAction.getExemptMode() != null ? lastAction.getExemptMode() : 0;
+                boolean delToAccountExempt = (delExemptMode == 2 || delExemptMode == 3);
+                boolean delFromAccountExempt = (delExemptMode == 1 || delExemptMode == 3);
+                lastToAccount = handleAccount(ContentValues.ACTION_SUB, flow.getMoney(), lastToAccount, delToAccountExempt);
                 accountService.updateOriginAccount(lastToAccount);
-                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, flowExempt);
+                lastAccount = handleAccount(ContentValues.ACTION_ADD, flow.getMoney(), lastAccount, delFromAccountExempt);
                 break;
         }
 

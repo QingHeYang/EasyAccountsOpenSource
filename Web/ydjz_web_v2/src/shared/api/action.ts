@@ -1,6 +1,21 @@
 import { getRequest } from './request'
 import type { ApiResponse } from '../types'
 
+/**
+ * 内部转账豁免模式
+ * 仅对内部转账（handle=2）生效，用于控制转账时哪个账户的金额变动不计入净资产
+ */
+export enum ExemptMode {
+  /** 都不豁免（默认） */
+  NONE = 0,
+  /** 转出账户豁免 */
+  FROM_EXEMPT = 1,
+  /** 转入账户豁免（如还信用卡） */
+  TO_EXEMPT = 2,
+  /** 两边都豁免 */
+  BOTH_EXEMPT = 3,
+}
+
 /** 收支操作类型 */
 export enum ActionHandle {
   /** 流入（账户金额增加） */
@@ -20,6 +35,8 @@ export interface Action {
   handle: ActionHandle
   /** 是否不计入总金额 */
   exempt: boolean
+  /** 内部转账豁免模式（仅 handle=2 时生效） */
+  exemptMode?: ExemptMode
 }
 
 /** 添加/更新收支参数 */
@@ -27,6 +44,8 @@ export interface ActionParams {
   hname: string
   handle: ActionHandle
   exempt?: boolean
+  /** 内部转账豁免模式（仅 handle=2 时生效，默认0） */
+  exemptMode?: ExemptMode
 }
 
 /** 收支管理 API */

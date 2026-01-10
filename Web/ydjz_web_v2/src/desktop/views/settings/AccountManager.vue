@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Close, CreditCard } from '@element-plus/icons-vue'
-import { accountApi, type Account } from '@shared/api/account'
+import { Plus, Close, CreditCard, QuestionFilled } from '@element-plus/icons-vue'
+import { accountApi, AccountType, type Account } from '@shared/api/account'
 import alipayIcon from '@shared/assets/icons/alipay.svg'
 import wechatIcon from '@shared/assets/icons/wechat.svg'
 import housingFundIcon from '@shared/assets/icons/housing-fund.svg'
@@ -32,6 +32,7 @@ const accountForm = ref({
   exemptMoney: '',
   card: '',
   note: '',
+  accountType: AccountType.ASSET as AccountType,
 })
 
 // 监听外部 visible 变化
@@ -82,8 +83,8 @@ function formatMoneyInput(value: string): string {
   if (parts.length === 2 && parts[1].length > 2) {
     result = parts[0] + '.' + parts[1].slice(0, 2)
   }
-  // 恢复负号
-  if (isNegative && result) {
+  // 恢复负号（即使 result 为空也保留，允许用户先输入负号）
+  if (isNegative) {
     result = '-' + result
   }
   return result
@@ -116,6 +117,7 @@ function onEdit(account: Account) {
     exemptMoney: account.exemptMoney || '',
     card: account.card || '',
     note: account.note || '',
+    accountType: account.accountType ?? AccountType.ASSET,
   }
   showDetail.value = true
 }
@@ -133,13 +135,24 @@ function resetForm() {
     exemptMoney: '',
     card: '',
     note: '',
+    accountType: AccountType.ASSET,
   }
 }
 
-// 判断账户余额是否为负数（负债类账户）
-const isNegativeBalance = computed(() => {
-  const m = parseFloat(accountForm.value.money || '0')
-  return m < 0
+// 判断是否为负债账户
+const isLiabilityAccount = computed(() => {
+  return accountForm.value.accountType === AccountType.LIABILITY
+})
+
+// 帮助对话框
+const showAccountTypeHelp = ref(false)
+const showExemptMoneyHelp = ref(false)
+
+// 计算账户净资产
+const netAsset = computed(() => {
+  const money = parseFloat(accountForm.value.money || '0')
+  const exempt = parseFloat(accountForm.value.exemptMoney || '0')
+  return (money - exempt).toFixed(2)
 })
 
 async function onSubmit() {
@@ -153,8 +166,8 @@ async function onSubmit() {
   }
 
   try {
-    // 负数账户（负债类）不允许设置不计入金额
-    const exemptMoney = isNegativeBalance.value ? '' : (accountForm.value.exemptMoney || '')
+    // 负债账户不允许设置不计入金额
+    const exemptMoney = isLiabilityAccount.value ? '' : (accountForm.value.exemptMoney || '')
 
     const params = {
       name: accountForm.value.name.trim(),
@@ -162,6 +175,7 @@ async function onSubmit() {
       exemptMoney,
       card: accountForm.value.card || '',
       note: accountForm.value.note || '',
+      accountType: accountForm.value.accountType,
     }
 
     if (editingAccount.value) {
@@ -184,12 +198,17 @@ async function onDelete() {
 
   try {
     await ElMessageBox.confirm(
-      '确定停用该账户吗？停用后将无法在此账户下记账！关于此账户的数据不会删除。',
+      `<div style="line-height: 1.8;">
+        <p>确定停用该账户吗？</p>
+        <p style="color: var(--color-expense); font-weight: 500;">请先将账户余额设置为 0，否则此账户金额将无法继续记账！</p>
+        <p style="color: var(--color-text-tertiary); font-size: 13px;">停用后关于此账户的历史数据不会删除。</p>
+      </div>`,
       '停用账户',
       {
         confirmButtonText: '确定停用',
         cancelButtonText: '取消',
         type: 'warning',
+        dangerouslyUseHTMLString: true,
         customClass: 'high-zindex-msgbox',
       }
     )
@@ -239,10 +258,20 @@ async function onDelete() {
               <el-icon v-else :size="24"><CreditCard /></el-icon>
             </div>
             <div class="account-info">
-              <div class="account-name">{{ account.name }}</div>
+              <div class="account-name-row">
+                <span class="account-name">{{ account.name }}</span>
+                <span
+                  class="account-type-badge"
+                  :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+                >
+                  {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+                </span>
+              </div>
               <div v-if="account.card" class="account-card">{{ account.card }}</div>
             </div>
-            <div class="account-money">{{ formatMoney(account.money) }}</div>
+            <div class="account-money" :class="{ negative: parseFloat(account.money || '0') < 0 }">
+              {{ formatMoney(account.money) }}
+            </div>
           </div>
           <el-empty v-if="!loading && accounts.length === 0" description="暂无账户" />
         </div>
@@ -267,6 +296,41 @@ async function onDelete() {
                 />
               </div>
 
+              <!-- 账户类型 -->
+              <div class="form-item">
+                <label class="form-label">
+                  账户类型 <span class="required">*</span>
+                  <el-icon class="help-icon" @click="showAccountTypeHelp = true"><QuestionFilled /></el-icon>
+                </label>
+                <div class="type-radio-group" :class="{ disabled: editingAccount }">
+                  <div
+                    class="type-radio-item"
+                    :class="{ active: accountForm.accountType === AccountType.ASSET }"
+                    @click="!editingAccount && (accountForm.accountType = AccountType.ASSET)"
+                  >
+                    <div class="type-radio-dot"></div>
+                    <span class="type-radio-text">资产账户</span>
+                  </div>
+                  <div
+                    class="type-radio-item liability"
+                    :class="{ active: accountForm.accountType === AccountType.LIABILITY }"
+                    @click="!editingAccount && (accountForm.accountType = AccountType.LIABILITY)"
+                  >
+                    <div class="type-radio-dot"></div>
+                    <span class="type-radio-text">负债账户</span>
+                  </div>
+                </div>
+                <div v-if="editingAccount" class="input-hint warning">
+                  账户类型创建后无法修改
+                </div>
+                <div v-else-if="isLiabilityAccount" class="input-hint">
+                  负债账户余额通常为负数，如 -5000 表示欠款
+                </div>
+                <div v-else class="input-hint">
+                  资产账户余额通常为正数，表示实际持有金额
+                </div>
+              </div>
+
               <!-- 账户余额 -->
               <div class="form-item">
                 <label class="form-label">账户余额 <span class="required">*</span></label>
@@ -278,27 +342,39 @@ async function onDelete() {
                 >
                   <template #prefix>¥</template>
                 </el-input>
-                <div v-if="isNegativeBalance" class="input-hint warning">
-                  负数余额通常表示信用卡或负债账户
-                </div>
               </div>
 
               <!-- 不计入金额 -->
               <div class="form-item">
-                <label class="form-label">不计入金额</label>
+                <label class="form-label">
+                  不计入金额
+                  <el-icon class="help-icon" @click="showExemptMoneyHelp = true"><QuestionFilled /></el-icon>
+                </label>
                 <el-input
                   :model-value="accountForm.exemptMoney"
                   @input="(val: string) => accountForm.exemptMoney = formatMoneyInput(val)"
                   placeholder="0.00"
                   size="large"
-                  :disabled="isNegativeBalance"
+                  :disabled="isLiabilityAccount"
                 >
                   <template #prefix>¥</template>
                 </el-input>
-                <div v-if="isNegativeBalance" class="input-hint warning">
-                  负债类账户不支持设置不计入金额
+                <div v-if="isLiabilityAccount" class="input-hint warning">
+                  负债账户不支持设置不计入金额
                 </div>
-                <div v-else class="input-hint">此金额不计入资产统计</div>
+                <div v-else class="exempt-hint">
+                  <span class="exempt-hint-text">此金额不计入净资产统计</span>
+                  <div class="exempt-formula">
+                    <div class="formula-text">账户净资产 = 账户余额 - 不计入金额</div>
+                    <div class="formula-calc">
+                      <span class="net-asset">{{ netAsset }}</span>
+                      <span class="calc-equal">=</span>
+                      <span class="calc-value">({{ accountForm.money || '0.00' }})</span>
+                      <span class="calc-operator">-</span>
+                      <span class="calc-value">({{ accountForm.exemptMoney || '0.00' }})</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- 卡号 -->
@@ -333,6 +409,55 @@ async function onDelete() {
         </div>
       </Transition>
     </div>
+
+    <!-- 账户类型帮助对话框 -->
+    <el-dialog
+      v-model="showAccountTypeHelp"
+      title="账户类型说明"
+      width="400px"
+      :z-index="4000"
+    >
+      <div class="help-content">
+        <div class="help-item">
+          <div class="help-item-title asset">资产账户</div>
+          <div class="help-item-desc">储蓄卡、现金、支付宝余额等有实际金额的账户，余额通常为正数。</div>
+        </div>
+        <div class="help-item">
+          <div class="help-item-title liability">负债账户</div>
+          <div class="help-item-desc">信用卡、借款、花呗等负债类账户，余额通常为负数，表示欠款金额。</div>
+        </div>
+        <div class="help-warning">
+          <el-icon><QuestionFilled /></el-icon>
+          <span>注意：账户类型创建后无法修改</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showAccountTypeHelp = false">我知道了</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 不计入金额帮助对话框 -->
+    <el-dialog
+      v-model="showExemptMoneyHelp"
+      title="不计入金额说明"
+      width="400px"
+      :z-index="4000"
+    >
+      <div class="help-content">
+        <div class="help-item">
+          <div class="help-item-desc">不计入金额一般指：资金代管、借钱收款等内容。</div>
+        </div>
+        <div class="help-item">
+          <div class="help-item-desc">这部分金额虽然在账户中，但不属于您的实际资产，因此不计入净资产统计。</div>
+        </div>
+        <div class="help-item">
+          <div class="help-item-desc">此项金额不影响正常记账，不代表实际账户的余额。</div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showExemptMoneyHelp = false">我知道了</el-button>
+      </template>
+    </el-dialog>
   </el-drawer>
 </template>
 
@@ -504,10 +629,33 @@ async function onDelete() {
   min-width: 0;
 }
 
+.account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .account-name {
   font-size: 15px;
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.account-type-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.account-type-badge.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.account-type-badge.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
 }
 
 .account-card {
@@ -523,6 +671,10 @@ async function onDelete() {
   font-size: 16px;
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.account-money.negative {
+  color: var(--color-expense);
 }
 
 /* 表单样式 */
@@ -565,6 +717,196 @@ async function onDelete() {
 }
 
 .input-hint.warning {
+  color: var(--color-expense);
+}
+
+/* 不计入金额提示 */
+.exempt-hint {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exempt-hint-text {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.exempt-formula {
+  padding: 10px 14px;
+  background: var(--color-bg-page);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formula-text {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.formula-calc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.formula-calc .net-asset {
+  font-weight: 600;
+  color: var(--color-transfer);
+}
+
+.formula-calc .calc-equal,
+.formula-calc .calc-operator {
+  color: var(--color-text-tertiary);
+}
+
+.formula-calc .calc-value {
+  color: var(--color-text-secondary);
+}
+
+/* 帮助图标 */
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-icon {
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  cursor: help;
+}
+
+.help-icon:hover {
+  color: var(--color-transfer);
+}
+
+/* 帮助对话框 */
+.help-content {
+  padding: 0;
+}
+
+.help-item {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--color-bg-page);
+  border-radius: 10px;
+}
+
+.help-item:last-of-type {
+  margin-bottom: 0;
+}
+
+.help-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.help-item-title.asset {
+  color: var(--color-income);
+}
+
+.help-item-title.liability {
+  color: var(--color-expense);
+}
+
+.help-item-desc {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+
+.help-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: var(--color-expense-bg);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-expense);
+}
+
+/* 账户类型选择器 */
+.type-radio-group {
+  display: flex;
+  gap: 12px;
+}
+
+.type-radio-group.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.type-radio-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.type-radio-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.type-radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-text-tertiary);
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+}
+
+.type-radio-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.type-radio-item.active {
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.12) 0%, rgba(24, 144, 255, 0.06) 100%);
+  border-color: var(--color-transfer);
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.15);
+}
+
+.type-radio-item.active .type-radio-dot {
+  border-color: var(--color-transfer);
+  background: var(--color-transfer);
+  box-shadow: inset 0 0 0 3px #fff, 0 0 0 2px var(--color-transfer);
+}
+
+.type-radio-item.active .type-radio-text {
+  color: var(--color-transfer);
+}
+
+.type-radio-item.liability.active {
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.12) 0%, rgba(245, 34, 45, 0.06) 100%);
+  border-color: var(--color-expense);
+  box-shadow: 0 4px 16px rgba(245, 34, 45, 0.15);
+}
+
+.type-radio-item.liability.active .type-radio-dot {
+  border-color: var(--color-expense);
+  background: var(--color-expense);
+  box-shadow: inset 0 0 0 3px #fff, 0 0 0 2px var(--color-expense);
+}
+
+.type-radio-item.liability.active .type-radio-text {
   color: var(--color-expense);
 }
 </style>

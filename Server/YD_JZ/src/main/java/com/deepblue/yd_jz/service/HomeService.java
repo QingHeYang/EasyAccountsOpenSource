@@ -85,6 +85,8 @@ public class HomeService {
             hab.setAccountAsset(account.getMoney());
             hab.setExemptAsset(account.getExemptMoney());
             hab.setNote(account.getNote());
+            // v2.6.0: 设置账户类型
+            hab.setAccountType(account.getAccountType());
             BigDecimal accountAsset = new BigDecimal(account.getMoney());
             // v2.6.0: 防止除零错误，当总资产为0时百分比显示为0
             if (totalAsset.compareTo(BigDecimal.ZERO) == 0) {

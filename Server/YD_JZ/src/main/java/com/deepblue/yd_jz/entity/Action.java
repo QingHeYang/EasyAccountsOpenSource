@@ -22,4 +22,9 @@ public class Action {
     @Column(name = "handle", nullable = false)
     private int handle;
 
+    // v2.6.0: 内部转账exempt模式
+    // 0=都不exempt，1=转出账户exempt，2=转入账户exempt，3=都exempt
+    @Column(name = "exempt_mode", nullable = false)
+    private Integer exemptMode = 0;
+
 }

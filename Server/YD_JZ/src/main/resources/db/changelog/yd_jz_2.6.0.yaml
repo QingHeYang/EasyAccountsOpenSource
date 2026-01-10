@@ -1,0 +1,40 @@
+databaseChangeLog:
+  # v2.6.0: 账户类型字段
+  - changeSet:
+      id: 2.6.0-add-account-type
+      author: claude
+      changes:
+        - addColumn:
+            tableName: account
+            columns:
+              - column:
+                  name: account_type
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "账户类型：0=资产账户，1=负债账户"
+
+  # v2.6.0: Action 表添加 exempt_mode 字段
+  - changeSet:
+      id: 2.6.0-add-action-exempt-mode
+      author: claude
+      changes:
+        - addColumn:
+            tableName: action
+            columns:
+              - column:
+                  name: exempt_mode
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "内部转账exempt模式：0=都不exempt，1=转出exempt，2=转入exempt，3=都exempt"
+
+  # v2.6.0: 数据迁移 - 内部转账且exempt=true的action设置exempt_mode=2
+  - changeSet:
+      id: 2.6.0-migrate-action-exempt-mode
+      author: claude
+      changes:
+        - sql:
+            sql: UPDATE action SET exempt_mode = 2 WHERE handle = 2 AND exempt = true
