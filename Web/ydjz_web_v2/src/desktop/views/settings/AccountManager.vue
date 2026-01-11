@@ -909,4 +909,29 @@ async function onDelete() {
 .type-radio-item.liability.active .type-radio-text {
   color: var(--color-expense);
 }
+
+/* 暗黑模式 */
+html.dark .type-radio-item {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+html.dark .type-radio-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .type-radio-item.active {
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.2) 0%, rgba(24, 144, 255, 0.1) 100%);
+}
+
+html.dark .type-radio-item.active .type-radio-dot {
+  box-shadow: inset 0 0 0 3px #1a1a1a, 0 0 0 2px var(--color-transfer);
+}
+
+html.dark .type-radio-item.liability.active {
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.2) 0%, rgba(245, 34, 45, 0.1) 100%);
+}
+
+html.dark .type-radio-item.liability.active .type-radio-dot {
+  box-shadow: inset 0 0 0 3px #1a1a1a, 0 0 0 2px var(--color-expense);
+}
 </style>

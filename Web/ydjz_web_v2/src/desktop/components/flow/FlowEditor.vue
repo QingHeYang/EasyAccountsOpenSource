@@ -27,7 +27,7 @@ import { Calendar as VanCalendar } from 'vant'
 import 'vant/es/calendar/style'
 import { flowApi, type FlowParams, type FlowDetail } from '@shared/api/flow'
 import { actionApi, type Action } from '@shared/api/action'
-import { accountApi, type Account } from '@shared/api/account'
+import { accountApi, AccountType, type Account } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { templateApi, type Template } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
@@ -1168,10 +1168,14 @@ function onClose() {
                 :class="{
                   active: accountPanelType === 1
                     ? selectedAccount?.id === account.id
-                    : selectedAccountTo?.id === account.id
+                    : selectedAccountTo?.id === account.id,
+                  liability: account.accountType === AccountType.LIABILITY
                 }"
                 @click="onSelectAccount(account)"
               >
+                <div class="account-type-bar" :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'">
+                  {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+                </div>
                 <div class="account-icon" :class="{ 'has-svg': getAccountIcon(account.name) }">
                   <img v-if="getAccountIcon(account.name)" :src="getAccountIcon(account.name)!" class="account-svg" />
                   <el-icon v-else :size="24"><CreditCard /></el-icon>
@@ -2039,6 +2043,7 @@ function onClose() {
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
+  padding-left: 0;
   margin-bottom: 10px;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(8px);
@@ -2048,6 +2053,7 @@ function onClose() {
   transition: all 0.25s ease;
   border: 1.5px solid rgba(0, 0, 0, 0.04);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 }
 
 .account-item:hover {
@@ -2060,6 +2066,38 @@ function onClose() {
   border-color: var(--color-transfer);
   background: linear-gradient(135deg, rgba(24, 144, 255, 0.08) 0%, rgba(24, 144, 255, 0.04) 100%);
   box-shadow: 0 4px 16px rgba(24, 144, 255, 0.15);
+}
+
+.account-item.liability.active {
+  border-color: var(--color-expense);
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.08) 0%, rgba(245, 34, 45, 0.04) 100%);
+  box-shadow: 0 4px 16px rgba(245, 34, 45, 0.15);
+}
+
+.account-type-bar {
+  width: 22px;
+  min-width: 22px;
+  margin: -16px 0 -16px -1.5px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 12px 0 0 12px;
+  transition: all 0.25s ease;
+}
+
+.account-type-bar.asset {
+  background: linear-gradient(180deg, var(--color-income) 0%, rgba(82, 196, 26, 0.7) 100%);
+}
+
+.account-type-bar.liability {
+  background: linear-gradient(180deg, var(--color-expense) 0%, rgba(245, 34, 45, 0.7) 100%);
 }
 
 .account-icon {
@@ -2592,6 +2630,18 @@ html.dark .account-item:hover,
 html.dark .template-item:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .account-item.liability.active {
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.15) 0%, rgba(245, 34, 45, 0.08) 100%);
+}
+
+html.dark .account-type-bar.asset {
+  background: linear-gradient(180deg, var(--color-income) 0%, rgba(82, 196, 26, 0.5) 100%);
+}
+
+html.dark .account-type-bar.liability {
+  background: linear-gradient(180deg, var(--color-expense) 0%, rgba(245, 34, 45, 0.5) 100%);
 }
 
 html.dark .type-group {

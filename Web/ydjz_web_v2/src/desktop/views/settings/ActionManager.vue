@@ -59,6 +59,20 @@ function getHandleInfo(handle: ActionHandle) {
   }
 }
 
+// 获取不计入显示文本（内部转账根据模式显示）
+function getExemptText(action: Action): string {
+  if (!action.exempt) return ''
+  // 收入/支出只显示"不计入"
+  if (action.handle !== ActionHandle.TRANSFER) return '不计入'
+  // 内部转账根据模式显示
+  switch (action.exemptMode) {
+    case ExemptMode.FROM_EXEMPT: return '转出不计入'
+    case ExemptMode.TO_EXEMPT: return '转入不计入'
+    case ExemptMode.BOTH_EXEMPT: return '两边不计入'
+    default: return '不计入'
+  }
+}
+
 async function loadActions() {
   loading.value = true
   try {
@@ -220,7 +234,7 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
                 >
                   {{ getHandleInfo(action.handle).text }}
                 </span>
-                <span v-if="action.exempt" class="action-tag exempt">不计入</span>
+                <span v-if="action.exempt" class="action-tag exempt">{{ getExemptText(action) }}</span>
               </div>
             </div>
             <el-icon class="action-arrow"><ArrowRight /></el-icon>
@@ -821,5 +835,47 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
   padding: 0 12px;
   color: var(--color-transfer);
   background: rgba(24, 144, 255, 0.08);
+}
+
+/* 暗黑模式 */
+html.dark .transfer-exempt-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .transfer-account.from {
+  background: rgba(245, 34, 45, 0.15);
+}
+
+html.dark .transfer-account.to {
+  background: rgba(82, 196, 26, 0.15);
+}
+
+html.dark .transfer-account.active.from {
+  background: rgba(245, 34, 45, 0.3);
+}
+
+html.dark .transfer-account.active.to {
+  background: rgba(82, 196, 26, 0.3);
+}
+
+html.dark .transfer-arrow {
+  background: rgba(24, 144, 255, 0.2);
+}
+
+html.dark .transfer-account-label {
+  color: var(--color-text-primary);
+}
+
+html.dark .transfer-account.from .transfer-account-label {
+  color: #ff7875;
+}
+
+html.dark .transfer-account.to .transfer-account-label {
+  color: #95de64;
+}
+
+html.dark .switch-label {
+  color: var(--color-text-secondary);
 }
 </style>
