@@ -460,6 +460,9 @@ function toAI() {
           :key="acc.id"
           @click="toScreen(acc.id)"
         >
+          <div class="account-type-tag" :class="acc.accountType === 1 ? 'liability' : 'asset'">
+            {{ acc.accountType === 1 ? '负债' : '资产' }}
+          </div>
           <div class="account-info">
             <div class="account-name">{{ acc.accountName }}</div>
             <div class="account-note" v-if="acc.note">{{ acc.note }}</div>
@@ -936,6 +939,7 @@ function toAI() {
 .account-item {
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 16px;
   border-radius: 12px;
   margin-bottom: 8px;
@@ -946,8 +950,27 @@ function toAI() {
   opacity: 0.8;
 }
 
+.account-type-tag {
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.account-type-tag.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.account-type-tag.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
+}
+
 .account-info {
   flex: 1;
+  min-width: 0;
 }
 
 .account-name {

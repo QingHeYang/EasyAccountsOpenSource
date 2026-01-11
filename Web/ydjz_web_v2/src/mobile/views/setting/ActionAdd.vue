@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showLoadingToast, closeToast, showToast } from 'vant'
-import { actionApi, ActionHandle } from '@shared/api/action'
+import { showLoadingToast, closeToast, showToast, showDialog } from 'vant'
+import { actionApi, ActionHandle, ExemptMode } from '@shared/api/action'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 
 const route = useRoute()
@@ -20,6 +20,53 @@ const isEdit = computed(() => actionId.value !== null)
 const actionName = ref('')
 const handleType = ref<string>('0')
 const exempt = ref(false)
+const exemptMode = ref<ExemptMode>(ExemptMode.NONE)
+
+// 是否为转账类型
+const isTransfer = computed(() => handleType.value === '2')
+
+// 转出账户不计入总金额
+const fromNotCount = computed({
+  get: () => exemptMode.value === ExemptMode.FROM_EXEMPT || exemptMode.value === ExemptMode.BOTH_EXEMPT,
+  set: (val: boolean) => {
+    const toVal = exemptMode.value === ExemptMode.TO_EXEMPT || exemptMode.value === ExemptMode.BOTH_EXEMPT
+    if (val && toVal) {
+      exemptMode.value = ExemptMode.BOTH_EXEMPT
+    } else if (val) {
+      exemptMode.value = ExemptMode.FROM_EXEMPT
+    } else if (toVal) {
+      exemptMode.value = ExemptMode.TO_EXEMPT
+    } else {
+      exemptMode.value = ExemptMode.NONE
+    }
+  }
+})
+
+// 转入账户不计入总金额
+const toNotCount = computed({
+  get: () => exemptMode.value === ExemptMode.TO_EXEMPT || exemptMode.value === ExemptMode.BOTH_EXEMPT,
+  set: (val: boolean) => {
+    const fromVal = exemptMode.value === ExemptMode.FROM_EXEMPT || exemptMode.value === ExemptMode.BOTH_EXEMPT
+    if (val && fromVal) {
+      exemptMode.value = ExemptMode.BOTH_EXEMPT
+    } else if (val) {
+      exemptMode.value = ExemptMode.TO_EXEMPT
+    } else if (fromVal) {
+      exemptMode.value = ExemptMode.FROM_EXEMPT
+    } else {
+      exemptMode.value = ExemptMode.NONE
+    }
+  }
+})
+
+// 显示帮助
+function showHelp() {
+  showDialog({
+    title: '不计入总金额说明',
+    message: '不计入总金额一般用于资金代管、借钱还钱等场景。\n\n• 转出不计入：转出账户的金额变动不计入总金额\n• 转入不计入：转入账户的金额变动不计入总金额\n• 都不计入：两个账户的金额变动都不计入总金额',
+    confirmButtonText: '我知道了',
+  })
+}
 
 // 加载现有数据
 async function loadAction() {
@@ -31,6 +78,7 @@ async function loadAction() {
     actionName.value = action.hname
     handleType.value = String(action.handle)
     exempt.value = action.exempt
+    exemptMode.value = action.exemptMode ?? ExemptMode.NONE
   } catch (err) {
     showToast('获取数据失败')
     console.error(err)
@@ -54,6 +102,8 @@ async function onSubmit() {
       hname: actionName.value.trim(),
       handle: parseInt(handleType.value) as ActionHandle,
       exempt: exempt.value,
+      // exemptMode 仅对转账类型生效
+      exemptMode: isTransfer.value ? exemptMode.value : undefined,
     }
 
     if (isEdit.value && actionId.value) {
@@ -149,6 +199,34 @@ onMounted(() => {
             <span class="form-hint">开启后该收支不计入统计</span>
           </div>
           <van-switch v-model="exempt" size="24" />
+        </div>
+
+        <!-- 转账不计入设置（仅转账且开启不计入时显示） -->
+        <div v-if="isTransfer && exempt" class="form-item">
+          <label class="form-label">
+            不计入设置
+            <van-icon name="question-o" class="help-icon" @click="showHelp" />
+          </label>
+          <div class="transfer-card">
+            <div class="transfer-account from" :class="{ active: fromNotCount }">
+              <div class="account-label">转出账户</div>
+              <div class="account-switch">
+                <span>不计入</span>
+                <van-switch v-model="fromNotCount" size="20" />
+              </div>
+            </div>
+            <div class="transfer-arrow">
+              <van-icon name="arrow" />
+            </div>
+            <div class="transfer-account to" :class="{ active: toNotCount }">
+              <div class="account-label">转入账户</div>
+              <div class="account-switch">
+                <span>不计入</span>
+                <van-switch v-model="toNotCount" size="20" />
+              </div>
+            </div>
+          </div>
+          <span class="form-hint">选择哪个账户的金额变动不计入总金额</span>
         </div>
       </div>
 
@@ -352,6 +430,83 @@ onMounted(() => {
 
 .submit-btn:active {
   opacity: 0.9;
+}
+
+/* 帮助图标 */
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-icon {
+  font-size: 16px;
+  color: var(--color-text-tertiary);
+}
+
+/* 转账不计入设置卡片 */
+.transfer-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-bg-page);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.transfer-account {
+  flex: 1;
+  padding: 12px;
+  background: var(--color-bg-card);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.transfer-account.from {
+  background: rgba(245, 34, 45, 0.06);
+}
+
+.transfer-account.to {
+  background: rgba(82, 196, 26, 0.06);
+}
+
+.transfer-account.from.active {
+  border-color: var(--color-expense);
+  background: rgba(245, 34, 45, 0.12);
+}
+
+.transfer-account.to.active {
+  border-color: var(--color-income);
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.account-label {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.transfer-account.from .account-label {
+  color: var(--color-expense);
+}
+
+.transfer-account.to .account-label {
+  color: var(--color-income);
+}
+
+.account-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.transfer-arrow {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
 }
 </style>
 

@@ -26,7 +26,7 @@ import cashIcon from '@shared/assets/icons/cash.svg'
 import { Calendar as VanCalendar } from 'vant'
 import 'vant/es/calendar/style'
 import { flowApi, type FlowParams, type FlowDetail } from '@shared/api/flow'
-import { actionApi, type Action } from '@shared/api/action'
+import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 import { accountApi, AccountType, type Account } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { templateApi, type Template } from '@shared/api/template'
@@ -158,13 +158,92 @@ function closeAllPanels() {
 // ==================== 计算属性 ====================
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
 
-// 转账可用账户（排除有不计入金额的账户）
-const transferableAccounts = computed(() => {
-  return accounts.value.filter(acc => {
-    const exempt = parseFloat(acc.exemptMoney || '0')
-    return exempt === 0
-  })
-})
+// ==================== 双向限制逻辑 ====================
+
+/**
+ * 判断账户是否应该被禁用（根据已选收支类型）
+ * 负债账户不能用于"不计入"类型的收支
+ */
+function isAccountDisabled(account: Account, panelType: 1 | 2): boolean {
+  // 如果账户不是负债，不禁用
+  if (account.accountType !== AccountType.LIABILITY) return false
+
+  // 如果没选收支，或者收支不是"不计入"类型，不禁用
+  if (!selectedAction.value?.exempt) return false
+
+  // 普通不计入收支（非转账）：禁用所有负债账户
+  if (selectedAction.value.handle !== ActionHandle.TRANSFER) {
+    return true
+  }
+
+  // 内部转账的不计入，根据 exemptMode 判断
+  const mode = selectedAction.value.exemptMode ?? ExemptMode.NONE
+
+  if (panelType === 1) {
+    // 源账户面板：禁用负债如果是转出不计入或两边不计入
+    return mode === ExemptMode.FROM_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  } else {
+    // 目标账户面板：禁用负债如果是转入不计入或两边不计入
+    return mode === ExemptMode.TO_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  }
+}
+
+/**
+ * 判断收支是否应该被禁用（根据已选账户）
+ * 如果选了负债账户，则禁用相关的"不计入"收支
+ */
+function isActionDisabled(action: Action): boolean {
+  // 如果收支不是"不计入"类型，不禁用
+  if (!action.exempt) return false
+
+  // 检查源账户是否为负债
+  const sourceIsLiability = selectedAccount.value?.accountType === AccountType.LIABILITY
+  // 检查目标账户是否为负债
+  const targetIsLiability = selectedAccountTo.value?.accountType === AccountType.LIABILITY
+
+  // 如果都不是负债，不禁用
+  if (!sourceIsLiability && !targetIsLiability) return false
+
+  // 普通不计入收支（非转账）：只要源账户是负债就禁用
+  if (action.handle !== ActionHandle.TRANSFER) {
+    return sourceIsLiability
+  }
+
+  // 内部转账的不计入
+  const mode = action.exemptMode ?? ExemptMode.NONE
+
+  if (sourceIsLiability) {
+    // 源账户是负债：禁用转出不计入、两边不计入
+    if (mode === ExemptMode.FROM_EXEMPT || mode === ExemptMode.BOTH_EXEMPT) {
+      return true
+    }
+  }
+
+  if (targetIsLiability) {
+    // 目标账户是负债：禁用转入不计入、两边不计入
+    if (mode === ExemptMode.TO_EXEMPT || mode === ExemptMode.BOTH_EXEMPT) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * 获取账户禁用原因提示
+ */
+function getAccountDisabledReason(account: Account, panelType: 1 | 2): string {
+  if (!isAccountDisabled(account, panelType)) return ''
+  return '负债账户不支持此收支类型'
+}
+
+/**
+ * 获取收支禁用原因提示
+ */
+function getActionDisabledReason(action: Action): string {
+  if (!isActionDisabled(action)) return ''
+  return '已选负债账户不支持'
+}
 
 // 普通 action 和 不计入的 action 分开
 const normalActions = computed(() => actions.value.filter(a => !a.exempt))
@@ -962,18 +1041,25 @@ function onClose() {
           </div>
           <Transition name="collapse">
             <div v-show="exemptActionsExpanded" class="exempt-actions">
-              <div
+              <el-tooltip
                 v-for="action in exemptActions"
                 :key="action.id"
-                class="action-tab exempt"
-                :class="{
-                  active: selectedAction?.id === action.id,
-                  [getActionClass(action.handle)]: true
-                }"
-                @click="onSelectAction(action)"
+                :content="getActionDisabledReason(action)"
+                :disabled="!isActionDisabled(action)"
+                placement="top"
               >
-                {{ action.hname }}
-              </div>
+                <div
+                  class="action-tab exempt"
+                  :class="{
+                    active: selectedAction?.id === action.id,
+                    [getActionClass(action.handle)]: true,
+                    disabled: isActionDisabled(action)
+                  }"
+                  @click="!isActionDisabled(action) && onSelectAction(action)"
+                >
+                  {{ action.hname }}
+                </div>
+              </el-tooltip>
             </div>
           </Transition>
         </div>
@@ -1155,38 +1241,45 @@ function onClose() {
             <span class="sub-panel-title">{{ accountPanelType === 1 ? '选择账户' : '选择目标账户' }}</span>
           </div>
           <div ref="accountPanelBody" class="panel-body">
-            <!-- 转账模式提示 -->
-            <div v-if="isTransfer" class="transfer-hint">
-              <el-icon><Warning /></el-icon>
-              <span>转账不支持选择含有"不计入金额"的账户，负债类账户请分两笔记录</span>
-            </div>
             <div class="account-list">
-              <div
-                v-for="account in (isTransfer ? transferableAccounts : accounts)"
+              <el-tooltip
+                v-for="account in accounts"
                 :key="account.id"
-                class="account-item"
-                :class="{
-                  active: accountPanelType === 1
-                    ? selectedAccount?.id === account.id
-                    : selectedAccountTo?.id === account.id,
-                  liability: account.accountType === AccountType.LIABILITY
-                }"
-                @click="onSelectAccount(account)"
+                :content="getAccountDisabledReason(account, accountPanelType)"
+                :disabled="!isAccountDisabled(account, accountPanelType)"
+                placement="right"
               >
-                <div class="account-type-bar" :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'">
-                  {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+                <div
+                  class="account-item"
+                  :class="{
+                    active: accountPanelType === 1
+                      ? selectedAccount?.id === account.id
+                      : selectedAccountTo?.id === account.id,
+                    liability: account.accountType === AccountType.LIABILITY,
+                    disabled: isAccountDisabled(account, accountPanelType)
+                  }"
+                  @click="!isAccountDisabled(account, accountPanelType) && onSelectAccount(account)"
+                >
+                  <div class="account-type-bar" :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'">
+                    {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+                  </div>
+                  <div class="account-icon" :class="{ 'has-svg': getAccountIcon(account.name) }">
+                    <img v-if="getAccountIcon(account.name)" :src="getAccountIcon(account.name)!" class="account-svg" />
+                    <el-icon v-else :size="24"><CreditCard /></el-icon>
+                  </div>
+                  <div class="account-info">
+                    <div class="account-name">{{ account.name }}</div>
+                    <div v-if="account.card" class="account-card">{{ account.card }}</div>
+                  </div>
+                  <div class="account-money-info">
+                    <div class="account-money">{{ formatMoneyDisplay(account.money) }}</div>
+                    <div v-if="account.exemptMoney && parseFloat(account.exemptMoney) !== 0" class="account-exempt">
+                      不计入 {{ formatMoneyDisplay(account.exemptMoney) }}
+                    </div>
+                  </div>
                 </div>
-                <div class="account-icon" :class="{ 'has-svg': getAccountIcon(account.name) }">
-                  <img v-if="getAccountIcon(account.name)" :src="getAccountIcon(account.name)!" class="account-svg" />
-                  <el-icon v-else :size="24"><CreditCard /></el-icon>
-                </div>
-                <div class="account-info">
-                  <div class="account-name">{{ account.name }}</div>
-                  <div v-if="account.card" class="account-card">{{ account.card }}</div>
-                </div>
-                <div class="account-money">{{ formatMoneyDisplay(account.money) }}</div>
-              </div>
-              <el-empty v-if="(isTransfer ? transferableAccounts : accounts).length === 0" description="暂无可用账户" />
+              </el-tooltip>
+              <el-empty v-if="accounts.length === 0" description="暂无可用账户" />
             </div>
           </div>
         </div>
@@ -1666,6 +1759,26 @@ function onClose() {
   color: var(--color-transfer);
 }
 
+/* 禁用状态 */
+.action-tab.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-tab.disabled:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.account-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.account-item.disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
 .exempt-dot {
   position: absolute;
   top: 4px;
@@ -2014,25 +2127,6 @@ function onClose() {
   background: var(--color-transfer-bg);
 }
 
-/* 转账提示 */
-.transfer-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  background: var(--color-transfer-bg);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--color-transfer);
-  line-height: 1.5;
-}
-
-.transfer-hint .el-icon {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
 /* 账户列表 - 参考 AccountManager */
 .account-list {
   min-height: 200px;
@@ -2141,10 +2235,23 @@ function onClose() {
   white-space: nowrap;
 }
 
+.account-money-info {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .account-money {
   font-size: 16px;
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.account-exempt {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 
 /* 分类列表 - 参考 TypeManager */

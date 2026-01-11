@@ -57,10 +57,14 @@ public class FlowService {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
 
-        // 校验分类：有子分类的父分类不允许直接记账
+        // 校验分类：有子分类且定义了actionId的父分类不允许直接记账
         List<Type> subTypes = typeRepository.findByParent(flowAddRequestDto.getTypeId());
         if (subTypes != null && !subTypes.isEmpty()) {
-            throw new BusinessException(ErrorCode.TYPE_HAS_CHILDREN, "该分类有子分类，请选择子分类记账");
+            // v2.6.0: 只有定义了 actionId 的父分类才需要选子分类记账
+            Type currentType = typeRepository.findById(flowAddRequestDto.getTypeId()).orElse(null);
+            if (currentType != null && currentType.getActionId() != null) {
+                throw new BusinessException(ErrorCode.TYPE_HAS_CHILDREN, "该分类有子分类，请选择子分类记账");
+            }
         }
 
         String log = "新增flow\n"+"金额： "+ flowAddRequestDto.getMoney()+"";
@@ -136,10 +140,14 @@ public class FlowService {
         // 格式化金额，确保只有2位小数
         flowAddRequestDto.setMoney(MoneyUtils.formatMoney(flowAddRequestDto.getMoney()));
 
-        // 校验分类：有子分类的父分类不允许直接记账
+        // 校验分类：有子分类且定义了actionId的父分类不允许直接记账
         List<Type> subTypes = typeRepository.findByParent(flowAddRequestDto.getTypeId());
         if (subTypes != null && !subTypes.isEmpty()) {
-            throw new BusinessException(ErrorCode.TYPE_HAS_CHILDREN, "该分类有子分类，请选择子分类记账");
+            // v2.6.0: 只有定义了 actionId 的父分类才需要选子分类记账
+            Type currentType = typeRepository.findById(flowAddRequestDto.getTypeId()).orElse(null);
+            if (currentType != null && currentType.getActionId() != null) {
+                throw new BusinessException(ErrorCode.TYPE_HAS_CHILDREN, "该分类有子分类，请选择子分类记账");
+            }
         }
 
         // 处理from字段：如果没有传入from字段，则置空

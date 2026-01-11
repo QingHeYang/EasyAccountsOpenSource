@@ -76,7 +76,8 @@ FLOWS_PARAMS = [
         name="types",
         param_type="array",
         description="分类ID列表。使用types工具获取分类ID",
-        required=False
+        required=False,
+        items={"type": "integer"}
     ),
     ToolParam(
         name="analysis",
@@ -222,7 +223,8 @@ MAKE_EXCEL_PARAMS = [
         name="types",
         param_type="array",
         description="分类ID列表",
-        required=False
+        required=False,
+        items={"type": "integer"}
     ),
     ToolParam(
         name="collect",

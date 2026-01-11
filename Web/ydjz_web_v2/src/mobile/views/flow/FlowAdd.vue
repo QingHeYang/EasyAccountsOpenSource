@@ -9,8 +9,8 @@ import {
   showImagePreview,
 } from 'vant'
 import { flowApi, type FlowParams } from '@shared/api/flow'
-import { actionApi, type Action } from '@shared/api/action'
-import { accountApi, type Account } from '@shared/api/account'
+import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
+import { accountApi, AccountType, type Account } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { templateApi, type Template } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
@@ -107,13 +107,92 @@ const maxDate = new Date()
 // ==================== 计算属性 ====================
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
 
-// 转账可用账户（排除有不计入金额的账户）
-const transferableAccounts = computed(() => {
-  return accounts.value.filter(acc => {
-    const exempt = parseFloat(acc.exemptMoney || '0')
-    return exempt === 0
-  })
-})
+// ==================== 双向限制逻辑 ====================
+
+/**
+ * 判断账户是否应该被禁用（根据已选收支类型）
+ * 负债账户不能用于"不计入"类型的收支
+ */
+function isAccountDisabled(account: Account, panelType: 1 | 2): boolean {
+  // 如果账户不是负债，不禁用
+  if (account.accountType !== AccountType.LIABILITY) return false
+
+  // 如果没选收支，或者收支不是"不计入"类型，不禁用
+  if (!selectedAction.value?.exempt) return false
+
+  // 普通不计入收支（非转账）：禁用所有负债账户
+  if (selectedAction.value.handle !== ActionHandle.TRANSFER) {
+    return true
+  }
+
+  // 内部转账的不计入，根据 exemptMode 判断
+  const mode = selectedAction.value.exemptMode ?? ExemptMode.NONE
+
+  if (panelType === 1) {
+    // 源账户面板：禁用负债如果是转出不计入或两边不计入
+    return mode === ExemptMode.FROM_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  } else {
+    // 目标账户面板：禁用负债如果是转入不计入或两边不计入
+    return mode === ExemptMode.TO_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  }
+}
+
+/**
+ * 判断收支是否应该被禁用（根据已选账户）
+ * 如果选了负债账户，则禁用相关的"不计入"收支
+ */
+function isActionDisabled(action: Action): boolean {
+  // 如果收支不是"不计入"类型，不禁用
+  if (!action.exempt) return false
+
+  // 检查源账户是否为负债
+  const sourceIsLiability = selectedAccount.value?.accountType === AccountType.LIABILITY
+  // 检查目标账户是否为负债
+  const targetIsLiability = selectedAccountTo.value?.accountType === AccountType.LIABILITY
+
+  // 如果都不是负债，不禁用
+  if (!sourceIsLiability && !targetIsLiability) return false
+
+  // 普通不计入收支（非转账）：只要源账户是负债就禁用
+  if (action.handle !== ActionHandle.TRANSFER) {
+    return sourceIsLiability
+  }
+
+  // 内部转账的不计入
+  const mode = action.exemptMode ?? ExemptMode.NONE
+
+  if (sourceIsLiability) {
+    // 源账户是负债：禁用转出不计入、两边不计入
+    if (mode === ExemptMode.FROM_EXEMPT || mode === ExemptMode.BOTH_EXEMPT) {
+      return true
+    }
+  }
+
+  if (targetIsLiability) {
+    // 目标账户是负债：禁用转入不计入、两边不计入
+    if (mode === ExemptMode.TO_EXEMPT || mode === ExemptMode.BOTH_EXEMPT) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * 获取账户禁用原因提示
+ */
+function getAccountDisabledReason(account: Account, panelType: 1 | 2): string {
+  if (!isAccountDisabled(account, panelType)) return ''
+  return '负债账户不支持此收支类型'
+}
+
+/**
+ * 获取收支禁用原因提示
+ */
+function getActionDisabledReason(action: Action): string {
+  if (!isActionDisabled(action)) return ''
+  return '已选负债账户不支持此类型'
+}
 
 // 获取收支样式类
 function getActionClass(handle: number | undefined): string {
@@ -128,6 +207,20 @@ function getActionHandleText(handle: number | undefined): string {
   if (handle === 1) return '账户金额减少'
   if (handle === 2) return '账户金额不变'
   return ''
+}
+
+// 获取不计入显示文本（内部转账根据模式显示）
+function getExemptText(action: Action): string {
+  if (!action.exempt) return ''
+  // 收入/支出只显示"不计入"
+  if (action.handle !== ActionHandle.TRANSFER) return '不计入'
+  // 内部转账根据模式显示
+  switch (action.exemptMode) {
+    case ExemptMode.FROM_EXEMPT: return '转出不计入'
+    case ExemptMode.TO_EXEMPT: return '转入不计入'
+    case ExemptMode.BOTH_EXEMPT: return '两边不计入'
+    default: return '不计入'
+  }
 }
 
 // ==================== 数据加载 ====================
@@ -784,7 +877,7 @@ watch(selectedTag, () => {
               <span class="action-tag" :class="getActionClass(selectedAction.handle)">
                 {{ selectedAction.hname }}
               </span>
-              <span v-if="selectedAction.exempt" class="exempt-badge">不计入</span>
+              <span v-if="selectedAction.exempt" class="exempt-badge">{{ getExemptText(selectedAction) }}</span>
             </template>
             <span v-else class="form-placeholder">请选择</span>
             <van-icon name="arrow" size="16" class="arrow-icon" />
@@ -970,9 +1063,10 @@ watch(selectedTag, () => {
           class="sheet-item"
           :class="{
             active: selectedAction?.id === action.id,
-            [getActionClass(action.handle)]: selectedAction?.id === action.id
+            [getActionClass(action.handle)]: selectedAction?.id === action.id,
+            disabled: isActionDisabled(action)
           }"
-          @click="onSelectAction(action)"
+          @click="!isActionDisabled(action) && onSelectAction(action)"
         >
           <div class="sheet-item-info">
             <span class="sheet-item-name">{{ action.hname }}</span>
@@ -980,8 +1074,11 @@ watch(selectedTag, () => {
               <span class="action-tag small" :class="getActionClass(action.handle)">
                 {{ getActionHandleText(action.handle) }}
               </span>
-              <span v-if="action.exempt" class="exempt-badge small">不计入</span>
+              <span v-if="action.exempt" class="exempt-badge small">{{ getExemptText(action) }}</span>
             </div>
+            <span v-if="isActionDisabled(action)" class="disabled-reason">
+              {{ getActionDisabledReason(action) }}
+            </span>
           </div>
           <van-icon v-if="selectedAction?.id === action.id" name="success" class="check-icon" />
         </div>
@@ -991,29 +1088,39 @@ watch(selectedTag, () => {
     <!-- 账户选择器 -->
     <van-action-sheet v-model:show="showAccountSheet" :title="accountSheetType === 1 ? '选择账户' : '选择目标账户'" teleport="body">
       <div class="sheet-list">
-        <!-- 转账模式提示 -->
-        <div v-if="isTransfer" class="transfer-hint">
-          <van-icon name="warning-o" size="16" />
-          <span>转账不支持选择含有"不计入金额"的账户，负债类账户请分两笔记录</span>
-        </div>
         <div
-          v-for="account in (isTransfer ? transferableAccounts : accounts)"
+          v-for="account in accounts"
           :key="account.id"
-          class="sheet-item"
+          class="sheet-item account-sheet-item"
           :class="{
             active: accountSheetType === 1
               ? selectedAccount?.id === account.id
-              : selectedAccountTo?.id === account.id
+              : selectedAccountTo?.id === account.id,
+            disabled: isAccountDisabled(account, accountSheetType),
+            asset: account.accountType !== AccountType.LIABILITY,
+            liability: account.accountType === AccountType.LIABILITY
           }"
-          @click="onSelectAccount(account)"
+          @click="!isAccountDisabled(account, accountSheetType) && onSelectAccount(account)"
         >
-          <div class="sheet-item-info">
-            <span class="sheet-item-name">{{ account.name }}</span>
-            <span v-if="account.note" class="sheet-item-note">{{ account.note }}</span>
+          <div class="account-left">
+            <div class="account-type-tag" :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'">
+              {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+            </div>
+            <div class="sheet-item-info">
+              <span class="sheet-item-name">{{ account.name }}</span>
+              <span v-if="isAccountDisabled(account, accountSheetType)" class="sheet-item-note disabled-reason">
+                {{ getAccountDisabledReason(account, accountSheetType) }}
+              </span>
+            </div>
           </div>
-          <span class="account-balance">¥{{ account.money }}</span>
+          <div class="account-right">
+            <span class="account-balance">¥{{ account.money }}</span>
+            <span v-if="account.exemptMoney && parseFloat(account.exemptMoney) !== 0" class="account-exempt">
+              不计入 ¥{{ account.exemptMoney }}
+            </span>
+          </div>
         </div>
-        <div v-if="(isTransfer ? transferableAccounts : accounts).length === 0" class="empty-accounts">
+        <div v-if="accounts.length === 0" class="empty-accounts">
           暂无可用账户
         </div>
       </div>
@@ -1590,25 +1697,6 @@ watch(selectedTag, () => {
   overflow-y: auto;
 }
 
-/* 转账提示 */
-.transfer-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  background: var(--color-transfer-bg);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--color-transfer);
-  line-height: 1.5;
-}
-
-.transfer-hint .van-icon {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
 /* 空账户提示 */
 .empty-accounts {
   padding: 40px 0;
@@ -1665,6 +1753,94 @@ watch(selectedTag, () => {
 
 .sheet-item:active {
   opacity: 0.8;
+}
+
+/* 禁用状态 */
+.sheet-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sheet-item.disabled:active {
+  opacity: 0.5;
+}
+
+.disabled-reason {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+/* 账户选择器项 */
+.account-sheet-item {
+  gap: 10px;
+}
+
+.account-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.account-left .sheet-item-info {
+  gap: 2px;
+}
+
+.account-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.account-exempt {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.sheet-item.active .account-exempt {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.account-type-tag {
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.account-type-tag.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.account-type-tag.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
+}
+
+/* 账户选中状态 - 资产绿色 */
+.sheet-item.account-sheet-item.active.asset {
+  background: var(--color-income);
+}
+
+.sheet-item.account-sheet-item.active.asset .account-type-tag {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* 账户选中状态 - 负债红色 */
+.sheet-item.account-sheet-item.active.liability {
+  background: var(--color-expense);
+}
+
+.sheet-item.account-sheet-item.active.liability .account-type-tag {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .sheet-item-info {

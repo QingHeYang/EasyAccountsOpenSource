@@ -17,6 +17,7 @@ class ToolParam:
     required: bool = True
     enum: Optional[List[str]] = None  # 可选的枚举值列表
     default: Any = None
+    items: Optional[Dict[str, Any]] = None  # array 类型的元素定义，如 {"type": "integer"}
 
     def to_schema(self) -> Dict[str, Any]:
         """转换为JSON Schema格式"""
@@ -28,6 +29,9 @@ class ToolParam:
             schema["enum"] = self.enum
         if self.param_type == "object":
             schema["additionalProperties"] = True
+        if self.param_type == "array":
+            # array 类型必须有 items 定义，否则部分模型会报错
+            schema["items"] = self.items or {"type": "string"}
         return schema
 
 

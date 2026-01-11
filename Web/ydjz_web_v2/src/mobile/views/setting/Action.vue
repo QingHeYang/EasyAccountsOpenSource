@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { actionApi, type Action, ActionHandle } from '@shared/api/action'
+import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 
 const router = useRouter()
@@ -22,6 +22,20 @@ function getHandleInfo(handle: ActionHandle) {
       return { text: '转账', color: 'var(--color-transfer)', bg: 'var(--color-transfer-bg)' }
     default:
       return { text: '未知', color: 'var(--color-text-secondary)', bg: 'var(--color-bg-page)' }
+  }
+}
+
+// 获取不计入显示文本（内部转账根据模式显示）
+function getExemptText(action: Action): string {
+  if (!action.exempt) return ''
+  // 收入/支出只显示"不计入"
+  if (action.handle !== ActionHandle.TRANSFER) return '不计入'
+  // 内部转账根据模式显示
+  switch (action.exemptMode) {
+    case ExemptMode.FROM_EXEMPT: return '转出不计入'
+    case ExemptMode.TO_EXEMPT: return '转入不计入'
+    case ExemptMode.BOTH_EXEMPT: return '两边不计入'
+    default: return '不计入'
   }
 }
 
@@ -89,7 +103,7 @@ onMounted(() => {
               >
                 {{ getHandleInfo(action.handle).text }}
               </span>
-              <span v-if="action.exempt" class="action-tag exempt">不计入</span>
+              <span v-if="action.exempt" class="action-tag exempt">{{ getExemptText(action) }}</span>
             </div>
           </div>
           <van-icon name="arrow" class="action-arrow" />

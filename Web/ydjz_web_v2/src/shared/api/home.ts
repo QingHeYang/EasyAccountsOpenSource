@@ -9,6 +9,8 @@ export interface HomeAccount {
   exemptAsset: string
   note: string
   percent: string
+  /** 账户类型：0=资产，1=负债 */
+  accountType?: number
 }
 
 /** 月度明细 */

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showLoadingToast, closeToast, showToast } from 'vant'
-import { accountApi } from '@shared/api/account'
+import { showLoadingToast, closeToast, showToast, showDialog } from 'vant'
+import { accountApi, AccountType } from '@shared/api/account'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 
 const route = useRoute()
@@ -18,16 +18,39 @@ const isEdit = computed(() => accountId.value !== null)
 
 // 表单数据
 const accountName = ref('')
+const accountType = ref<AccountType>(AccountType.ASSET)
 const money = ref('')
 const exemptMoney = ref('')
 const card = ref('')
 const note = ref('')
 
-// 判断账户余额是否为负数（负债类账户）
-const isNegativeBalance = computed(() => {
+// 判断是否为负债账户
+const isLiabilityAccount = computed(() => accountType.value === AccountType.LIABILITY)
+
+// 计算净资产
+const netAsset = computed(() => {
   const m = parseFloat(money.value || '0')
-  return m < 0
+  const e = parseFloat(exemptMoney.value || '0')
+  return (m - e).toFixed(2)
 })
+
+// 显示账户类型帮助
+function showAccountTypeHelp() {
+  showDialog({
+    title: '账户类型说明',
+    message: '资产账户：储蓄卡、现金、支付宝余额等，余额通常为正数。\n\n负债账户：信用卡、借款、花呗等，余额通常为负数，表示欠款金额。\n\n注意：账户类型创建后无法修改。',
+    confirmButtonText: '我知道了',
+  })
+}
+
+// 显示不计入金额帮助
+function showExemptMoneyHelp() {
+  showDialog({
+    title: '不计入金额说明',
+    message: '不计入金额一般指：资金代管、借钱收款等内容。\n\n这部分金额虽然在账户中，但不属于您的实际资产，因此不计入总金额统计。\n\n此项金额不影响正常记账，不代表实际账户的余额。',
+    confirmButtonText: '我知道了',
+  })
+}
 
 // 金额输入格式化（允许负数，最多两位小数）
 function formatMoneyInput(value: string): string {
@@ -44,8 +67,8 @@ function formatMoneyInput(value: string): string {
   if (parts.length === 2 && parts[1].length > 2) {
     result = parts[0] + '.' + parts[1].slice(0, 2)
   }
-  // 恢复负号
-  if (isNegative && result) {
+  // 恢复负号（即使 result 为空也保留，允许用户先输入负号）
+  if (isNegative) {
     result = '-' + result
   }
   return result
@@ -69,6 +92,7 @@ async function loadAccount() {
     const res = await accountApi.getById(accountId.value)
     const account = res.data.data
     accountName.value = account.name
+    accountType.value = account.accountType ?? AccountType.ASSET
     money.value = account.money || ''
     exemptMoney.value = account.exemptMoney || ''
     card.value = account.card || ''
@@ -102,12 +126,12 @@ async function onSubmit() {
   })
 
   try {
-    // 负数账户（负债类）不允许设置不计入金额
-    const submitExemptMoney = isNegativeBalance.value ? '' : (exemptMoney.value || '')
+    // 负债账户不允许设置不计入金额
+    const submitExemptMoney = isLiabilityAccount.value ? '' : (exemptMoney.value || '')
 
-    // Account 的 id 只在 URL 中，body 不需要
     const params = {
       name: accountName.value.trim(),
+      accountType: accountType.value,
       money: String(money.value),
       card: card.value || '',
       exemptMoney: submitExemptMoney,
@@ -166,6 +190,35 @@ onMounted(() => {
           />
         </div>
 
+        <!-- 账户类型 -->
+        <div class="form-item">
+          <label class="form-label required">
+            账户类型
+            <van-icon name="question-o" class="help-icon" @click="showAccountTypeHelp" />
+          </label>
+          <div class="type-radio-group" :class="{ disabled: isEdit }">
+            <div
+              class="type-radio-item"
+              :class="{ active: accountType === AccountType.ASSET }"
+              @click="!isEdit && (accountType = AccountType.ASSET)"
+            >
+              <div class="type-radio-dot"></div>
+              <span class="type-radio-text">资产账户</span>
+            </div>
+            <div
+              class="type-radio-item liability"
+              :class="{ active: accountType === AccountType.LIABILITY }"
+              @click="!isEdit && (accountType = AccountType.LIABILITY)"
+            >
+              <div class="type-radio-dot"></div>
+              <span class="type-radio-text">负债账户</span>
+            </div>
+          </div>
+          <p v-if="isEdit" class="form-hint warning">账户类型创建后无法修改</p>
+          <p v-else-if="isLiabilityAccount" class="form-hint">负债账户余额通常为负数，如 -5000 表示欠款</p>
+          <p v-else class="form-hint">资产账户余额通常为正数，表示实际持有金额</p>
+        </div>
+
         <!-- 账户余额 -->
         <div class="form-item">
           <label class="form-label required">账户余额</label>
@@ -180,15 +233,15 @@ onMounted(() => {
               placeholder="0.00"
             />
           </div>
-          <p v-if="isNegativeBalance" class="form-hint warning">
-            负数余额通常表示信用卡或负债账户
-          </p>
         </div>
 
         <!-- 不计入金额 -->
         <div class="form-item">
-          <label class="form-label">不计入金额</label>
-          <div class="input-with-prefix" :class="{ disabled: isNegativeBalance }">
+          <label class="form-label">
+            不计入金额
+            <van-icon name="question-o" class="help-icon" @click="showExemptMoneyHelp" />
+          </label>
+          <div class="input-with-prefix" :class="{ disabled: isLiabilityAccount }">
             <span class="input-prefix">¥</span>
             <input
               :value="exemptMoney"
@@ -196,14 +249,26 @@ onMounted(() => {
               type="text"
               inputmode="decimal"
               class="form-input"
-              placeholder="不计入总资产的金额"
-              :disabled="isNegativeBalance"
+              placeholder="0.00"
+              :disabled="isLiabilityAccount"
             />
           </div>
-          <p v-if="isNegativeBalance" class="form-hint warning">
-            负债类账户不支持设置不计入金额
+          <p v-if="isLiabilityAccount" class="form-hint warning">
+            负债账户不支持设置不计入金额
           </p>
-          <p v-else class="form-hint">该金额包含在账户余额中，但不计入总资产</p>
+          <template v-else>
+            <p class="form-hint">此金额不计入总金额统计</p>
+            <div class="net-asset-card">
+              <div class="formula-text">账户净资产 = 账户余额 - 不计入金额</div>
+              <div class="formula-calc">
+                <span class="net-asset-value">{{ netAsset }}</span>
+                <span class="calc-symbol">=</span>
+                <span class="calc-value">({{ money || '0.00' }})</span>
+                <span class="calc-symbol">-</span>
+                <span class="calc-value">({{ exemptMoney || '0.00' }})</span>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- 卡号 -->
@@ -302,7 +367,9 @@ onMounted(() => {
 }
 
 .form-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text-secondary);
@@ -313,6 +380,113 @@ onMounted(() => {
   content: '*';
   color: var(--color-expense);
   margin-left: 4px;
+}
+
+.help-icon {
+  font-size: 16px;
+  color: var(--color-text-tertiary);
+}
+
+/* 账户类型选择 */
+.type-radio-group {
+  display: flex;
+  gap: 12px;
+}
+
+.type-radio-group.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.type-radio-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-bg-page);
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.type-radio-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-text-tertiary);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.type-radio-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.type-radio-item.active {
+  background: var(--color-transfer-bg);
+  border-color: var(--color-transfer);
+}
+
+.type-radio-item.active .type-radio-dot {
+  border-color: var(--color-transfer);
+  background: var(--color-transfer);
+  box-shadow: inset 0 0 0 3px var(--color-bg-card);
+}
+
+.type-radio-item.active .type-radio-text {
+  color: var(--color-transfer);
+}
+
+.type-radio-item.liability.active {
+  background: var(--color-expense-bg);
+  border-color: var(--color-expense);
+}
+
+.type-radio-item.liability.active .type-radio-dot {
+  border-color: var(--color-expense);
+  background: var(--color-expense);
+  box-shadow: inset 0 0 0 3px var(--color-bg-card);
+}
+
+.type-radio-item.liability.active .type-radio-text {
+  color: var(--color-expense);
+}
+
+/* 净资产计算卡片 */
+.net-asset-card {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--color-bg-page);
+  border-radius: 10px;
+}
+
+.formula-text {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 6px;
+}
+
+.formula-calc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.net-asset-value {
+  font-weight: 600;
+  color: var(--color-transfer);
+}
+
+.calc-symbol {
+  color: var(--color-text-tertiary);
+}
+
+.calc-value {
+  color: var(--color-text-secondary);
 }
 
 .form-input {

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
-import { accountApi, type Account } from '@shared/api/account'
+import { accountApi, AccountType, type Account } from '@shared/api/account'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 import alipayIcon from '@shared/assets/icons/alipay.svg'
 import wechatIcon from '@shared/assets/icons/wechat.svg'
@@ -61,7 +61,9 @@ async function onDelete() {
   try {
     await showConfirmDialog({
       title: '停用账户',
-      message: '确定停用该账户吗？\n停用后将无法在此账户下记账！\n关于此账户的数据不会删除。',
+      message: '确定停用该账户吗？\n\n请先将账户余额设置为 0，否则此账户金额将无法继续记账！\n\n停用后关于此账户的历史数据不会删除。',
+      confirmButtonText: '确定停用',
+      confirmButtonColor: 'var(--color-expense)',
     })
 
     await accountApi.delete(currentAccount.value.id)
@@ -126,10 +128,23 @@ onMounted(() => {
             <van-icon v-else name="card" size="24" />
           </div>
           <div class="account-info">
-            <div class="account-name">{{ account.name }}</div>
+            <div class="account-name-row">
+              <span class="account-name">{{ account.name }}</span>
+              <span
+                class="account-type-badge"
+                :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+              >
+                {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+              </span>
+            </div>
             <div class="account-card" v-if="account.card">{{ account.card }}</div>
           </div>
-          <div class="account-money">{{ formatMoney(account.money) }}</div>
+          <div class="account-money-info">
+            <div class="account-money">{{ formatMoney(account.money) }}</div>
+            <div v-if="account.exemptMoney && parseFloat(account.exemptMoney) !== 0" class="account-exempt">
+              不计入 {{ formatMoney(account.exemptMoney) }}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -138,23 +153,32 @@ onMounted(() => {
     </div>
 
     <!-- 账户详情弹窗 -->
-    <van-action-sheet v-model:show="showSheet" :title="currentAccount?.name" teleport="body">
+    <van-action-sheet v-model:show="showSheet" teleport="body">
       <div class="sheet-content">
+        <!-- 头部：账户名称和类型 -->
+        <div class="sheet-header">
+          <span class="sheet-title">{{ currentAccount?.name }}</span>
+          <span
+            class="sheet-type-badge"
+            :class="currentAccount?.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+          >
+            {{ currentAccount?.accountType === AccountType.LIABILITY ? '负债账户' : '资产账户' }}
+          </span>
+        </div>
+
+        <!-- 余额卡片 -->
+        <div class="balance-card" :class="currentAccount?.accountType === AccountType.LIABILITY ? 'liability' : 'asset'">
+          <div class="balance-label">账户余额</div>
+          <div class="balance-value">{{ formatMoney(currentAccount?.money) }}</div>
+          <div v-if="currentAccount?.exemptMoney && parseFloat(currentAccount.exemptMoney) !== 0" class="balance-exempt">
+            不计入金额：{{ formatMoney(currentAccount?.exemptMoney) }}
+          </div>
+        </div>
+
         <!-- 详情信息 -->
         <div class="detail-list">
           <div class="detail-item">
-            <span class="detail-label">账户余额</span>
-            <span class="detail-value money">{{ formatMoney(currentAccount?.money) }}</span>
-          </div>
-          <div class="detail-item" v-if="currentAccount?.exemptMoney">
-            <span class="detail-label">豁免金额</span>
-            <span class="detail-value">
-              {{ formatMoney(currentAccount?.exemptMoney) }}
-              <span class="detail-hint">（不计入总资产）</span>
-            </span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">卡号</span>
+            <span class="detail-label">卡号/账号</span>
             <span class="detail-value">{{ formatValue(currentAccount?.card, '未设置') }}</span>
           </div>
           <div class="detail-item">
@@ -272,11 +296,34 @@ onMounted(() => {
   min-width: 0;
 }
 
+.account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .account-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: 4px;
+}
+
+.account-type-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.account-type-badge.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.account-type-badge.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
 }
 
 .account-card {
@@ -287,17 +334,96 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+.account-money-info {
+  text-align: right;
+}
+
 .account-money {
   font-size: 17px;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-/* 弹窗内容 */
-.sheet-content {
-  padding: 16px 20px 24px;
+.account-exempt {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
 }
 
+/* 弹窗内容 */
+.sheet-content {
+  padding: 20px;
+}
+
+/* 弹窗头部 */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sheet-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sheet-type-badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.sheet-type-badge.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.sheet-type-badge.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
+}
+
+/* 余额卡片 */
+.balance-card {
+  padding: 20px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.balance-card.asset {
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.12) 0%, rgba(82, 196, 26, 0.06) 100%);
+}
+
+.balance-card.liability {
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.12) 0%, rgba(245, 34, 45, 0.06) 100%);
+}
+
+.balance-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.balance-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.balance-card.liability .balance-value {
+  color: var(--color-expense);
+}
+
+.balance-exempt {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+/* 详情列表 */
 .detail-list {
   background: var(--color-bg-page);
   border-radius: 12px;
@@ -323,16 +449,6 @@ onMounted(() => {
   text-align: right;
   flex: 1;
   margin-left: 16px;
-}
-
-.detail-value.money {
-  font-weight: 600;
-  font-size: 16px;
-}
-
-.detail-hint {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
 }
 
 /* 操作按钮 */
