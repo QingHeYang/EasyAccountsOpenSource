@@ -12,6 +12,7 @@ const themeStore = useThemeStore()
 const loading = ref(false)
 const versions = ref<VersionInfo>({
   release: '',
+  versionCode: 0,
   fontBranch: '',
   backendBranch: '',
   mysqlBranch: '',
