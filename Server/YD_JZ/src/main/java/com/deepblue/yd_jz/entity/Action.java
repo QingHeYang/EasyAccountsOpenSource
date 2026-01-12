@@ -27,4 +27,8 @@ public class Action {
     @Column(name = "exempt_mode", nullable = false)
     private Integer exemptMode = 0;
 
+    // v2.6.0: 禁用标记
+    @Column(name = "a_disable", nullable = false)
+    private boolean disable = false;
+
 }

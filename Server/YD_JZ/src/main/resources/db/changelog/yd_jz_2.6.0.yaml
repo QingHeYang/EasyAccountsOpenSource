@@ -38,3 +38,19 @@ databaseChangeLog:
       changes:
         - sql:
             sql: UPDATE action SET exempt_mode = 2 WHERE handle = 2 AND exempt = true
+
+  # v2.6.0: Action 表添加禁用字段
+  - changeSet:
+      id: 2.6.0-add-action-disable
+      author: claude
+      changes:
+        - addColumn:
+            tableName: action
+            columns:
+              - column:
+                  name: a_disable
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "是否禁用：0=启用，1=禁用"

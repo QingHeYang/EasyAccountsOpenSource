@@ -33,12 +33,20 @@ public class ActionController {
         return BaseDto.setSuccessBean();
     }
 
-    @Operation(summary = "获取全部收支")
+    @Operation(summary = "获取全部收支（不含禁用）")
     @GetMapping("/getAction")
     public BaseDto<List<Action>> getActions(){
         BaseDto baseDto = BaseDto.setSuccessBean();
         baseDto.setData(actionService.getActions());
         log.info(baseDto.toString());
+        return baseDto;
+    }
+
+    @Operation(summary = "获取全部收支（含禁用，管理页面用）")
+    @GetMapping("/getAllAction")
+    public BaseDto<List<Action>> getAllActions(){
+        BaseDto baseDto = BaseDto.setSuccessBean();
+        baseDto.setData(actionService.getAllActions());
         return baseDto;
     }
 
@@ -48,5 +56,12 @@ public class ActionController {
         BaseDto baseDto = BaseDto.setSuccessBean();
         baseDto.setData(actionService.getAction(id));
         return baseDto;
+    }
+
+    @Operation(summary = "禁用收支")
+    @DeleteMapping("/disableAction/{id}")
+    public BaseDto disableAction(@PathVariable int id){
+        actionService.disableAction(id);
+        return BaseDto.setSuccessBean();
     }
 }

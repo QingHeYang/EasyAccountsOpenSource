@@ -8,4 +8,7 @@ import java.util.List;
 public interface ActionRepository extends JpaRepository<Action, Integer> {
     // 你可以添加自定义查询方法，例如：
     List<Action> findByExempt(boolean exempt);
+
+    // v2.6.0: 获取未禁用的收支类型
+    List<Action> findByDisableFalse();
 }
