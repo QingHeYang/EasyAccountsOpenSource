@@ -187,6 +187,7 @@ onMounted(() => {
             type="text"
             class="form-input"
             placeholder="请输入账户名称"
+            maxlength="6"
           />
         </div>
 

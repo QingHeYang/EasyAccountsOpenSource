@@ -14,9 +14,12 @@ import {
   MagicStick,
   Setting
 } from '@element-plus/icons-vue'
-import { homeApi, type VersionInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
+import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import logoUrl from '@shared/assets/logo.png'
+import MarkdownIt from 'markdown-it'
+
+const md = new MarkdownIt()
 import './styles.css'
 
 // 子组件
@@ -38,6 +41,7 @@ const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === tr
 const showAbout = ref(false)
 const versions = ref<VersionInfo>({
   release: '',
+  versionCode: 0,
   fontBranch: '',
   backendBranch: '',
   mysqlBranch: '',
@@ -46,6 +50,19 @@ const versions = ref<VersionInfo>({
 })
 const authConfig = ref<AuthConfig | null>(null)
 const backupConfig = ref<BackupConfig | null>(null)
+const updateInfo = ref<UpdateInfo | null>(null)
+
+// 是否有更新
+const hasUpdate = computed(() => updateInfo.value !== null)
+
+// 更新详情弹窗
+const showUpdateDialog = ref(false)
+
+// 渲染 changelog 为 HTML
+const changelogHtml = computed(() => {
+  if (!updateInfo.value?.changelog) return ''
+  return md.render(updateInfo.value.changelog)
+})
 
 // 系统信息抽屉
 const showSystemInfo = ref(false)
@@ -56,6 +73,7 @@ async function loadSystemConfig() {
     versions.value = res.data.data.versions
     authConfig.value = res.data.data.auth
     backupConfig.value = res.data.data.backup
+    updateInfo.value = res.data.data.update
     // 如果不需要认证，清除 token
     if (authConfig.value && !authConfig.value.enable) {
       localStorage.removeItem('token')
@@ -251,9 +269,10 @@ onMounted(() => {
       <div class="setting-section">
         <h2 class="section-title">其他</h2>
         <div class="other-actions">
-          <el-button size="large" @click="openAbout">
+          <el-button size="large" class="about-btn" @click="openAbout">
             <el-icon><InfoFilled /></el-icon>
             <span>关于</span>
+            <span v-if="hasUpdate" class="update-dot"></span>
           </el-button>
           <el-button v-if="showLogout" size="large" type="danger" plain @click="onLogout">
             <el-icon><SwitchButton /></el-icon>
@@ -292,7 +311,14 @@ onMounted(() => {
         <!-- 版本标签 -->
         <div class="about-version-tag">
           <span class="version-label">Version</span>
-          <span class="version-value">{{ versions.release || '...' }}</span>
+          <span class="version-value">{{ versions.release || '...' }} ({{ versions.versionCode || '...' }})</span>
+        </div>
+
+        <!-- 更新提示 -->
+        <div v-if="updateInfo" class="update-banner" @click="showUpdateDialog = true">
+          <span class="update-icon">🎉</span>
+          <span class="update-text">发现新版本 {{ updateInfo.version }} ({{ updateInfo.versionCode }})</span>
+          <span class="update-link">查看详情</span>
         </div>
 
         <!-- 分隔线 -->
@@ -319,6 +345,37 @@ onMounted(() => {
         <!-- 底部 -->
         <div class="about-footer">Made with care</div>
       </div>
+    </el-dialog>
+
+    <!-- 更新详情弹窗 -->
+    <el-dialog
+      v-model="showUpdateDialog"
+      title="发现新版本"
+      width="420"
+      class="update-dialog"
+    >
+      <div v-if="updateInfo" class="update-content">
+        <div class="update-header">
+          <div class="update-version">{{ updateInfo.version }} ({{ updateInfo.versionCode }})</div>
+          <div class="update-date">发布于 {{ updateInfo.releaseDate }}</div>
+        </div>
+        <div class="update-changelog">
+          <div class="changelog-title">更新内容</div>
+          <div class="changelog-content markdown-body" v-html="changelogHtml"></div>
+        </div>
+        <a
+          href="https://mercys-organization-2.gitbook.io/easyaccounts/version"
+          target="_blank"
+          class="update-tip"
+        >
+          <el-icon><InfoFilled /></el-icon>
+          <span>查看更新指南</span>
+          <el-icon class="tip-arrow"><ArrowRight /></el-icon>
+        </a>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showUpdateDialog = false">我知道了</el-button>
+      </template>
     </el-dialog>
 
     <!-- 底部 Powered by -->
@@ -617,6 +674,151 @@ onMounted(() => {
 
 .powered-by a:hover {
   text-decoration: underline;
+}
+
+/* 关于按钮红点 */
+.about-btn {
+  position: relative;
+}
+
+.update-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-expense);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--color-bg-card);
+}
+
+/* 更新提示横幅 */
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.12) 0%, rgba(24, 144, 255, 0.12) 100%);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.update-banner:hover {
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.18) 0%, rgba(24, 144, 255, 0.18) 100%);
+}
+
+.update-icon {
+  font-size: 16px;
+}
+
+.update-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.update-link {
+  font-size: 13px;
+  color: var(--color-transfer);
+}
+
+/* 更新详情弹窗 */
+.update-content {
+  padding: 8px 0;
+}
+
+.update-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.update-version {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-income);
+}
+
+.update-date {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.update-changelog {
+  background: var(--color-bg-page);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.changelog-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.changelog-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+
+.changelog-content.markdown-body :deep(h1),
+.changelog-content.markdown-body :deep(h2),
+.changelog-content.markdown-body :deep(h3) {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 8px 0;
+}
+
+.changelog-content.markdown-body :deep(ul),
+.changelog-content.markdown-body :deep(ol) {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.changelog-content.markdown-body :deep(li) {
+  margin: 4px 0;
+}
+
+.changelog-content.markdown-body :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.changelog-content.markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.update-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--color-transfer-bg);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-transfer);
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.update-tip:hover {
+  background: rgba(24, 144, 255, 0.15);
+}
+
+.update-tip span {
+  flex: 1;
+}
+
+.update-tip .tip-arrow {
+  font-size: 14px;
 }
 </style>
 

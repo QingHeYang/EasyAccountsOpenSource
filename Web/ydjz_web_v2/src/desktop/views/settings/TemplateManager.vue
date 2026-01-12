@@ -4,8 +4,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Close, ArrowRight, ArrowDown, PriceTag, Check } from '@element-plus/icons-vue'
 import { templateApi, type Template } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
-import { actionApi, type Action, ActionHandle } from '@shared/api/action'
-import { accountApi, type Account } from '@shared/api/account'
+import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
+import { accountApi, type Account, AccountType } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 
 const props = defineProps<{
@@ -120,6 +120,38 @@ function getHandleInfo(handle: ActionHandle) {
     default:
       return { text: '未知', color: 'var(--color-text-secondary)', bg: 'var(--color-bg-page)' }
   }
+}
+
+// 获取不计入显示文本
+function getExemptText(action: Action): string {
+  if (!action.exempt) return ''
+  if (action.handle !== ActionHandle.TRANSFER) return '不计入'
+  switch (action.exemptMode) {
+    case ExemptMode.FROM_EXEMPT: return '转出不计入'
+    case ExemptMode.TO_EXEMPT: return '转入不计入'
+    case ExemptMode.BOTH_EXEMPT: return '两边不计入'
+    default: return '不计入'
+  }
+}
+
+// 判断账户是否应该被禁用（根据已选收支类型）
+function isAccountDisabled(account: Account, panelType: 1 | 2): boolean {
+  if (account.accountType !== AccountType.LIABILITY) return false
+  if (!templateForm.value.selectedAction?.exempt) return false
+  if (templateForm.value.selectedAction.handle !== ActionHandle.TRANSFER) return true
+
+  const mode = templateForm.value.selectedAction.exemptMode ?? ExemptMode.NONE
+  if (panelType === 1) {
+    return mode === ExemptMode.FROM_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  } else {
+    return mode === ExemptMode.TO_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  }
+}
+
+// 获取账户禁用原因
+function getAccountDisabledReason(account: Account, panelType: 1 | 2): string {
+  if (!isAccountDisabled(account, panelType)) return ''
+  return '负债账户不支持此收支类型'
 }
 
 // ============ 模板相关 ============
@@ -564,11 +596,11 @@ async function onDeleteTag() {
                         <Transition name="expand">
               <div v-if="expandedTemplateIds.includes(item.id)" class="template-details">
                 <div v-if="item.account" class="detail-row">
-                  <span class="detail-label">{{ item.accountTo ? '源账户' : '账户' }}</span>
+                  <span class="detail-label">{{ item.accountTo ? '转出账户' : '账户' }}</span>
                   <span class="detail-value">{{ item.account.name }}</span>
                 </div>
                 <div v-if="item.accountTo" class="detail-row">
-                  <span class="detail-label">目标账户</span>
+                  <span class="detail-label">转入账户</span>
                   <span class="detail-value transfer">{{ item.accountTo.name }}</span>
                 </div>
                 <div v-if="item.type" class="detail-row">
@@ -623,7 +655,7 @@ async function onDeleteTag() {
                     >
                       {{ templateForm.selectedAction.hname }}
                     </span>
-                    <span v-if="templateForm.selectedAction.exempt" class="exempt-tag">不计入</span>
+                    <span v-if="templateForm.selectedAction.exempt" class="exempt-tag">{{ getExemptText(templateForm.selectedAction) }}</span>
                   </span>
                   <span v-else class="placeholder">点击选择收支</span>
                   <el-icon><ArrowRight /></el-icon>
@@ -632,7 +664,7 @@ async function onDeleteTag() {
 
               <!-- 账户 -->
               <div class="form-item">
-                <label class="form-label">{{ isTemplateTransfer ? '源账户' : '选择账户' }}</label>
+                <label class="form-label">{{ isTemplateTransfer ? '转出账户' : '选择账户' }}</label>
                 <div class="form-select" @click="openTemplateAccountPicker(1)">
                   <span :class="{ placeholder: !templateForm.selectedAccount }">
                     {{ templateForm.selectedAccount?.name || '点击选择账户' }}
@@ -641,12 +673,12 @@ async function onDeleteTag() {
                 </div>
               </div>
 
-              <!-- 目标账户（转账） -->
+              <!-- 转入账户（转账） -->
               <div v-if="isTemplateTransfer" class="form-item">
-                <label class="form-label">目标账户</label>
+                <label class="form-label">转入账户</label>
                 <div class="form-select" @click="openTemplateAccountPicker(2)">
                   <span :class="{ placeholder: !templateForm.selectedAccountTo }">
-                    {{ templateForm.selectedAccountTo?.name || '点击选择目标账户' }}
+                    {{ templateForm.selectedAccountTo?.name || '点击选择转入账户' }}
                   </span>
                   <el-icon><ArrowRight /></el-icon>
                 </div>
@@ -815,7 +847,7 @@ async function onDeleteTag() {
               >
                 {{ getHandleInfo(action.handle).text }}
               </span>
-              <span v-if="action.exempt" class="exempt-tag">不计入</span>
+              <span v-if="action.exempt" class="exempt-tag">{{ getExemptText(action) }}</span>
             </div>
           </div>
         </div>
@@ -826,24 +858,44 @@ async function onDeleteTag() {
     <!-- 账户选择器 -->
     <el-dialog
       v-model="showTemplateAccountPicker"
-      :title="templateAccountPickerType === 1 ? '选择账户' : '选择目标账户'"
+      :title="templateAccountPickerType === 1 ? (isTemplateTransfer ? '选择转出账户' : '选择账户') : '选择转入账户'"
       width="520"
       :z-index="4000"
       class="picker-dialog"
     >
       <div class="picker-list">
-        <div
+        <el-tooltip
           v-for="account in accounts"
           :key="account.id"
-          class="picker-item"
-          @click="onSelectTemplateAccount(account)"
+          :content="getAccountDisabledReason(account, templateAccountPickerType)"
+          :disabled="!isAccountDisabled(account, templateAccountPickerType)"
+          placement="right"
         >
-          <div class="picker-info">
-            <span class="picker-name">{{ account.name }}</span>
-            <span v-if="account.note" class="picker-hint">{{ account.note }}</span>
+          <div
+            class="picker-item account-picker-item"
+            :class="{ disabled: isAccountDisabled(account, templateAccountPickerType) }"
+            @click="!isAccountDisabled(account, templateAccountPickerType) && onSelectTemplateAccount(account)"
+          >
+            <div class="picker-left">
+              <span
+                class="account-type-tag"
+                :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+              >
+                {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+              </span>
+              <div class="picker-info">
+                <span class="picker-name">{{ account.name }}</span>
+                <span v-if="account.note" class="picker-hint">{{ account.note }}</span>
+              </div>
+            </div>
+            <div class="picker-right">
+              <span class="picker-money">¥{{ account.money }}</span>
+              <span v-if="account.exemptMoney && parseFloat(account.exemptMoney) !== 0" class="picker-exempt">
+                不计入 ¥{{ account.exemptMoney }}
+              </span>
+            </div>
           </div>
-          <span class="picker-money">¥{{ account.money }}</span>
-        </div>
+        </el-tooltip>
         <el-empty v-if="!accounts.length" description="暂无账户" :image-size="60" />
       </div>
     </el-dialog>
@@ -1511,6 +1563,56 @@ async function onDeleteTag() {
   font-size: 12px;
   color: var(--color-text-tertiary);
   margin-top: 4px;
+}
+
+/* 账户选择器样式 */
+.account-picker-item {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.account-picker-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.picker-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.picker-exempt {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.account-type-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.account-type-tag.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.account-type-tag.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
 }
 
 /* 分类选择器 */

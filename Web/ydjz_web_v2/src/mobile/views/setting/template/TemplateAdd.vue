@@ -4,8 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { showLoadingToast, closeToast, showToast, showConfirmDialog, showDialog } from 'vant'
 import { templateApi } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
-import { actionApi, type Action } from '@shared/api/action'
-import { accountApi, type Account } from '@shared/api/account'
+import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
+import { accountApi, type Account, AccountType } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 
@@ -76,8 +76,60 @@ function getActionHandleText(handle: number | undefined): string {
   return ''
 }
 
+// 获取不计入显示文本（内部转账根据模式显示）
+function getExemptText(action: Action): string {
+  if (!action.exempt) return ''
+  // 收入/支出只显示"不计入"
+  if (action.handle !== ActionHandle.TRANSFER) return '不计入'
+  // 内部转账根据模式显示
+  switch (action.exemptMode) {
+    case ExemptMode.FROM_EXEMPT: return '转出不计入'
+    case ExemptMode.TO_EXEMPT: return '转入不计入'
+    case ExemptMode.BOTH_EXEMPT: return '两边不计入'
+    default: return '不计入'
+  }
+}
+
 // 是否为转账类型
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
+
+// ==================== 双向限制逻辑 ====================
+
+/**
+ * 判断账户是否应该被禁用（根据已选收支类型）
+ * 负债账户不能用于"不计入"类型的收支
+ */
+function isAccountDisabled(account: Account, panelType: 1 | 2): boolean {
+  // 如果账户不是负债，不禁用
+  if (account.accountType !== AccountType.LIABILITY) return false
+
+  // 如果没选收支，或者收支不是"不计入"类型，不禁用
+  if (!selectedAction.value?.exempt) return false
+
+  // 普通不计入收支（非转账）：禁用所有负债账户
+  if (selectedAction.value.handle !== ActionHandle.TRANSFER) {
+    return true
+  }
+
+  // 内部转账的不计入，根据 exemptMode 判断
+  const mode = selectedAction.value.exemptMode ?? ExemptMode.NONE
+
+  if (panelType === 1) {
+    // 源账户面板：禁用负债如果是转出不计入或两边不计入
+    return mode === ExemptMode.FROM_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  } else {
+    // 目标账户面板：禁用负债如果是转入不计入或两边不计入
+    return mode === ExemptMode.TO_EXEMPT || mode === ExemptMode.BOTH_EXEMPT
+  }
+}
+
+/**
+ * 获取账户禁用原因提示
+ */
+function getAccountDisabledReason(account: Account, panelType: 1 | 2): string {
+  if (!isAccountDisabled(account, panelType)) return ''
+  return '负债账户不支持此收支类型'
+}
 
 // 加载收支列表
 async function fetchActions() {
@@ -411,7 +463,7 @@ onMounted(() => {
               <span class="action-tag" :class="getActionClass(selectedAction.handle)">
                 {{ selectedAction.hname }}
               </span>
-              <span v-if="selectedAction.exempt" class="exempt-tag">不计入</span>
+              <span v-if="selectedAction.exempt" class="exempt-tag">{{ getExemptText(selectedAction) }}</span>
             </span>
             <span v-else class="placeholder">点击选择收支</span>
             <van-icon name="arrow" size="16" />
@@ -420,7 +472,7 @@ onMounted(() => {
 
         <!-- 选择账户 -->
         <div class="form-item" @click="openAccountSheet(1)">
-          <label class="form-label">{{ isTransfer ? '选择模板源账户' : '选择模板账户' }}</label>
+          <label class="form-label">{{ isTransfer ? '选择模板转出账户' : '选择模板账户' }}</label>
           <div class="form-select">
             <span :class="{ placeholder: !selectedAccount }">
               {{ selectedAccount?.name || '点击选择账户' }}
@@ -431,10 +483,10 @@ onMounted(() => {
 
         <!-- 目标账户（转账时显示） -->
         <div v-if="isTransfer" class="form-item" @click="openAccountSheet(2)">
-          <label class="form-label">选择模板目标账户</label>
+          <label class="form-label">选择模板转入账户</label>
           <div class="form-select">
             <span :class="{ placeholder: !selectedAccountTo }">
-              {{ selectedAccountTo?.name || '点击选择目标账户' }}
+              {{ selectedAccountTo?.name || '点击选择转入账户' }}
             </span>
             <van-icon name="arrow" size="16" />
           </div>
@@ -537,7 +589,7 @@ onMounted(() => {
               <span class="action-tag" :class="getActionClass(action.handle)">
                 {{ getActionHandleText(action.handle) }}
               </span>
-              <span v-if="action.exempt" class="exempt-tag">不计入</span>
+              <span v-if="action.exempt" class="exempt-tag">{{ getExemptText(action) }}</span>
             </div>
           </div>
           <van-icon
@@ -556,13 +608,37 @@ onMounted(() => {
           v-for="account in accounts"
           :key="account.id"
           class="account-item"
-          @click="onSelectAccount(account)"
+          :class="{
+            active: accountSheetType === 1
+              ? selectedAccount?.id === account.id
+              : selectedAccountTo?.id === account.id,
+            disabled: isAccountDisabled(account, accountSheetType)
+          }"
+          @click="!isAccountDisabled(account, accountSheetType) && onSelectAccount(account)"
         >
-          <div class="account-info">
-            <span class="account-name">{{ account.name }}</span>
-            <span class="account-note" v-if="account.note">{{ account.note }}</span>
+          <div class="account-left">
+            <div
+              class="account-type-tag"
+              :class="account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+            >
+              {{ account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+            </div>
+            <div class="account-info">
+              <span class="account-name">{{ account.name }}</span>
+              <span v-if="isAccountDisabled(account, accountSheetType)" class="disabled-reason">
+                {{ getAccountDisabledReason(account, accountSheetType) }}
+              </span>
+            </div>
           </div>
-          <span class="account-money">¥{{ account.money }}</span>
+          <div class="account-right">
+            <span class="account-balance">¥{{ account.money }}</span>
+            <span
+              v-if="account.exemptMoney && parseFloat(account.exemptMoney) !== 0"
+              class="account-exempt"
+            >
+              不计入 ¥{{ account.exemptMoney }}
+            </span>
+          </div>
         </div>
       </div>
     </van-action-sheet>
@@ -894,15 +970,69 @@ onMounted(() => {
   gap: 8px;
 }
 
-.account-note {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
+/* 账户选择器新样式 */
+.account-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.account-money {
+.account-type-tag {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.account-type-tag.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.account-type-tag.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
+}
+
+.account-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.account-balance {
   font-size: 15px;
   font-weight: 500;
   color: var(--color-text-primary);
+}
+
+.account-exempt {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* 账户选中状态 */
+.account-item.active {
+  border: 2px solid var(--color-transfer);
+  background: var(--color-transfer-bg);
+}
+
+/* 账户禁用状态 */
+.account-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.account-item.disabled:active {
+  opacity: 0.5;
+}
+
+.disabled-reason {
+  font-size: 11px;
+  color: var(--color-expense);
+  margin-top: 4px;
 }
 
 .check-icon {

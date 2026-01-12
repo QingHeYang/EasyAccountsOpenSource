@@ -293,6 +293,7 @@ async function onDelete() {
                   v-model="accountForm.name"
                   placeholder="请输入账户名称"
                   size="large"
+                  maxlength="6"
                 />
               </div>
 

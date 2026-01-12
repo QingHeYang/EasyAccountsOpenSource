@@ -21,6 +21,7 @@ const actionName = ref('')
 const handleType = ref<string>('0')
 const exempt = ref(false)
 const exemptMode = ref<ExemptMode>(ExemptMode.NONE)
+const disable = ref(false)
 
 // 是否为转账类型
 const isTransfer = computed(() => handleType.value === '2')
@@ -68,6 +69,15 @@ function showHelp() {
   })
 }
 
+// 显示禁用帮助
+function showDisableHelp() {
+  showDialog({
+    title: '禁用收支说明',
+    message: '禁用后该收支类型将不会出现在记账页面的选项中。\n\n• 快记模板：使用此收支的快记模板将被清空收支设置，需要重新选择\n\n• 已有账单：已记录的账单不会受影响，数据会正常保留',
+    confirmButtonText: '我知道了',
+  })
+}
+
 // 加载现有数据
 async function loadAction() {
   if (!actionId.value) return
@@ -79,6 +89,7 @@ async function loadAction() {
     handleType.value = String(action.handle)
     exempt.value = action.exempt
     exemptMode.value = action.exemptMode ?? ExemptMode.NONE
+    disable.value = action.disable ?? false
   } catch (err) {
     showToast('获取数据失败')
     console.error(err)
@@ -104,6 +115,8 @@ async function onSubmit() {
       exempt: exempt.value,
       // exemptMode 仅对转账类型生效
       exemptMode: isTransfer.value ? exemptMode.value : undefined,
+      // 禁用状态仅在编辑时提交
+      disable: isEdit.value ? disable.value : undefined,
     }
 
     if (isEdit.value && actionId.value) {
@@ -155,6 +168,7 @@ onMounted(() => {
             type="text"
             class="form-input"
             placeholder="请输入收支名称"
+            maxlength="6"
           />
         </div>
 
@@ -227,6 +241,18 @@ onMounted(() => {
             </div>
           </div>
           <span class="form-hint">选择哪个账户的金额变动不计入总金额</span>
+        </div>
+
+        <!-- 禁用开关（仅编辑时显示） -->
+        <div v-if="isEdit" class="form-item switch-item">
+          <div class="switch-info">
+            <label class="form-label">
+              禁用此收支
+              <van-icon name="question-o" class="help-icon" @click="showDisableHelp" />
+            </label>
+            <span class="form-hint">禁用后不会出现在记账选项中</span>
+          </div>
+          <van-switch v-model="disable" size="24" />
         </div>
       </div>
 
@@ -317,6 +343,7 @@ onMounted(() => {
   border: none;
   border-radius: 12px;
   outline: none;
+  box-sizing: border-box;
 }
 
 .form-input::placeholder {
@@ -412,6 +439,12 @@ onMounted(() => {
 .form-hint {
   font-size: 12px;
   color: var(--color-text-tertiary);
+}
+
+.form-hint.warning {
+  display: block;
+  color: var(--color-expense);
+  margin-top: 4px;
 }
 
 /* 提交按钮 */

@@ -2,7 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useThemeStore } from '@shared/stores/theme'
-import { homeApi, type VersionInfo, type AuthConfig } from '@shared/api/home'
+import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig } from '@shared/api/home'
+import MarkdownIt from 'markdown-it'
+
+const md = new MarkdownIt()
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import { showConfirmDialog } from 'vant'
 import logoUrl from '@shared/assets/logo.png'
@@ -32,6 +35,7 @@ function onThemeChange() {
 const showAbout = ref(false)
 const versions = ref<VersionInfo>({
   release: '',
+  versionCode: 0,
   fontBranch: '',
   backendBranch: '',
   mysqlBranch: '',
@@ -39,12 +43,17 @@ const versions = ref<VersionInfo>({
   webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
+const updateInfo = ref<UpdateInfo | null>(null)
+
+// 是否有更新
+const hasUpdate = computed(() => updateInfo.value !== null)
 
 async function loadSystemConfig() {
   try {
     const res = await homeApi.getSystemConfig()
     versions.value = res.data.data.versions
     authConfig.value = res.data.data.auth
+    updateInfo.value = res.data.data.update
     // 如果不需要认证，清除 token
     if (authConfig.value && !authConfig.value.enable) {
       localStorage.removeItem('token')
@@ -52,6 +61,21 @@ async function loadSystemConfig() {
   } catch (err) {
     console.error('获取系统配置失败', err)
   }
+}
+
+// 更新详情弹窗
+const showUpdateDialog = ref(false)
+
+// 渲染 changelog 为 HTML
+const changelogHtml = computed(() => {
+  if (!updateInfo.value?.changelog) return ''
+  return md.render(updateInfo.value.changelog)
+})
+
+// 显示更新详情
+function showUpdateDetail() {
+  if (!updateInfo.value) return
+  showUpdateDialog.value = true
 }
 
 // 是否显示退出登录（需要认证才显示）
@@ -169,8 +193,14 @@ onMounted(() => {
           title="关于"
           icon="info-o"
           is-link
+          class="about-cell"
           @click="openAbout"
-        />
+        >
+          <template #title>
+            <span>关于</span>
+            <span v-if="hasUpdate" class="update-dot"></span>
+          </template>
+        </van-cell>
         <van-cell
           v-if="showLogout"
           title="退出登录"
@@ -208,7 +238,14 @@ onMounted(() => {
         <!-- 版本标签 -->
         <div class="about-version-tag">
           <span class="version-label">Version</span>
-          <span class="version-value">{{ versions.release || '...' }}</span>
+          <span class="version-value">{{ versions.release || '...' }} ({{ versions.versionCode || '...' }})</span>
+        </div>
+
+        <!-- 更新提示 -->
+        <div v-if="updateInfo" class="update-banner" @click="showUpdateDetail">
+          <span class="update-icon">🎉</span>
+          <span class="update-text">发现新版本 {{ updateInfo.version }} ({{ updateInfo.versionCode }})</span>
+          <van-icon name="arrow" class="update-arrow" />
         </div>
 
         <!-- 分隔线 -->
@@ -238,6 +275,37 @@ onMounted(() => {
         <div class="about-footer">
           Made with care
         </div>
+      </div>
+    </van-popup>
+
+    <!-- 更新详情弹窗 -->
+    <van-popup
+      v-model:show="showUpdateDialog"
+      round
+      closeable
+      close-icon="cross"
+      teleport="body"
+      :style="{ width: '85%', maxWidth: '320px' }"
+    >
+      <div v-if="updateInfo" class="update-dialog">
+        <div class="update-header">
+          <div class="update-version">{{ updateInfo.version }} ({{ updateInfo.versionCode }})</div>
+          <div class="update-date">发布于 {{ updateInfo.releaseDate }}</div>
+        </div>
+        <div class="update-changelog">
+          <div class="changelog-title">更新内容</div>
+          <div class="changelog-content markdown-body" v-html="changelogHtml"></div>
+        </div>
+        <a
+          href="https://mercys-organization-2.gitbook.io/easyaccounts/version"
+          target="_blank"
+          class="update-tip"
+        >
+          <van-icon name="info-o" />
+          <span>查看更新指南</span>
+          <van-icon name="arrow" />
+        </a>
+        <van-button type="primary" block round @click="showUpdateDialog = false">我知道了</van-button>
       </div>
     </van-popup>
   </div>
@@ -418,6 +486,145 @@ onMounted(() => {
 /* AI 未配置状态 */
 .ai-unconfigured {
   opacity: 0.7;
+}
+
+/* 关于单元格红点 */
+.about-cell :deep(.van-cell__title) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.update-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-expense);
+  border-radius: 50%;
+}
+
+/* 更新提示横幅 */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.12) 0%, rgba(24, 144, 255, 0.12) 100%);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.update-banner:active {
+  opacity: 0.8;
+}
+
+.update-icon {
+  font-size: 16px;
+}
+
+.update-text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.update-arrow {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+/* 更新详情弹窗 */
+.update-dialog {
+  padding: 24px;
+  background: var(--color-bg-card);
+}
+
+.update-dialog .update-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.update-dialog .update-version {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-income);
+}
+
+.update-dialog .update-date {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.update-dialog .update-changelog {
+  background: var(--color-bg-page);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.update-dialog .changelog-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.update-dialog .changelog-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.update-dialog .changelog-content.markdown-body :deep(h1),
+.update-dialog .changelog-content.markdown-body :deep(h2),
+.update-dialog .changelog-content.markdown-body :deep(h3) {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 6px 0;
+}
+
+.update-dialog .changelog-content.markdown-body :deep(ul),
+.update-dialog .changelog-content.markdown-body :deep(ol) {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.update-dialog .changelog-content.markdown-body :deep(li) {
+  margin: 3px 0;
+}
+
+.update-dialog .changelog-content.markdown-body :deep(p) {
+  margin: 0 0 6px 0;
+}
+
+.update-dialog .changelog-content.markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.update-dialog .update-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--color-transfer-bg);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-transfer);
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+
+.update-dialog .update-tip:active {
+  opacity: 0.8;
+}
+
+.update-dialog .update-tip span {
+  flex: 1;
 }
 </style>
 

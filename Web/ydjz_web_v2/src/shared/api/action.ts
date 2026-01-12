@@ -37,6 +37,8 @@ export interface Action {
   exempt: boolean
   /** 内部转账豁免模式（仅 handle=2 时生效） */
   exemptMode?: ExemptMode
+  /** 是否禁用 */
+  disable?: boolean
 }
 
 /** 添加/更新收支参数 */
@@ -46,13 +48,20 @@ export interface ActionParams {
   exempt?: boolean
   /** 内部转账豁免模式（仅 handle=2 时生效，默认0） */
   exemptMode?: ExemptMode
+  /** 是否禁用 */
+  disable?: boolean
 }
 
 /** 收支管理 API */
 export const actionApi = {
-  /** 获取全部收支 */
+  /** 获取启用的收支（用于记账页面） */
   getAll() {
     return getRequest().get<ApiResponse<Action[]>>('/action/getAction')
+  },
+
+  /** 获取全部收支含禁用（用于管理页面） */
+  getAllWithDisabled() {
+    return getRequest().get<ApiResponse<Action[]>>('/action/getAllAction')
   },
 
   /** 获取指定收支 */

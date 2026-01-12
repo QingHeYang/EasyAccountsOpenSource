@@ -27,6 +27,7 @@ const actionForm = ref({
   handle: ActionHandle.IN,
   exempt: false,
   exemptMode: ExemptMode.NONE as ExemptMode,
+  disable: false,
 })
 
 // 监听外部 visible 变化
@@ -76,7 +77,7 @@ function getExemptText(action: Action): string {
 async function loadActions() {
   loading.value = true
   try {
-    const res = await actionApi.getAll()
+    const res = await actionApi.getAllWithDisabled()
     actions.value = res.data.data
   } catch (err) {
     console.error('获取收支列表失败', err)
@@ -99,6 +100,7 @@ function onEdit(action: Action) {
     handle: action.handle,
     exempt: action.exempt,
     exemptMode: action.exemptMode ?? ExemptMode.NONE,
+    disable: action.disable ?? false,
   }
   showDetail.value = true
 }
@@ -115,6 +117,7 @@ function resetForm() {
     handle: ActionHandle.IN,
     exempt: false,
     exemptMode: ExemptMode.NONE,
+    disable: false,
   }
 }
 
@@ -123,6 +126,7 @@ const isTransfer = computed(() => actionForm.value.handle === ActionHandle.TRANS
 
 // 帮助对话框
 const showHelpDialog = ref(false)
+const showDisableHelpDialog = ref(false)
 
 // 转出账户是否不计入
 const fromExempt = computed({
@@ -171,6 +175,7 @@ async function onSubmit() {
       exempt: actionForm.value.exempt,
       // exemptMode 仅对转账类型生效
       exemptMode: isTransfer.value ? actionForm.value.exemptMode : undefined,
+      disable: actionForm.value.disable,
     }
 
     if (editingAction.value) {
@@ -219,7 +224,7 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
             v-for="action in actions"
             :key="action.id"
             class="action-item"
-            :class="{ active: editingAction?.id === action.id }"
+            :class="{ active: editingAction?.id === action.id, disabled: action.disable }"
             @click="onEdit(action)"
           >
             <div class="action-info">
@@ -235,6 +240,7 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
                   {{ getHandleInfo(action.handle).text }}
                 </span>
                 <span v-if="action.exempt" class="action-tag exempt">{{ getExemptText(action) }}</span>
+                <span v-if="action.disable" class="action-tag disabled-tag">已禁用</span>
               </div>
             </div>
             <el-icon class="action-arrow"><ArrowRight /></el-icon>
@@ -259,6 +265,7 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
                   v-model="actionForm.hname"
                   placeholder="请输入收支名称"
                   size="large"
+                  maxlength="6"
                 />
               </div>
 
@@ -332,6 +339,18 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
                 </div>
                 <el-switch v-model="actionForm.exempt" />
               </div>
+
+              <!-- 禁用开关（仅编辑时显示） -->
+              <div v-if="editingAction" class="form-item switch-item">
+                <div class="switch-info">
+                  <label class="form-label">
+                    禁用此收支
+                    <el-icon class="help-icon" @click="showDisableHelpDialog = true"><QuestionFilled /></el-icon>
+                  </label>
+                  <span class="form-hint">禁用后不会出现在记账选项中</span>
+                </div>
+                <el-switch v-model="actionForm.disable" />
+              </div>
             </div>
           </div>
           <div class="detail-footer">
@@ -372,6 +391,29 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
       </div>
       <template #footer>
         <el-button type="primary" @click="showHelpDialog = false">我知道了</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 禁用帮助对话框 -->
+    <el-dialog
+      v-model="showDisableHelpDialog"
+      title="禁用收支说明"
+      width="400px"
+      :z-index="4000"
+    >
+      <div class="help-content">
+        <p>禁用后该收支类型将不会出现在记账页面的选项中。</p>
+        <div class="help-item">
+          <div class="help-item-title">快记模板</div>
+          <div class="help-item-desc">使用此收支的快记模板将被清空收支设置，需要重新选择</div>
+        </div>
+        <div class="help-item">
+          <div class="help-item-title">已有账单</div>
+          <div class="help-item-desc">已记录的账单不会受影响，数据会正常保留</div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="showDisableHelpDialog = false">我知道了</el-button>
       </template>
     </el-dialog>
   </el-drawer>
@@ -544,6 +586,20 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
 .action-tag.exempt {
   color: var(--color-text-secondary);
   background: var(--color-bg-card);
+}
+
+.action-tag.disabled-tag {
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-page);
+}
+
+.action-item.disabled {
+  opacity: 0.6;
+}
+
+.action-item.disabled .action-name {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
 }
 
 .action-arrow {
@@ -757,6 +813,12 @@ const drawerSize = computed(() => showDetail.value ? '800px' : '480px')
 .form-hint {
   font-size: 13px;
   color: var(--color-text-tertiary);
+}
+
+.form-hint.warning {
+  color: var(--color-expense);
+  display: block;
+  margin-top: 4px;
 }
 
 .input-hint {

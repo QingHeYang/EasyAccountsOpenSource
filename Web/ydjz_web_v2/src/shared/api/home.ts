@@ -47,6 +47,8 @@ export interface HomeInfo {
 export interface VersionInfo {
   /** 总版本号 */
   release: string
+  /** 版本码 */
+  versionCode: number
   /** 前端版本 */
   fontBranch: string
   /** 后端版本 */
@@ -57,6 +59,18 @@ export interface VersionInfo {
   agentBranch: string
   /** WebHook 版本 */
   webhookBranch: string
+}
+
+/** 更新信息 */
+export interface UpdateInfo {
+  /** 新版本号 */
+  version: string
+  /** 新版本码 */
+  versionCode: number
+  /** 发布日期 */
+  releaseDate: string
+  /** 更新内容（Markdown） */
+  changelog: string
 }
 
 /** 认证配置 */
@@ -79,11 +93,13 @@ export interface BackupConfig {
   description: string
 }
 
-/** 系统配置（版本 + 认证 + 备份） */
+/** 系统配置（版本 + 认证 + 备份 + 更新） */
 export interface SystemConfig {
   versions: VersionInfo
   auth: AuthConfig
   backup: BackupConfig
+  /** 更新信息（有新版本时返回，无更新时为 null） */
+  update: UpdateInfo | null
 }
 
 /** 首页 API */

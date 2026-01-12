@@ -43,7 +43,7 @@ function getExemptText(action: Action): string {
 async function fetchActions() {
   loading.value = true
   try {
-    const res = await actionApi.getAll()
+    const res = await actionApi.getAllWithDisabled()
     actions.value = res.data.data
   } catch (err) {
     console.error('获取收支列表失败', err)
@@ -89,6 +89,7 @@ onMounted(() => {
           v-for="action in actions"
           :key="action.id"
           class="action-item"
+          :class="{ disabled: action.disable }"
           @click="onItemClick(action)"
         >
           <div class="action-info">
@@ -104,6 +105,7 @@ onMounted(() => {
                 {{ getHandleInfo(action.handle).text }}
               </span>
               <span v-if="action.exempt" class="action-tag exempt">{{ getExemptText(action) }}</span>
+              <span v-if="action.disable" class="action-tag disabled-tag">已禁用</span>
             </div>
           </div>
           <van-icon name="arrow" class="action-arrow" />
@@ -211,6 +213,20 @@ onMounted(() => {
 .action-tag.exempt {
   color: var(--color-text-secondary);
   background: var(--color-bg-page);
+}
+
+.action-tag.disabled-tag {
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-page);
+}
+
+.action-item.disabled {
+  opacity: 0.6;
+}
+
+.action-item.disabled .action-name {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
 }
 
 .action-arrow {

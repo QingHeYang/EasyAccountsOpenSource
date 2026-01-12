@@ -664,7 +664,7 @@ function validateForm(): boolean {
     return false
   }
   if (isTransfer.value && !selectedAccountTo.value) {
-    showToast('请选择目标账户')
+    showToast('请选择转入账户')
     return false
   }
   if (!selectedType.value?.tname) {
@@ -888,7 +888,7 @@ watch(selectedTag, () => {
         <div class="form-item" @click="openAccountSheet(1)">
           <div class="form-item-left">
             <van-icon name="credit-pay" size="20" class="form-icon" />
-            <span class="form-label">{{ isTransfer ? '源账户' : '账户' }}</span>
+            <span class="form-label">{{ isTransfer ? '转出账户' : '账户' }}</span>
           </div>
           <div class="form-item-right">
             <span v-if="selectedAccount" class="form-value">{{ selectedAccount.name }}</span>
@@ -897,11 +897,11 @@ watch(selectedTag, () => {
           </div>
         </div>
 
-        <!-- 目标账户（转账时显示） -->
+        <!-- 转入账户（转账时显示） -->
         <div v-if="isTransfer" class="form-item" @click="openAccountSheet(2)">
           <div class="form-item-left">
             <van-icon name="exchange" size="20" class="form-icon transfer-icon" />
-            <span class="form-label">目标账户</span>
+            <span class="form-label">转入账户</span>
           </div>
           <div class="form-item-right">
             <span v-if="selectedAccountTo" class="form-value">{{ selectedAccountTo.name }}</span>
@@ -1086,7 +1086,7 @@ watch(selectedTag, () => {
     </van-action-sheet>
 
     <!-- 账户选择器 -->
-    <van-action-sheet v-model:show="showAccountSheet" :title="accountSheetType === 1 ? '选择账户' : '选择目标账户'" teleport="body">
+    <van-action-sheet v-model:show="showAccountSheet" :title="accountSheetType === 1 ? (isTransfer ? '选择转出账户' : '选择账户') : '选择转入账户'" teleport="body">
       <div class="sheet-list">
         <div
           v-for="account in accounts"
@@ -1255,12 +1255,28 @@ watch(selectedTag, () => {
           </span>
         </div>
         <div v-if="selectedTemplate.account" class="detail-row">
-          <span class="detail-label">账户</span>
-          <span class="detail-value">{{ selectedTemplate.account.name }}</span>
+          <span class="detail-label">{{ selectedTemplate.action?.handle === ActionHandle.TRANSFER ? '转出账户' : '账户' }}</span>
+          <span class="detail-value">
+            <span
+              class="account-type-badge"
+              :class="selectedTemplate.account.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+            >
+              {{ selectedTemplate.account.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+            </span>
+            {{ selectedTemplate.account.name }}
+          </span>
         </div>
         <div v-if="selectedTemplate.accountTo" class="detail-row">
-          <span class="detail-label">目标账户</span>
-          <span class="detail-value">{{ selectedTemplate.accountTo.name }}</span>
+          <span class="detail-label">转入账户</span>
+          <span class="detail-value">
+            <span
+              class="account-type-badge"
+              :class="selectedTemplate.accountTo.accountType === AccountType.LIABILITY ? 'liability' : 'asset'"
+            >
+              {{ selectedTemplate.accountTo.accountType === AccountType.LIABILITY ? '负债' : '资产' }}
+            </span>
+            {{ selectedTemplate.accountTo.name }}
+          </span>
         </div>
         <div v-if="selectedTemplate.type" class="detail-row">
           <span class="detail-label">分类</span>
@@ -2077,8 +2093,29 @@ watch(selectedTag, () => {
 }
 
 .detail-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   color: var(--color-text-primary);
+}
+
+/* 模板详情中的账户类型标签 */
+.template-detail .account-type-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.template-detail .account-type-badge.asset {
+  background: var(--color-income-bg);
+  color: var(--color-income);
+}
+
+.template-detail .account-type-badge.liability {
+  background: var(--color-expense-bg);
+  color: var(--color-expense);
 }
 </style>
 
