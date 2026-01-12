@@ -110,3 +110,11 @@ ai/koalaq_hub_webui_full.tar.gz
 
 # Claude配置目录（所有层级）
 **/.claude/
+
+# Claude Code临时工作目录
+tmpclaude-*/
+**/tmpclaude-*/
+
+# Vite缓存
+.vite/
+**/.vite/
