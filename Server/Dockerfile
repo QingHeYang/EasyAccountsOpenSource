@@ -37,5 +37,5 @@ WORKDIR /Ledger
 # 设置容器启动时执行的命令（内存优化版）
 CMD ["java", "-Duser.timezone=Asia/Shanghai", \
      "-Xms32m", "-Xmx128m", "-Xss512k", \
-     "-XX:MaxMetaspaceSize=64m", "-XX:+UseSerialGC", \
+     "-XX:+UseSerialGC", \
      "-jar", "/Ledger/app/YD_JZ-SNAPSHOT.jar"]
