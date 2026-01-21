@@ -34,8 +34,9 @@ COPY YD_JZ/target/YD_JZ-SNAPSHOT.jar /Ledger/app/
 # 设置工作目录
 WORKDIR /Ledger
 
-# 设置容器启动时执行的命令（内存优化版）
+# 设置容器启动时执行的命令（内存优化版，约200MB）
 CMD ["java", "-Duser.timezone=Asia/Shanghai", \
-     "-Xms32m", "-Xmx128m", "-Xss512k", \
+     "-XX:MaxRAM=200m", \
+     "-Xss512k", \
      "-XX:+UseSerialGC", \
      "-jar", "/Ledger/app/YD_JZ-SNAPSHOT.jar"]
