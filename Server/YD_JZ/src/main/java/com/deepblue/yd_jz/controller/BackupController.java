@@ -22,6 +22,15 @@ public class BackupController {
     @Autowired
     private BackupService backupService;
 
+    @Operation(summary = "手动备份数据库")
+    @PostMapping("/backup")
+    public BaseDto<String> backup() {
+        String fileName = backupService.backup();
+        BaseDto<String> baseDto = BaseDto.setSuccessBean();
+        baseDto.setData(fileName);
+        return baseDto;
+    }
+
     @Operation(summary = "上传并恢复数据库")
     @PostMapping("/restore")
     public BaseDto restore(@RequestParam("file") MultipartFile file) {
