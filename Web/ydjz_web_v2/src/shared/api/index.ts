@@ -19,6 +19,7 @@ export { templateApi } from './template'
 export { imageApi } from './image'
 export { analysisApi } from './analysis'
 export { aiApi } from './ai'
+export { backupApi } from './backup'
 
 // 类型导出
 export type { LoginParams, LoginResult } from './auth'

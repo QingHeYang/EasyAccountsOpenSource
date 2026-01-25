@@ -12,7 +12,8 @@ import {
   ArrowRight,
   Close,
   MagicStick,
-  Setting
+  Setting,
+  FolderOpened
 } from '@element-plus/icons-vue'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
@@ -29,6 +30,7 @@ import TypeManager from './TypeManager.vue'
 import TemplateManager from './TemplateManager.vue'
 import AiSettings from './AiSettings.vue'
 import SystemInfo from './SystemInfo.vue'
+import BackupManager from './BackupManager.vue'
 
 const router = useRouter()
 
@@ -131,6 +133,7 @@ const showAccountDrawer = ref(false)
 const showTypeDrawer = ref(false)
 const showTemplateDrawer = ref(false)
 const showAiDrawer = ref(false)
+const showBackupDrawer = ref(false)
 
 function openDrawer(key: string) {
   if (key === 'action') {
@@ -192,6 +195,8 @@ function openDrawer(key: string) {
     showAiDrawer.value = true
   } else if (key === 'systemInfo') {
     showSystemInfo.value = true
+  } else if (key === 'backup') {
+    showBackupDrawer.value = true
   }
 }
 
@@ -259,6 +264,17 @@ onMounted(() => {
             <div class="card-info">
               <div class="card-title">系统信息</div>
               <div class="card-desc">版本、认证与备份信息</div>
+            </div>
+            <el-icon class="card-arrow"><ArrowRight /></el-icon>
+          </div>
+          <!-- 数据备份卡片 -->
+          <div class="data-card" @click="openDrawer('backup')">
+            <div class="card-icon backup-icon">
+              <el-icon :size="24"><FolderOpened /></el-icon>
+            </div>
+            <div class="card-info">
+              <div class="card-title">数据备份</div>
+              <div class="card-desc">备份与恢复数据库</div>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
@@ -395,6 +411,7 @@ onMounted(() => {
       :auth-config="authConfig"
       :backup-config="backupConfig"
     />
+    <BackupManager v-model:visible="showBackupDrawer" />
   </div>
 </template>
 
@@ -505,6 +522,11 @@ onMounted(() => {
 /* 系统信息卡片样式 */
 .card-icon.system-icon {
   background: var(--color-transfer);
+}
+
+/* 数据备份卡片样式 */
+.card-icon.backup-icon {
+  background: var(--color-income);
 }
 
 /* 其他操作 */
