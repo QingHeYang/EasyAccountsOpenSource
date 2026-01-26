@@ -157,11 +157,19 @@ build_component() {
 # 上传单个组件到 Docker Hub
 push_dockerhub() {
     local component=$1
-    local version=$(get_component_info "$component" "version")
+    local specified_version=$2
     local image=$(get_component_info "$component" "image")
     local full_image="${NAMESPACE}/${image}"
 
-    echo -e "${YELLOW}推送到 Docker Hub: ${full_image}${NC}"
+    # 如果指定了版本就用指定的，否则从配置读取
+    local version
+    if [ -n "$specified_version" ]; then
+        version=$specified_version
+    else
+        version=$(get_component_info "$component" "version")
+    fi
+
+    echo -e "${YELLOW}推送到 Docker Hub: ${full_image}:${version}${NC}"
 
     docker push "${full_image}:${version}"
     docker push "${full_image}:latest"
@@ -179,7 +187,15 @@ upload_menu() {
     echo -e "  Docker Hub:  ${BLUE}${NAMESPACE}${NC}"
     echo ""
 
+    # 显示本地存在的镜像版本
+    echo -e "${CYAN}本地镜像版本:${NC}"
+    for component in server web webhook ai mysql; do
+        local image=$(get_component_info "$component" "image")
+        local tags=$(docker images "${NAMESPACE}/${image}" --format "{{.Tag}}" | grep -v latest | head -3 | tr '\n' ' ')
+        printf "  %-10s: %s\n" "$component" "$tags"
+    done
     echo ""
+
     echo -e "${YELLOW}选择要上传的组件:${NC}"
     echo ""
     echo "  1) Server"
@@ -205,6 +221,11 @@ upload_menu() {
     esac
 
     echo ""
+    # 询问要上传的版本
+    echo -e "${YELLOW}输入要上传的版本 (直接回车使用 versions.json 配置的版本):${NC}"
+    read -p "版本号: " upload_version
+    echo ""
+
     echo -e "${YELLOW}开始上传...${NC}"
     echo ""
 
@@ -212,7 +233,7 @@ upload_menu() {
         echo -e "${BLUE}----------------------------------------${NC}"
         echo -e "${BLUE}  上传: ${comp}${NC}"
         echo -e "${BLUE}----------------------------------------${NC}"
-        push_dockerhub "$comp"
+        push_dockerhub "$comp" "$upload_version"
         echo ""
     done
 

@@ -2,13 +2,13 @@
   "namespace": "775495797",
   "components": {
     "server": {
-      "version": "2.5.1",
+      "version": "2.6.1",
       "image": "easyaccounts-server",
       "context": "Server",
       "pre_build": "cd Server/YD_JZ && mvn clean install -Pserver"
     },
     "web": {
-      "version": "4.0.0",
+      "version": "4.0.1",
       "image": "easyaccounts-nginx",
       "context": "Web",
       "pre_build": "cd Web/ydjz_web_v2 && pnpm install && pnpm build"
