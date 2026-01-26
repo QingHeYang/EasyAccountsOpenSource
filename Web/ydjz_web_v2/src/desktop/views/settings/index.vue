@@ -541,7 +541,7 @@ onMounted(() => {
 
 /* 数据备份卡片样式 */
 .card-icon.backup-icon {
-  background: var(--color-income);
+  background: var(--color-transfer);
 }
 
 /* 其他操作 */

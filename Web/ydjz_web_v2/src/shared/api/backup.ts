@@ -8,7 +8,9 @@ export const backupApi = {
    * 生成备份文件 → 发送 WebHook（邮件）→ 返回文件名
    */
   backup() {
-    return getRequest().post<ApiResponse<string>>('/backup/backup')
+    return getRequest().post<ApiResponse<string>>('/backup/backup', null, {
+      timeout: 30000, // 手动备份可能需要较长时间，设置 30 秒超时
+    })
   },
 
   /**
