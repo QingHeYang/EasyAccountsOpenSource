@@ -29,7 +29,7 @@ const backupResult = ref<string | null>(null)
 const isRestoring = ref(false)
 const selectedFile = ref<File | null>(null)
 const showRestoreSuccess = ref(false)
-const restoreCountdown = ref(10)
+const restoreCountdown = ref(30)
 
 // 执行备份
 async function doBackup() {
@@ -139,9 +139,9 @@ async function doRestore() {
   try {
     const res = await backupApi.restore(selectedFile.value)
     if (res.data.code === 0) {
-      // 显示成功提示，10秒后跳转主页
+      // 显示成功提示，30秒后跳转主页
       showRestoreSuccess.value = true
-      restoreCountdown.value = 10
+      restoreCountdown.value = 30
 
       const timer = setInterval(() => {
         restoreCountdown.value--
@@ -168,7 +168,10 @@ async function doRestore() {
     direction="rtl"
     size="420px"
     class="setting-drawer backup-drawer"
-    @update:model-value="emit('update:visible', $event)"
+    :close-on-click-modal="!showRestoreSuccess"
+    :close-on-press-escape="!showRestoreSuccess"
+    :show-close="!showRestoreSuccess"
+    @update:model-value="!showRestoreSuccess && emit('update:visible', $event)"
   >
     <div class="backup-content">
       <!-- 手动备份 -->
@@ -279,7 +282,7 @@ async function doRestore() {
         <div class="success-countdown">
           <el-progress
             type="circle"
-            :percentage="restoreCountdown * 10"
+            :percentage="Math.round(restoreCountdown / 30 * 100)"
             :width="80"
             :stroke-width="6"
             color="#52C41A"
