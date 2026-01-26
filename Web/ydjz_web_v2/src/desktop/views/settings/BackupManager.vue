@@ -28,6 +28,8 @@ const backupResult = ref<string | null>(null)
 // 恢复状态
 const isRestoring = ref(false)
 const selectedFile = ref<File | null>(null)
+const showRestoreSuccess = ref(false)
+const restoreCountdown = ref(10)
 
 // 执行备份
 async function doBackup() {
@@ -137,18 +139,17 @@ async function doRestore() {
   try {
     const res = await backupApi.restore(selectedFile.value)
     if (res.data.code === 0) {
-      ElMessageBox.alert(
-        '数据恢复成功！为确保数据一致性，请重新登录。',
-        '恢复成功',
-        {
-          confirmButtonText: '重新登录',
-          type: 'success',
-          callback: () => {
-            localStorage.removeItem('token')
-            window.location.href = '/auth?mode=1'
-          }
+      // 显示成功提示，10秒后跳转主页
+      showRestoreSuccess.value = true
+      restoreCountdown.value = 10
+
+      const timer = setInterval(() => {
+        restoreCountdown.value--
+        if (restoreCountdown.value <= 0) {
+          clearInterval(timer)
+          window.location.href = '/'
         }
-      )
+      }, 1000)
     } else {
       ElMessage.error(res.data.msg || '恢复失败')
     }
@@ -264,6 +265,31 @@ async function doRestore() {
             <span>{{ isRestoring ? '恢复中...' : '恢复数据' }}</span>
           </el-button>
         </div>
+      </div>
+    </div>
+
+    <!-- 恢复成功遮罩 -->
+    <div v-if="showRestoreSuccess" class="restore-success-overlay">
+      <div class="success-content">
+        <div class="success-icon">
+          <el-icon :size="64" color="#52C41A"><Check /></el-icon>
+        </div>
+        <div class="success-title">数据恢复成功</div>
+        <div class="success-desc">正在重新加载数据，请稍候...</div>
+        <div class="success-countdown">
+          <el-progress
+            type="circle"
+            :percentage="restoreCountdown * 10"
+            :width="80"
+            :stroke-width="6"
+            color="#52C41A"
+          >
+            <template #default>
+              <span class="countdown-text">{{ restoreCountdown }}s</span>
+            </template>
+          </el-progress>
+        </div>
+        <div class="success-tip">即将跳转到主页</div>
       </div>
     </div>
   </el-drawer>
@@ -416,6 +442,59 @@ async function doRestore() {
 .restore-btn {
   width: 100%;
   margin-top: 16px;
+}
+
+/* 恢复成功遮罩 */
+.restore-success-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.success-content {
+  text-align: center;
+  padding: 40px;
+}
+
+.success-icon {
+  margin-bottom: 24px;
+}
+
+.success-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.success-desc {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 32px;
+}
+
+.success-countdown {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.countdown-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-income);
+}
+
+.success-tip {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
 }
 </style>
 
