@@ -1,10 +1,14 @@
 package com.deepblue.yd_jz.controller;
 
 import com.deepblue.yd_jz.dto.HomeDto;
+import com.deepblue.yd_jz.dto.NoticeDto;
 import com.deepblue.yd_jz.dto.VersionDto;
 import com.deepblue.yd_jz.service.HomeService;
+import com.deepblue.yd_jz.service.NoticeService;
 import com.deepblue.yd_jz.service.ScreenService;
 import com.deepblue.yd_jz.dto.BaseDto;
+
+import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +28,9 @@ public class HomeController {
 
     @Autowired
     ScreenService screenService;
+
+    @Autowired
+    NoticeService noticeService;
 
     @Value("${webhook_url}")
     private String webhookUrl;
@@ -51,6 +58,14 @@ public class HomeController {
     public BaseDto<VersionDto> getVersion() {
         BaseDto baseDto = new BaseDto();
         baseDto.setData(homeService.getVersion());
+        return baseDto;
+    }
+
+    @Operation(summary = "获取公告列表")
+    @GetMapping("/getNotices")
+    public BaseDto<List<NoticeDto.Notice>> getNotices() {
+        BaseDto baseDto = new BaseDto();
+        baseDto.setData(noticeService.getNotices());
         return baseDto;
     }
 }

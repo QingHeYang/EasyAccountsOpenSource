@@ -26,6 +26,10 @@ server.port=8085
 # 循环依赖（临时方案，后续修复）
 spring.main.allow-circular-references=true
 
+# Tomcat 线程优化（单用户场景，节省内存）
+server.tomcat.threads.max=10
+server.tomcat.threads.min-spare=1
+
 # =====================================================
 # 文件路径配置（必须使用绝对路径）
 # =====================================================
@@ -50,8 +54,17 @@ auth.folder=D:/你的输出路径/auth/
 # 备份文件路径
 sqlBackUpFolder=D:/你的输出路径/backup/
 
-# 备份命令（Windows 需配置 mysqldump 路径）
-sqldumpCmd=mysqldump -h localhost -P 3306 -uroot -p你的数据库密码 --databases yd_jz >
+# 操作系统类型：win / ubuntu（本地开发用 win，Docker 环境用 ubuntu）
+system.os=win
+
+# 备份命令（Windows 需配置 mysqldump 完整路径）
+sqldumpCmd=D:/你的mysql路径/bin/mysqldump -h localhost -P 3306 -uroot -p你的数据库密码 --databases yd_jz >
+
+# 恢复命令（Windows 需配置 mysql 完整路径）
+sqlRestoreCmd=D:/你的mysql路径/bin/mysql -h localhost -P 3306 -uroot -p你的数据库密码 yd_jz <
+
+# 恢复前清空数据库命令（先删库再建库，确保兼容旧版本备份）
+sqlDropCreateCmd=D:/你的mysql路径/bin/mysql -h localhost -P 3306 -uroot -p你的数据库密码 -e "DROP DATABASE IF EXISTS yd_jz; CREATE DATABASE yd_jz;"
 
 # 备份定时任务 cron 表达式（默认晚上 22 点）
 cron.sqlBackupTime=0 0 22 * * ?
@@ -109,13 +122,16 @@ spring.liquibase.change-log=classpath:/db/changelog/db.changelog-master.yaml
 # =====================================================
 # 版本信息
 # =====================================================
-version.release=2.6.0-local
-version.code=260
-version.font_branch=4.0.0-local
-version.backend_branch=2.5.1-local
+version.release=2.6.1-local
+version.code=2610
+version.font_branch=4.0.1-local
+version.backend_branch=2.6.1-local
 version.mysql_branch=2.5.0-local
 version.agent_branch=1.1.0-local
 version.webhook_branch=1.0.0-local
 
 # 云端版本通知 JSON 地址（用于检查更新）
 version.notice.url=https://blue-out-share.oss-cn-zhangjiakou.aliyuncs.com/version-notice.json
+
+# 公告通知 JSON 地址（用户主动获取）
+notices.url=https://blue-out-share.oss-cn-zhangjiakou.aliyuncs.com/notices.json

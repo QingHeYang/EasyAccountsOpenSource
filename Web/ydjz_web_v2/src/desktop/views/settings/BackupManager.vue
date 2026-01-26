@@ -18,6 +18,9 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
 
+// 文件输入框引用
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
 // 备份状态
 const isBackingUp = ref(false)
 const backupResult = ref<string | null>(null)
@@ -81,8 +84,12 @@ function onDragOver(e: DragEvent) {
 function clearFile() {
   selectedFile.value = null
   // 重置 input
-  const input = document.getElementById('backup-file-input') as HTMLInputElement
-  if (input) input.value = ''
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+// 触发文件选择
+function triggerFileSelect() {
+  fileInputRef.value?.click()
 }
 
 // 执行恢复
@@ -95,15 +102,30 @@ async function doRestore() {
   // 二次确认
   try {
     await ElMessageBox.prompt(
-      '此操作将覆盖当前所有数据，且无法撤销！\n\n请输入"确认恢复"以继续：',
-      '确认恢复数据',
+      `<div class="restore-confirm-content">
+        <div class="warning-icon">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="warning-title">确认恢复数据？</div>
+        <div class="warning-desc">此操作将<strong>覆盖当前所有数据</strong>，且无法撤销！</div>
+        <div class="warning-tip">
+          <div class="tip-icon">💡</div>
+          <div class="tip-text">数据恢复成功后，系统将自动重启。如果无法成功登录，请手动执行以下命令重启服务：<br/><code>docker compose restart</code></div>
+        </div>
+        <div class="input-label">请输入 <span class="confirm-text">确认恢复</span> 以继续：</div>
+      </div>`,
+      '',
       {
-        confirmButtonText: '恢复',
+        confirmButtonText: '恢复数据',
         cancelButtonText: '取消',
-        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
         inputPattern: /^确认恢复$/,
         inputErrorMessage: '请输入"确认恢复"',
         customClass: 'restore-confirm-dialog',
+        dangerouslyUseHTMLString: true,
+        showClose: false,
       }
     )
   } catch {
@@ -196,10 +218,10 @@ async function doRestore() {
             :class="{ 'has-file': selectedFile }"
             @drop="onDrop"
             @dragover="onDragOver"
-            @click="() => document.getElementById('backup-file-input')?.click()"
+            @click="triggerFileSelect"
           >
             <input
-              id="backup-file-input"
+              ref="fileInputRef"
               type="file"
               accept=".sql"
               style="display: none"
@@ -428,14 +450,114 @@ html.dark .restore-warning {
 
 /* 恢复确认对话框 */
 .restore-confirm-dialog .el-message-box__header {
-  padding-bottom: 12px;
+  display: none;
 }
 
-.restore-confirm-dialog .el-message-box__title {
+.restore-confirm-dialog .el-message-box__content {
+  padding: 0;
+}
+
+.restore-confirm-dialog .el-message-box {
+  width: 420px;
+  max-width: 90vw;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.restore-confirm-dialog .el-message-box__btns {
+  padding: 16px 24px 24px;
+}
+
+.restore-confirm-content {
+  text-align: center;
+  padding: 32px 24px 20px;
+}
+
+.restore-confirm-content .warning-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.12) 0%, rgba(250, 84, 28, 0.12) 100%);
+  border-radius: 50%;
+  margin-bottom: 20px;
+  color: #f5222d;
+}
+
+.restore-confirm-content .warning-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.restore-confirm-content .warning-desc {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.restore-confirm-content .warning-desc strong {
+  color: #f5222d;
+}
+
+.restore-confirm-content .warning-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--color-bg-page, #f5f5f5);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.restore-confirm-content .tip-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.restore-confirm-content .tip-text {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.restore-confirm-content .tip-text code {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+html.dark .restore-confirm-content .tip-text code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.restore-confirm-content .input-label {
+  font-size: 14px;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.restore-confirm-content .confirm-text {
+  color: #f5222d;
   font-weight: 600;
 }
 
-.restore-confirm-dialog .el-message-box__message {
-  white-space: pre-wrap;
+/* 暗色模式 */
+html.dark .restore-confirm-content .warning-icon {
+  background: linear-gradient(135deg, rgba(245, 34, 45, 0.2) 0%, rgba(250, 84, 28, 0.2) 100%);
+}
+
+html.dark .restore-confirm-content .warning-tip {
+  background: rgba(255, 255, 255, 0.05);
 }
 </style>

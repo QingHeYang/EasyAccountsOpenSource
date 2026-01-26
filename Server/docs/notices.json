@@ -1,0 +1,20 @@
+{
+  "notices": [
+    {
+      "id": 1,
+      "title": "v2.6.1 发布",
+      "content": "新增数据库备份恢复功能，支持任意版本备份恢复",
+      "date": "2026-01-26",
+      "url": "",
+      "expire": "2026-02-28"
+    },
+    {
+      "id": 2,
+      "title": "欢迎反馈",
+      "content": "使用中遇到问题欢迎在 GitHub 提交 Issue",
+      "date": "2026-01-26",
+      "url": "https://github.com/QingHeYang/EasyAccounts/issues",
+      "expire": ""
+    }
+  ]
+}

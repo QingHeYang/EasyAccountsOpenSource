@@ -11,8 +11,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -33,8 +35,27 @@ public class BackupService {
     @Value("${sqlRestoreCmd}")
     private String restoreCmd;
 
+    @Value("${sqlDropCreateCmd:}")
+    private String dropCreateCmd;
+
+    @Value("${system.os:ubuntu}")
+    private String systemOs;
+
     @Autowired
     private FileMakeWebHook fileMakeWebHook;
+
+    /**
+     * 根据操作系统构建命令
+     * win: cmd /c command
+     * ubuntu: /bin/sh -c command
+     */
+    private String[] buildCommand(String command) {
+        if ("win".equalsIgnoreCase(systemOs)) {
+            return new String[]{"cmd", "/c", command};
+        } else {
+            return new String[]{"/bin/sh", "-c", command};
+        }
+    }
 
     /**
      * 上传并恢复数据库
@@ -68,21 +89,77 @@ public class BackupService {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "文件保存失败: " + e.getMessage());
         }
 
-        // 3. 执行恢复命令
+        // 3. 先删除并重建数据库（确保清空所有表，包括新版本添加的表）
+        if (dropCreateCmd != null && !dropCreateCmd.isEmpty()) {
+            LogUtils.log_print("清空数据库...");
+            String[] dropCmd = buildCommand(dropCreateCmd);
+
+            try {
+                Process dropProcess = Runtime.getRuntime().exec(dropCmd);
+
+                // 捕获错误输出
+                StringBuilder dropError = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(dropProcess.getErrorStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        dropError.append(line).append("\n");
+                    }
+                }
+
+                int dropExitCode = dropProcess.waitFor();
+                if (dropExitCode != 0) {
+                    String errorMsg = dropError.toString().trim();
+                    log.error("清空数据库失败，退出码: {}, 错误: {}", dropExitCode, errorMsg);
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "清空数据库失败: " + (errorMsg.isEmpty() ? "退出码 " + dropExitCode : errorMsg));
+                }
+                LogUtils.log_print("数据库已清空");
+            } catch (BusinessException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("清空数据库异常", e);
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "清空数据库失败: " + e.getMessage());
+            }
+        }
+
+        // 4. 执行恢复命令
         LogUtils.log_print("开始恢复数据库\n文件: " + filePath);
-        String[] cmd = new String[]{"/bin/sh", "-c", restoreCmd + filePath};
+        // 文件路径可能包含空格，需要用引号包裹
+        String[] cmd = buildCommand(restoreCmd + "\"" + filePath + "\"");
 
         try {
             Process process = Runtime.getRuntime().exec(cmd);
+
+            // 捕获错误输出
+            StringBuilder errorOutput = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    errorOutput.append(line).append("\n");
+                }
+            }
+
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                log.error("数据库恢复失败，退出码: {}", exitCode);
-                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "恢复失败，退出码: " + exitCode);
+                String errorMsg = errorOutput.toString().trim();
+                log.error("数据库恢复失败，退出码: {}, 错误: {}", exitCode, errorMsg);
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "恢复失败: " + (errorMsg.isEmpty() ? "退出码 " + exitCode : errorMsg));
             }
 
             LogUtils.log_print("数据库恢复成功: " + originalName);
             log.info("数据库恢复成功: {}", originalName);
+
+            // 5. 延迟重启服务，让 Liquibase 补齐表结构
+            LogUtils.log_print("服务将在 3 秒后重启，Liquibase 将自动补齐表结构...");
+            new Thread(() -> {
+                try {
+                    Thread.sleep(3000);
+                    log.info("正在重启服务...");
+                    System.exit(0);  // Docker restart: always 会自动重启
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
 
         } catch (BusinessException e) {
             throw e;
@@ -111,15 +188,27 @@ public class BackupService {
 
         // 3. 执行备份命令
         LogUtils.log_print("开始手动备份数据库\n文件: " + filePath);
-        String[] cmd = new String[]{"/bin/sh", "-c", dumpCmd + filePath};
+        // 文件路径可能包含空格，需要用引号包裹
+        String[] cmd = buildCommand(dumpCmd + "\"" + filePath + "\"");
 
         try {
             Process process = Runtime.getRuntime().exec(cmd);
+
+            // 捕获错误输出
+            StringBuilder errorOutput = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    errorOutput.append(line).append("\n");
+                }
+            }
+
             int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                log.error("数据库备份失败，退出码: {}", exitCode);
-                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "备份失败，退出码: " + exitCode);
+                String errorMsg = errorOutput.toString().trim();
+                log.error("数据库备份失败，退出码: {}, 错误: {}", exitCode, errorMsg);
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "备份失败: " + (errorMsg.isEmpty() ? "退出码 " + exitCode : errorMsg));
             }
 
             // 4. 检查文件是否生成并发送 WebHook

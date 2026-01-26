@@ -848,3 +848,85 @@ public void transferMoney(int fromAccountId, int toAccountId, String amount) {
 | MyBatis DAO | `src/main/java/com/deepblue/yd_jz/dao/mybatis/` |
 | Liquibase 脚本 | `src/main/resources/db/changelog/` |
 | 配置文件 | `src/main/resources/application-*.properties` |
+
+---
+
+## 数据库备份与恢复
+
+### 概述
+
+系统支持自动备份和手动备份/恢复功能，使用 `mysqldump` 和 `mysql` 命令行工具。
+
+### 配置项
+
+| 配置项 | 说明 | Windows 示例 | Ubuntu 示例 |
+|--------|------|--------------|-------------|
+| `sqlBackUpFolder` | 备份文件目录 | `D:/backup/` | `/Ledger/backup/` |
+| `system.os` | 操作系统类型 | `win` | `ubuntu` |
+| `sqldumpCmd` | 备份命令 | `D:/mysql/bin/mysqldump ...` | `/usr/bin/mysqldump ...` |
+| `sqlRestoreCmd` | 恢复命令 | `D:/mysql/bin/mysql ...` | `/usr/bin/mysql ...` |
+| `sqlDropCreateCmd` | 清空数据库命令 | `D:/mysql/bin/mysql ... -e "DROP..."` | `/usr/bin/mysql ... -e "DROP..."` |
+| `cron.sqlBackupTime` | 自动备份 cron 表达式 | `0 0 22 * * ?` | `0 0 22 * * ?` |
+
+### 自动备份
+
+由 `SQLBackUpTask.java` 定时任务执行，默认每天 22:00 运行。
+
+**流程：**
+1. 生成文件名：`yd_jz_yyyyMMdd_HHmm.sql`
+2. 执行 `mysqldump` 命令
+3. 发送 WebHook 通知（邮件）
+
+### 手动备份
+
+**接口：** `POST /backup/backup`
+
+**流程：**
+1. 生成文件名：`yd_jz_manual_yyyyMMdd_HHmm.sql`
+2. 执行 `mysqldump` 命令
+3. 发送 WebHook 通知
+4. 返回文件名
+
+### 恢复数据库
+
+**接口：** `POST /backup/restore`（multipart/form-data）
+
+**流程：**
+1. 上传 `.sql` 备份文件
+2. 保存到备份目录
+3. 执行 `DROP DATABASE; CREATE DATABASE;`（清空数据库）
+4. 执行 `mysql < backup.sql`（导入数据）
+5. 3 秒后自动重启服务
+6. Liquibase 自动补齐新版本表结构
+
+### 恢复兼容性
+
+恢复前先清空数据库，解决以下问题：
+
+| 场景 | 问题 | 解决方案 |
+|------|------|----------|
+| 旧备份无 `--databases` | 新版本表不会被删除 | `DROP DATABASE` 清空所有表 |
+| 旧备份无 Liquibase 表 | 迁移记录不一致 | 清空后 Liquibase 从头运行 |
+| 备份缺少新版本字段 | 启动报错 | Liquibase 自动补齐 |
+
+### 跨平台支持
+
+根据 `system.os` 配置选择命令执行方式：
+
+```java
+private String[] buildCommand(String command) {
+    if ("win".equalsIgnoreCase(systemOs)) {
+        return new String[]{"cmd", "/c", command};
+    } else {
+        return new String[]{"/bin/sh", "-c", command};
+    }
+}
+```
+
+### 相关文件
+
+| 文件 | 说明 |
+|------|------|
+| `service/BackupService.java` | 备份恢复业务逻辑 |
+| `controller/BackupController.java` | 备份恢复接口 |
+| `task/SQLBackUpTask.java` | 自动备份定时任务 |

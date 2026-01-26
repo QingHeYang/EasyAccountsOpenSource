@@ -13,7 +13,8 @@ import {
   Close,
   MagicStick,
   Setting,
-  FolderOpened
+  FolderOpened,
+  Bell
 } from '@element-plus/icons-vue'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
@@ -31,6 +32,7 @@ import TemplateManager from './TemplateManager.vue'
 import AiSettings from './AiSettings.vue'
 import SystemInfo from './SystemInfo.vue'
 import BackupManager from './BackupManager.vue'
+import NoticeDrawer from './NoticeDrawer.vue'
 
 const router = useRouter()
 
@@ -68,6 +70,13 @@ const changelogHtml = computed(() => {
 
 // 系统信息抽屉
 const showSystemInfo = ref(false)
+
+// 公告抽屉
+const showNoticeDrawer = ref(false)
+const noticeDrawerRef = ref<InstanceType<typeof NoticeDrawer> | null>(null)
+
+// 是否有未读公告
+const hasUnreadNotice = computed(() => noticeDrawerRef.value?.hasUnread ?? false)
 
 async function loadSystemConfig() {
   try {
@@ -290,6 +299,11 @@ onMounted(() => {
             <span>关于</span>
             <span v-if="hasUpdate" class="update-dot"></span>
           </el-button>
+          <el-button size="large" class="notice-btn" @click="showNoticeDrawer = true">
+            <el-icon><Bell /></el-icon>
+            <span>公告</span>
+            <span v-if="hasUnreadNotice" class="notice-dot"></span>
+          </el-button>
           <el-button v-if="showLogout" size="large" type="danger" plain @click="onLogout">
             <el-icon><SwitchButton /></el-icon>
             <span>退出登录</span>
@@ -412,6 +426,7 @@ onMounted(() => {
       :backup-config="backupConfig"
     />
     <BackupManager v-model:visible="showBackupDrawer" />
+    <NoticeDrawer ref="noticeDrawerRef" v-model:visible="showNoticeDrawer" />
   </div>
 </template>
 
@@ -841,6 +856,22 @@ onMounted(() => {
 
 .update-tip .tip-arrow {
   font-size: 14px;
+}
+
+/* 公告按钮 */
+.notice-btn {
+  position: relative;
+}
+
+.notice-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-expense);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--color-bg-card);
 }
 </style>
 

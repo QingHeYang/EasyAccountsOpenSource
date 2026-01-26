@@ -9,6 +9,7 @@ const md = new MarkdownIt()
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import { showConfirmDialog } from 'vant'
 import logoUrl from '@shared/assets/logo.png'
+import NoticePopup from '../components/NoticePopup.vue'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -65,6 +66,13 @@ async function loadSystemConfig() {
 
 // 更新详情弹窗
 const showUpdateDialog = ref(false)
+
+// 公告弹窗
+const showNoticePopup = ref(false)
+const noticePopupRef = ref<InstanceType<typeof NoticePopup> | null>(null)
+
+// 是否有未读公告
+const hasUnreadNotice = computed(() => noticePopupRef.value?.hasUnread ?? false)
 
 // 渲染 changelog 为 HTML
 const changelogHtml = computed(() => {
@@ -202,6 +210,18 @@ onMounted(() => {
           </template>
         </van-cell>
         <van-cell
+          title="公告"
+          icon="volume-o"
+          is-link
+          class="notice-cell"
+          @click="showNoticePopup = true"
+        >
+          <template #title>
+            <span>公告</span>
+            <span v-if="hasUnreadNotice" class="notice-dot"></span>
+          </template>
+        </van-cell>
+        <van-cell
           v-if="showLogout"
           title="退出登录"
           icon="revoke"
@@ -308,6 +328,9 @@ onMounted(() => {
         <van-button type="primary" block round @click="showUpdateDialog = false">我知道了</van-button>
       </div>
     </van-popup>
+
+    <!-- 公告弹窗 -->
+    <NoticePopup ref="noticePopupRef" v-model:show="showNoticePopup" />
   </div>
 </template>
 
@@ -496,6 +519,20 @@ onMounted(() => {
 }
 
 .update-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-expense);
+  border-radius: 50%;
+}
+
+/* 公告单元格红点 */
+.notice-cell :deep(.van-cell__title) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notice-dot {
   width: 8px;
   height: 8px;
   background: var(--color-expense);

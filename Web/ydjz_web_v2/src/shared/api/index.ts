@@ -27,7 +27,7 @@ export type { Account, AccountParams, AddAccountParams, UpdateAccountParams } fr
 export type { Action, ActionParams, ActionHandle } from './action'
 export type { Type, TypeWithChildren, TypeParams } from './type'
 export type { Flow, FlowDetail, FlowListResult, FlowTypeDto, FlowParams, AddFlowParams, FlowHandle } from './flow'
-export type { HomeInfo, HomeAccount, HomeMonthDetail, VersionInfo, UpdateInfo, AuthConfig, BackupConfig, SystemConfig } from './home'
+export type { HomeInfo, HomeAccount, HomeMonthDetail, VersionInfo, UpdateInfo, AuthConfig, BackupConfig, SystemConfig, Notice } from './home'
 export type { ScreenFlowParams } from './screen'
 export type { Tag, TagParams } from './tag'
 export type { Template, TemplateParams } from './template'

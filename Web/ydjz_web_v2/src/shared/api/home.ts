@@ -102,6 +102,22 @@ export interface SystemConfig {
   update: UpdateInfo | null
 }
 
+/** 公告信息 */
+export interface Notice {
+  /** 公告唯一标识 */
+  id: number
+  /** 公告标题 */
+  title: string
+  /** 公告内容 */
+  content: string
+  /** 发布日期 (yyyy-MM-dd) */
+  date: string
+  /** 跳转链接，空则无链接 */
+  url: string
+  /** 过期日期，空则永不过期 */
+  expire: string
+}
+
 /** 首页 API */
 export const homeApi = {
   /** 获取首页信息 */
@@ -117,5 +133,10 @@ export const homeApi = {
   /** 获取系统配置（版本 + 认证） */
   getSystemConfig() {
     return getRequest().get<ApiResponse<SystemConfig>>('/home/getVersion')
+  },
+
+  /** 获取公告列表（自动过滤已过期公告） */
+  getNotices() {
+    return getRequest().get<ApiResponse<Notice[]>>('/home/getNotices')
   },
 }

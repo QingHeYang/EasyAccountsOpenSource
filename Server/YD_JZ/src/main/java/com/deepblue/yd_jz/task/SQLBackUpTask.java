@@ -28,11 +28,25 @@ public class SQLBackUpTask {
     @Value("${sqldumpCmd}")
     String sqldumpCmd;
 
+    @Value("${system.os:ubuntu}")
+    String systemOs;
+
     @Value("${webhook_url}")
     String webhookUrl;
 
     @Autowired
     FileMakeWebHook fileMakeWebHook;
+
+    /**
+     * 根据操作系统构建命令
+     */
+    private String[] buildCommand(String command) {
+        if ("win".equalsIgnoreCase(systemOs)) {
+            return new String[]{"cmd", "/c", command};
+        } else {
+            return new String[]{"/bin/sh", "-c", command};
+        }
+    }
 
     @Scheduled(cron = "${cron.sqlBackupTime}")
     public void doOutSqlFile() {
@@ -43,7 +57,7 @@ public class SQLBackUpTask {
 
         fileName = fileName + time + ".sql";
         LogUtils.log_print("开始备份sql\n" + "未生成文件地址--------------- " + sqlBackupFolder + fileName);
-        String[] cmd = new String[]{"/bin/sh", "-c", sqldumpCmd + sqlBackupFolder + fileName};
+        String[] cmd = buildCommand(sqldumpCmd + sqlBackupFolder + fileName);
         try {
            Process p =  Runtime.getRuntime().exec(cmd);
            p.waitFor();
