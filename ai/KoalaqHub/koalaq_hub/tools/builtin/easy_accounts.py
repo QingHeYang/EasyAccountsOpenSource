@@ -122,7 +122,7 @@ ADD_FLOW_PARAMS = [
     ToolParam(
         name="money",
         param_type="string",
-        description="金额，必填。格式如'100.00'",
+        description="金额，必填。只传正数，不要带负号，系统根据收支类型自动处理。格式如'100.00'",
         required=True
     ),
     ToolParam(
@@ -239,6 +239,12 @@ MAKE_EXCEL_PARAMS = [
 #                              工具描述
 # ==============================================================================
 
+ACTIONS_DESC = (
+    "获取所有收支动作(action)列表。返回每个动作的ID、名称和收支类型(handle)。"
+    "当分类(type)未绑定actionId时（即actionId=null），必须调用此工具获取正确的actionId。"
+    "handle含义：0=收入，1=支出，2=内部转账。根据用户的收支意图选择对应handle的action。"
+)
+
 ACCOUNTS_DESC = "查询用户的资金账户列表。返回所有账户的ID、名称和余额信息。如果用户需要查询特定账户或需要账户ID，请使用该工具。"
 
 TYPES_DESC = "获取所有账单分类(标签)信息。返回分类的层级结构，包含分类ID、名称、父子关系和对应的actionId。每个分类标注'可用'或'不可用'：有子分类的一级分类不可用，需使用其子分类；无子分类的一级分类和所有二级分类都可用。"
@@ -255,7 +261,9 @@ FLOWS_DESC = (
 
 ADD_FLOW_DESC = (
     "添加一条流水记录。可以记录收入、支出或内部转账。"
-    "使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId（只能使用标注为'可用'的分类） 3.用current_date获取日期"
+    "使用前请先：1.用accounts获取账户ID 2.用types获取typeId（只能使用标注为'可用'的分类）"
+    "3.检查分类的actionId：如果不为null则直接使用；如果为null则调用actions工具，根据收支类型选择对应的actionId "
+    "4.用current_date获取日期"
 )
 
 UPDATE_FLOW_DESC = "更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。分类只能使用标注为'可用'的分类。"
@@ -334,6 +342,39 @@ def _get_client(context: Dict[str, Any]) -> EasyAccountsClient:
 # ==============================================================================
 #                              工具实现
 # ==============================================================================
+
+@register_tool
+@tool(name="actions", description=ACTIONS_DESC, parameters=[])
+class ActionsTool(BaseTool):
+    """获取收支动作列表"""
+
+    async def execute(self, arguments: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            client = _get_client(context)
+            url = f"{client.base_url}/action/getAction"
+
+            async with httpx.AsyncClient() as http_client:
+                response = await http_client.get(url, headers=client._build_headers())
+
+                if response.status_code == 401:
+                    return self._error(error=json.dumps(client._handle_auth_error(response.text), ensure_ascii=False))
+
+                raw = response.json()
+                data = raw.get("data", []) if isinstance(raw, dict) else raw
+
+                # 格式化：只返回关键信息
+                result = []
+                for action in data:
+                    if action.get("disable"):
+                        continue
+                    result.append(
+                        f"actionId={action.get('id')},name={action.get('hname')},handle={action.get('handle')}"
+                    )
+
+                return self._success(result=json.dumps(result, ensure_ascii=False))
+        except Exception as e:
+            return self._error(error=f"获取动作列表失败: {str(e)}")
+
 
 @register_tool
 @tool(name="accounts", description=ACCOUNTS_DESC, parameters=[])
@@ -571,11 +612,16 @@ class AddFlowTool(BaseTool):
             elif not note:
                 note = "#AI记账"
 
+            # 金额修正：去掉负号，系统根据收支类型自动处理正负
+            money = str(arguments["money"]).strip()
+            if money.startswith("-"):
+                money = money[1:]
+
             payload = {
                 "accountId": arguments["accountId"],
                 "typeId": arguments["typeId"],
                 "actionId": arguments["actionId"],
-                "money": arguments["money"],
+                "money": money,
                 "fDate": arguments["fDate"],
                 "note": note,
                 "collect": arguments.get("collect", False),
@@ -640,11 +686,16 @@ class UpdateFlowTool(BaseTool):
             elif not note:
                 note = "#AI更新"
 
+            # 金额修正：去掉负号，系统根据收支类型自动处理正负
+            money = str(arguments["money"]).strip()
+            if money.startswith("-"):
+                money = money[1:]
+
             payload = {
                 "accountId": arguments["accountId"],
                 "typeId": arguments["typeId"],
                 "actionId": arguments["actionId"],
-                "money": arguments["money"],
+                "money": money,
                 "fDate": arguments["fDate"],
                 "note": note,
                 "collect": arguments.get("collect", False),
