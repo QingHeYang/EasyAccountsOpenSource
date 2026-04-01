@@ -10,10 +10,34 @@
     },
     {
       "id": 2,
+      "title": "用户调查问卷",
+      "content": "诚邀您参与EasyAccounts用户调查，帮助我们做得更好！",
+      "date": "2026-02-27",
+      "url": "https://v.wjx.cn/vm/evUfZ30.aspx",
+      "expire": ""
+    },
+    {
+      "id": 3,
       "title": "欢迎反馈",
       "content": "使用中遇到问题欢迎在 GitHub 提交 Issue",
       "date": "2026-01-26",
       "url": "https://github.com/QingHeYang/EasyAccounts/issues",
+      "expire": ""
+    },
+    {
+      "id": 4,
+      "title": "EasyAccounts QQ交流群",
+      "content": "QQ群：817098590，加群请说明来意",
+      "date": "2026-01-26",
+      "url": "",
+      "expire": ""
+    },
+    {
+      "id": 5,
+      "title": "已知AI记账BUG",
+      "content": "当前AI记账存在一定情况下无法使用AI新增账单的情况，解决办法如下： \n给每个设置的`分类`绑定`收支操作` 即可解决问题\n 下一版本会更新解决此问题",
+      "date": "2026-02-02",
+      "url": "",
       "expire": ""
     }
   ]
