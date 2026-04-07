@@ -176,34 +176,55 @@ clawhub delete <slug>
 3. **业务规则复杂**：typeId vs actionId 区分、分类可用性规则等
 4. **写操作**：add_flow、update_flow 有特殊标记（🦞OpenClaw记账/更新）
 
-### 5.2 最终方案：模式 C（混合）
+### 5.2 最终方案：Node.js 脚本（跨平台）
+
+**为什么不用 bash + curl + jq？**
+
+| 方案 | Windows 支持 | 依赖 |
+|------|-------------|------|
+| 纯 .sh | ❌ 需 Git Bash/WSL | bash, curl, jq |
+| .sh + .ps1 双份 | ✅ | 维护两套 |
+| **Node.js** ✅ | **✅ 全平台** | **node（OpenClaw 本身就是 Node 生态，用户必有）** |
+
+**Node.js 优势：**
+1. 真正跨平台，一份代码跑全平台
+2. JSON 原生支持，无需 jq
+3. HTTP 用 fetch（Node 18+ 内置），无需 curl
+4. **OpenClaw 本身用 Node 安装**，用户机器必有 Node
+5. 单文件脚本，无 npm 依赖
 
 ```
 easyaccounts/
-├── SKILL.md              # 元数据 + 操作指南 + 简单操作的 curl 示例
+├── SKILL.md              # 元数据 + 操作指南
 └── scripts/
-    ├── login.sh          # 登录获取 token
-    ├── api.sh            # 通用 API 调用封装（读 token、处理 401）
-    ├── add_flow.sh       # 添加流水（复杂 JSON 构造 + 🦞标记）
-    ├── update_flow.sh    # 更新流水（复杂 JSON 构造 + 🦞标记）
-    └── query_flows.sh    # 查询流水（多参数构造）
+    ├── _common.js        # 通用模块（token 读写、HTTP 封装、错误处理）
+    ├── login.js          # 登录获取 token
+    ├── accounts.js       # 查询账户列表
+    ├── types.js          # 获取分类列表
+    ├── actions.js        # 获取动作列表
+    ├── year_statistics.js  # 年度统计
+    ├── flows.js          # 查询流水
+    ├── get_flow.js       # 获取单条流水
+    ├── add_flow.js       # 添加流水（🦞标记）
+    ├── update_flow.js    # 更新流水（🦞标记）
+    └── make_excel.js     # 导出 Excel
 ```
 
 ### 5.3 工具清单（11 个操作）
 
-| 操作 | 实现方式 | API 端点 | 方法 |
-|------|----------|----------|------|
-| login | `scripts/login.sh` | `/auth/login` | POST |
-| current_date | 内联（`date`命令） | 无 | - |
-| accounts | 内联 curl | `/account/getAccount` | GET |
-| types | 内联 curl | `/type/getType` | GET |
-| actions | 内联 curl | `/action/getAction` | GET |
-| year_statistics | 内联 curl | `/home/getHomeInfoV2/{year}` | GET |
-| flows | `scripts/query_flows.sh` | `/screen/getFlowByScreen` | POST |
-| get_flow | 内联 curl | `/flow/getFlow/{flowId}` | GET |
-| add_flow | `scripts/add_flow.sh` | `/flow/addFlow` | POST |
-| update_flow | `scripts/update_flow.sh` | `/flow/updateFlow/{flowId}` | PUT |
-| make_excel | `scripts/query_flows.sh` 复用 | `/screen/makeExcel` | POST |
+| 操作 | 脚本 | API 端点 | 方法 |
+|------|------|----------|------|
+| login | `login.js` | `/auth/login` | POST |
+| current_date | 内联（Node `Date`） | 无 | - |
+| accounts | `accounts.js` | `/account/getAccount` | GET |
+| types | `types.js` | `/type/getType` | GET |
+| actions | `actions.js` | `/action/getAction` | GET |
+| year_statistics | `year_statistics.js` | `/home/getHomeInfoV2/{year}` | GET |
+| flows | `flows.js` | `/screen/getFlowByScreen` | POST |
+| get_flow | `get_flow.js` | `/flow/getFlow/{flowId}` | GET |
+| add_flow | `add_flow.js` | `/flow/addFlow` | POST |
+| update_flow | `update_flow.js` | `/flow/updateFlow/{flowId}` | PUT |
+| make_excel | `make_excel.js` | `/screen/makeExcel` | POST |
 
 ### 5.4 环境变量
 
@@ -231,8 +252,10 @@ easyaccounts/
 
 ```yaml
 requires:
-  bins: [curl, jq]
+  bins: [node]
 ```
+
+要求 Node.js 18+（用于内置 fetch API）。
 
 ---
 
