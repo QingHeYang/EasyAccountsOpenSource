@@ -51,9 +51,13 @@ ea_save_token() {
 }
 
 # 读取 token
+# 不存在时返回空字符串(支持 ENABLE_LOGIN=false 的服务端,无需登录直接调用)
 ea_load_token() {
-  [[ -f "$EA_TOKEN_FILE" ]] || ea_die "未登录,请先运行 login.sh"
-  cat "$EA_TOKEN_FILE"
+  if [[ -f "$EA_TOKEN_FILE" ]]; then
+    cat "$EA_TOKEN_FILE"
+  else
+    echo ""
+  fi
 }
 
 # 清除 token
@@ -64,21 +68,6 @@ ea_clear_token() {
 # ============================================================
 #                       HTTP 调用封装
 # ============================================================
-
-# GET 请求(带 token)
-# 用法:ea_get <path>
-ea_get() {
-  local path="$1"
-  local token
-  token=$(ea_load_token)
-
-  local response
-  response=$(curl -sS -w '\n__HTTP_STATUS__:%{http_code}' \
-    -H "authorization: $token" \
-    "${EASYACCOUNTS_URL}${path}")
-
-  ea_handle_response "$response"
-}
 
 # 把 JSON body 写到临时文件
 # 重要:Windows + Git Bash 上,curl -d "$body" 会通过 ANSI code page 传递命令行参数,
@@ -91,50 +80,96 @@ _ea_write_body_tmp() {
   echo "$tmp"
 }
 
-# POST 请求(带 token,JSON body)
-# 用法:ea_post <path> <json_body>
-ea_post() {
-  local path="$1"
-  local body="$2"
-  local token
-  token=$(ea_load_token)
+# 检查响应是否 401(纯检查,无副作用)
+_ea_is_401() {
+  local raw="$1"
+  local status
+  status=$(echo "$raw" | grep -o '__HTTP_STATUS__:[0-9]*' | tail -1 | cut -d: -f2)
+  [[ "$status" == "401" || "$status" == "418" ]]
+}
 
-  local tmp
+# 尝试用环境变量自动登录
+# 返回 0 = 成功,1 = 失败(无凭据或登录失败)
+# 不打印任何东西到 stdout(避免污染调用方)
+_ea_try_auto_login() {
+  if [[ -z "${EASYACCOUNTS_USERNAME:-}" || -z "${EASYACCOUNTS_PASSWORD:-}" ]]; then
+    return 1
+  fi
+
+  local hashed body tmp response status biz_code token
+  hashed=$(ea_md5 "$EASYACCOUNTS_PASSWORD")
+  body=$(jq -n --arg u "$EASYACCOUNTS_USERNAME" --arg p "$hashed" \
+    '{username: $u, password: $p}')
   tmp=$(_ea_write_body_tmp "$body")
 
-  local response
   response=$(curl -sS -w '\n__HTTP_STATUS__:%{http_code}' \
-    -H "authorization: $token" \
     -H "Content-Type: application/json; charset=utf-8" \
     -X POST \
     --data-binary "@$tmp" \
-    "${EASYACCOUNTS_URL}${path}")
-
+    "${EASYACCOUNTS_URL}/auth/login" 2>/dev/null) || { rm -f "$tmp"; return 1; }
   rm -f "$tmp"
-  ea_handle_response "$response"
+
+  status=$(echo "$response" | grep -o '__HTTP_STATUS__:[0-9]*' | tail -1 | cut -d: -f2)
+  [[ "$status" == "200" ]] || return 1
+
+  body=$(echo "$response" | sed 's/__HTTP_STATUS__:[0-9]*$//')
+  biz_code=$(echo "$body" | jq -r '.code // 0' 2>/dev/null || echo "0")
+  [[ "$biz_code" == "0" ]] || return 1
+
+  token=$(echo "$body" | jq -r '.data.token // empty')
+  [[ -n "$token" ]] || return 1
+
+  ea_save_token "$token"
+  return 0
 }
 
-# PUT 请求(带 token,JSON body)
-ea_put() {
-  local path="$1"
-  local body="$2"
+# 内部:执行一次 HTTP 调用,返回响应
+# 用法:_ea_curl <method> <path> [<body>]
+_ea_curl() {
+  local method="$1"
+  local path="$2"
+  local body="${3:-}"
   local token
   token=$(ea_load_token)
 
-  local tmp
-  tmp=$(_ea_write_body_tmp "$body")
+  if [[ "$method" == "GET" ]]; then
+    curl -sS -w '\n__HTTP_STATUS__:%{http_code}' \
+      -H "authorization: $token" \
+      "${EASYACCOUNTS_URL}${path}"
+  else
+    local tmp
+    tmp=$(_ea_write_body_tmp "$body")
+    curl -sS -w '\n__HTTP_STATUS__:%{http_code}' \
+      -H "authorization: $token" \
+      -H "Content-Type: application/json; charset=utf-8" \
+      -X "$method" \
+      --data-binary "@$tmp" \
+      "${EASYACCOUNTS_URL}${path}"
+    rm -f "$tmp"
+  fi
+}
+
+# 内部:带 401 自动重试的 HTTP 调用
+# 401 时尝试用 env 凭据自动登录,成功后重试一次
+_ea_call() {
+  local method="$1"
+  local path="$2"
+  local body="${3:-}"
 
   local response
-  response=$(curl -sS -w '\n__HTTP_STATUS__:%{http_code}' \
-    -H "authorization: $token" \
-    -H "Content-Type: application/json; charset=utf-8" \
-    -X PUT \
-    --data-binary "@$tmp" \
-    "${EASYACCOUNTS_URL}${path}")
+  response=$(_ea_curl "$method" "$path" "$body")
 
-  rm -f "$tmp"
+  if _ea_is_401 "$response" && _ea_try_auto_login; then
+    response=$(_ea_curl "$method" "$path" "$body")
+  fi
+
   ea_handle_response "$response"
 }
+
+# 公共 HTTP 接口
+ea_get() { _ea_call "GET" "$1"; }
+ea_post() { _ea_call "POST" "$1" "$2"; }
+ea_put() { _ea_call "PUT" "$1" "$2"; }
 
 # 不带 token 的 POST(用于 login)
 # 用法:ea_post_noauth <path> <json_body>
@@ -179,7 +214,7 @@ ea_handle_response() {
       ;;
     401|418)
       ea_clear_token
-      ea_die "认证失败(HTTP $status),token 已清除,请重新运行 login.sh"
+      ea_die "认证失败(HTTP $status)。可能原因:1) 服务端开启了登录但未提供 token;2) token 已过期(默认 30 分钟)。请运行 login.sh 重新登录(需要用户名密码)。"
       ;;
     *)
       ea_die "HTTP $status: $body"
