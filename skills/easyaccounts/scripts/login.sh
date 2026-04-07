@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 # EasyAccounts 登录脚本
-# 用法:login.sh <username> <password>
-# 成功:保存 token 到 ~/.config/easyaccounts/token,输出成功信息
+#
+# 用法:
+#   login.sh <username> <password>     # 显式传参
+#   login.sh                            # 从环境变量读
+#
+# 环境变量(可选,显式参数优先):
+#   EASYACCOUNTS_USERNAME
+#   EASYACCOUNTS_PASSWORD
+#
+# 成功:保存 token 到 ~/.config/easyaccounts/token
 # 失败:退出码非 0,输出错误原因
 
 set -euo pipefail
@@ -10,12 +18,12 @@ source "$(dirname "$0")/_common.sh"
 ea_check_deps
 ea_check_env
 
-if [[ $# -lt 2 ]]; then
-  ea_die "用法: $0 <username> <password>"
-fi
+USERNAME="${1:-${EASYACCOUNTS_USERNAME:-}}"
+PASSWORD="${2:-${EASYACCOUNTS_PASSWORD:-}}"
 
-USERNAME="$1"
-PASSWORD="$2"
+if [[ -z "$USERNAME" || -z "$PASSWORD" ]]; then
+  ea_die "用法: $0 <username> <password>  或设置 EASYACCOUNTS_USERNAME / EASYACCOUNTS_PASSWORD 环境变量"
+fi
 
 # 后端要求密码 MD5 hash(与前端 MD5(password).toString() 一致)
 HASHED=$(ea_md5 "$PASSWORD")

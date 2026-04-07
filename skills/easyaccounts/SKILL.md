@@ -1,6 +1,6 @@
 ---
 name: easyaccounts
-description: 家庭财务管家。管理 EasyAccounts 个人记账系统的账户、分类、流水,支持收支记录、查询、统计和 Excel 报表导出。
+description: 家庭财务管家 / Family finance manager. 通过自然语言对接 EasyAccounts 个人记账系统,支持记账、查账、批量记账、内部转账、流水修改、收支统计、年度分析、Excel 导出、系统公告查询等。Manage household accounts, expenses, income, transfers, statistics and reports for EasyAccounts (a self-hosted personal finance/bookkeeping system with MySQL backend).
 homepage: https://github.com/EasyAccounts
 metadata:
   openclaw:
@@ -36,23 +36,31 @@ metadata:
 - 用户只是闲聊财务话题,没有具体操作请求
 - 涉及股票、基金、加密货币等投资类查询(本系统不支持)
 
+## 不支持的操作(明确告知用户)
+
+- **删除流水**:本 skill **不提供**删除功能(高风险不可逆操作)。用户要求删除时,引导用户**到前端 EasyAccounts 网页/桌面端手动删除**(前端删除会同步恢复账户余额)
+- **删除账户、分类、动作**:同上,只读不删
+- **创建账户、分类、动作**:本 skill 不涉及主数据维护,引导用户去前端
+
 ---
 
 ## 准备工作
 
-### 1. 环境变量
+### 环境变量(用户配置在 `~/.openclaw/.env`)
 
-- `EASYACCOUNTS_URL` (必需):EasyAccounts 后端服务地址,如 `http://localhost:8081`
+| 变量 | 必需 | 说明 |
+|------|------|------|
+| `EASYACCOUNTS_URL` | ✅ | 后端地址,如 `http://localhost:8081` 或带 nginx 代理路径 `http://example.com/api` |
+| `EASYACCOUNTS_USERNAME` | ❌ | 仅服务端开启登录时需要 |
+| `EASYACCOUNTS_PASSWORD` | ❌ | 同上,脚本自动 MD5 |
 
-### 2. 登录
+### 认证(LLM 通常无需关心)
 
-首次使用前必须登录。token 会保存到 `~/.config/easyaccounts/token`,后续所有操作自动读取。
+- **未开启登录** → 直接调用,无需任何凭据
+- **开启登录 + env 有凭据** → 401 时自动登录、缓存 token、无感重试
+- **开启登录 + env 无凭据** → 操作返回 `认证失败(HTTP 401)`,LLM 向用户索要账号密码后调 `login.sh <username> <password>`,再重试原操作
 
-```bash
-bash {baseDir}/scripts/login.sh <username> <password>
-```
-
-如果遇到 401 错误,提示用户重新登录即可。
+**LLM 不要默认就调 login.sh,也不要硬编码密码。**
 
 ---
 
@@ -95,53 +103,77 @@ bash {baseDir}/scripts/login.sh <username> <password>
 
 ---
 
-## ⚠️ JSON 字段名注意事项(易踩坑)
+## ⚠️ JSON 字段名(后端 Lombok+Jackson 序列化坑)
 
-后端使用 Lombok + Jackson,某些字段会被特殊序列化(首字母小写但第二个字母大写的字段会被全小写化)。**不同接口的字段名不一致**,请严格按下表使用:
+**同一概念在不同接口里有 3 套命名**,根源是后端有的接口返回 DTO(用了 `name`),有的接口返回 entity(用 `aName` → 序列化为 `aname`),还有的用了自定义字段名(`accountName`)。LLM 必须按接口选字段名,**不能跨接口套用**:
 
-### accounts 接口返回字段(`/account/getAccount`)
+### 速查表
+
+| 概念 | `/account/getAccount` (DTO) | flows 列表 / get_flow 嵌套 / types (entity) | year_statistics 嵌套 |
+|------|------------------------------|---------------------------------------------|----------------------|
+| 账户名 | `name` | `aname`(小写) | `accountName` |
+| 分类名 | — | `tname`(小写) | — |
+| 动作名 | — | `hname`(小写) | — |
+| 日期 | — | `fdate`(小写) | — |
+| 转入账户名 | — | `toAName`(驼峰,转账时有值) | — |
+
+**特别注意**:`get_flow` 接口里的嵌套 `account` 对象**走 entity 路径**,字段是 `aname` 不是 `name`!跟 `/account/getAccount` 不一样。
+
+**记忆法**:Java 字段 `aName` → JSON `aname`(小写),`name` → JSON `name`(原样),`accountName` → JSON `accountName`(原样)。
+
+### accounts 接口(`/account/getAccount`)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | int | 账户 ID |
-| `name` | string | 账户名(注意:**不是** `aname`) |
+| `name` | string | 账户名 |
 | `money` | string | 余额 |
 | `exemptMoney` | string | 免计金额 |
 | `accountType` | int | 0=资产,1=负债 |
 | `note` | string | 备注 |
 | `card` | string | 卡号 |
 
-### flows 接口返回字段(`/screen/getFlowByScreen`、`/flow/getFlow`)
+### flows 列表接口(`/screen/getFlowByScreen`)
+
+返回**扁平字段**:
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | int | 流水 ID |
-| `aname` | string | 账户名(**注意小写,不是 `aName` 也不是 `name`**) |
-| `tname` | string | 分类名(同上) |
-| `hname` | string | 收支动作名(如"支出"、"收入") |
-| `handle` | int | 收支类型 0/1/2 |
+| `aname` | string | 账户名 |
+| `tname` | string | 分类名 |
+| `hname` | string | 收支动作名("支出"/"收入"等) |
+| `handle` | int | 0=收入 1=支出 2=转账 |
 | `money` | string | 金额 |
-| `fdate` | string | 流水日期(**注意小写,不是 `fDate`**) |
+| `fdate` | string | 流水日期 |
 | `note` | string | 备注 |
-| `toAName` | string | 转入账户名(**注意这个反而是驼峰**,内部转账时有值) |
+| `toAName` | string | 转入账户名(转账时有) |
 | `from` | string | 来源标记 |
 | `collect` | bool | 是否收藏 |
 | `hasImages` | bool | 是否有图片 |
+| `exempt` | bool | 是否免计 |
 
-### types 接口返回字段(`/type/getType`)
+### get_flow 详情接口(`/flow/getFlow/{id}`)
+
+返回**嵌套对象**(注意!跟列表接口结构完全不一样,也跟 `/account/getAccount` 字段名不一样):
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` / `money` / `fdate` / `note` / `from` / `collect` | 同列表 | 扁平字段 |
+| `account` | object | 源账户(entity 序列化):`{id, aname, money(余额), exemptMoney, card, accountType, note}` ⚠️ **是 `aname` 不是 `name`** |
+| `accountTo` | object | 转入账户(转账时有),字段同 account |
+| `type` | object | `{id, tname, parent, action(嵌套), childrenTypes, hasChild, ...}` |
+| `action` | object | `{id, handle, hname, exempt, exemptMode, disable}` |
+| `images` | array | 图片 URL 列表(可能为 null) |
+
+### types 接口(`/type/getType`)
 
 | 字段 | 说明 |
 |------|------|
 | `id` | 分类 ID(**这就是 typeId**) |
-| `tname` | 分类名(注意小写) |
-| `action.id` | actionId(可能为 null) |
-| `action.handle` | 收支方向 |
-| `action.hname` | 动作名 |
-| `childrenTypes` | 子分类列表(有则一级分类不可用) |
-
-### 一句话记忆
-
-> **accounts 用 `name`,flows/types 用 `aname`/`tname`**(因 Lombok 序列化差异)。
+| `tname` | 分类名 |
+| `action` | 嵌套对象 `{id, handle, hname}` 或 **null**(分类未绑定 action) |
+| `childrenTypes` | 子分类列表(有则一级分类不可用,需选子) |
 
 ---
 
@@ -168,6 +200,12 @@ bash {baseDir}/scripts/login.sh <username> <password>
    多笔(2 条及以上) → 调用 batch_add_flow,把所有条目组装成 JSON 数组一次性提交
 ```
 
+**重要细节**:
+- **金额规范化**:用户的金额可能带"块"、"元"、"块钱"等单位或符号,LLM 应解析成纯数字。如"30 块" → `30.00`,"一百二" → `120.00`
+- **createDate 不需要传**:helper 脚本自动设置当前时间
+- **内部转账(转账给自己的另一个账户)请走【流程 G】**,需要 `accountToId`
+- **金额只传正数**:即便用户说"花了 30",也是传 `30` 不是 `-30`,系统根据 actionId 自动定方向
+
 ### 流程 C:更新流水
 
 ```
@@ -177,11 +215,16 @@ bash {baseDir}/scripts/login.sh <username> <password>
 4. 调用 update_flow 更新
 ```
 
-### 流程 D:导出 Excel
+### 流程 D:导出 Excel(基于查询)
 
 ```
-当流水超过 100 条,或用户明确要求导出时,调用 make_excel
-返回的 downloadUrl 直接给用户
+1. 总是先调用 query_flows 查询(看一眼数量和数据)
+2. 检查返回字段:
+   - is_truncated == false 且数量较少 → 直接展示给用户,不需要导出
+   - is_truncated == true(>100 条) → 主动告知"共 X 条,只展示了前 100 条,可导出 Excel"
+3. 用户确认导出 → 用相同的查询参数 + --export "<文件名>" 调 query_flows
+4. 文件生成在服务器 Resource/excel/screen/ 目录(脚本返回 fileName)
+5. **没有直接的 downloadUrl**,告诉用户:"文件已生成在服务器,请到前端下载页面或让运维拷贝"
 ```
 
 ### 流程 E:查询系统信息和公告
@@ -190,6 +233,29 @@ bash {baseDir}/scripts/login.sh <username> <password>
 1. 用户问"有什么公告/通知" → 调用 system_info notices
 2. 用户问"系统版本/有没有更新/我的配置" → 调用 system_info version
 3. 用户首次使用或问"系统状态" → 调用 system_info all
+```
+
+⚠️ notices 返回的公告中可能含**已过期**的(`expire` 字段不为 null 且早于今天),LLM 应**主动跳过**,不要展示给用户。
+
+### 流程 F:删除流水(本 skill 不支持)
+
+```
+用户要求删除时:
+1. 不要调用任何 API
+2. 直接告知:"出于安全考虑,本 skill 不支持删除流水。请到前端 EasyAccounts 网页/桌面端手动删除,前端会自动恢复账户余额。"
+3. 如果用户只是想"撤销错误的记账",建议改用 update_flow 修改金额或备注
+```
+
+### 流程 G:内部转账(handle=2,与普通收支不同)
+
+```
+用户场景:"从微信转 500 到银行卡"、"工资转入理财账户"
+1. 调用 accounts 拿到源账户和目标账户的 ID
+2. 调用 actions,找 handle == 2 的动作(通常名为"内部转账")
+3. typeId 选用一个转账类目(通常是某个被标记为 handle=2 的分类),
+   或如果没有专属转账类目,可以复用普通分类(具体看你的 EasyAccounts 数据)
+4. 调用 add_flow,**必须**传 `--account-to-id <目标账户ID>`
+5. 金额仍然只传正数,后端自动处理"源账户 -money,目标账户 +money"
 ```
 
 ---
@@ -247,8 +313,34 @@ curl -s -H "authorization: $TOKEN" "$EASYACCOUNTS_URL/action/getAction" \
 ```bash
 TOKEN=$(cat ~/.config/easyaccounts/token)
 YEAR=2026
-curl -s -H "authorization: $TOKEN" "$EASYACCOUNTS_URL/home/getHomeInfoV2/$YEAR" | jq '.'
+curl -s -H "authorization: $TOKEN" "$EASYACCOUNTS_URL/home/getHomeInfoV2/$YEAR" | jq '.data'
 ```
+
+**返回字段**:
+
+| 字段 | 说明 |
+|------|------|
+| `totalAsset` | 总资产 |
+| `netAsset` | 净资产(总资产 - 负债) |
+| `yearIncome` | 该年总收入 |
+| `yearOutCome` | 该年总支出 |
+| `yearBalance` | 该年盈余(收入 - 支出) |
+| `curIncome` | 当月收入(只在查询当年时有值,跨年查询为 null) |
+| `curOutCome` | 当月支出(同上) |
+| `accounts` | 数组,各账户资产明细 |
+| `monthDetails` | 数组,各月详情 |
+
+**`accounts` 子字段**(注意!**第三种账户名命名**):
+
+| 子字段 | 说明 |
+|--------|------|
+| `id` | 账户 ID |
+| `accountName` | 账户名(**注意:不是 `name` 也不是 `aname`**) |
+| `accountAsset` | 账户资产值 |
+| `exemptAsset` | 免计资产 |
+| `percent` | 占总资产百分比 |
+| `accountType` | 0=资产,1=负债 |
+| `note` | 备注 |
 
 ### system_info(系统信息和公告)
 
@@ -269,6 +361,8 @@ bash {baseDir}/scripts/system_info.sh all
 - `id` / `title` / `content` / `date`
 - `url` — 相关链接(可能为 null)
 - `expire` — 过期时间(可能为 null,null 表示永不过期)
+
+⚠️ **LLM 必须主动过滤过期公告**:`expire` 不为 null 且早于今天的公告**不要展示**。如不确定今天日期,先调用 current_date(`date '+%Y-%m-%d'`)。
 
 **version 返回字段**(对象):
 - `versions` — 各模块版本号:`fontBranch`(前端)、`backendBranch`(后端)、`mysqlBranch`、`agentBranch`、`webhookBranch`、`release`(总版本)、`versionCode`
@@ -301,7 +395,32 @@ bash {baseDir}/scripts/query_flows.sh \
   [--order-by 2]
 ```
 
-handle 必填(0/1/2/3)。流水超过 100 条会自动截断,提示用 make_excel 导出。
+**参数说明**:
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--handle` | ✅ | 0=收入 1=支出 2=转账 3=全部 |
+| `--start-date` | ❌ | 开始日期 yyyy-MM-dd |
+| `--end-date` | ❌ | 结束日期 yyyy-MM-dd |
+| `--single-month true` | ❌ | 单月查询模式,只需 start-date(取该月任意日期),省略 end-date |
+| `--account-id N` | ❌ | 按账户筛选,先用 accounts 拿 ID |
+| `--types 5,8` | ❌ | **分类 ID 列表**(逗号分隔),不是分类名!需先调 types 拿 ID |
+| `--note 餐饮` | ❌ | **单个**关键字,模糊匹配备注(不支持多关键字 AND/OR) |
+| `--analysis true` | ❌ | 返回每条流水占总收入/支出的百分比 |
+| `--order-by N` | ❌ | 0=金额升序 1=金额降序 2=时间升序;**默认按时间倒序(最新在前)** |
+
+**返回字段**:
+
+| 字段 | 说明 |
+|------|------|
+| `summary` | 汇总字符串"收入=X,支出=Y,盈余=Z" |
+| `flows` | 格式化的流水字符串数组(每条形如 `流水ID:N;收支:Y;金额:Z;...`) |
+| `total_count` | 符合条件的总数(截断前) |
+| `returned_count` | 实际返回数量 |
+| `is_truncated` | bool,**true 表示超过 100 条被截断** |
+| `notice` | 截断时的提示消息 |
+
+**截断规则**:超过 100 条时,**保留按当前排序的前 100 条**(默认时间倒序即最新的)。剩余数据**无法**通过 flows 获取,**必须**用 make_excel 导出完整数据。LLM 应主动提醒用户。
 
 ### get_flow(获取单条流水详情)
 
@@ -327,7 +446,12 @@ bash {baseDir}/scripts/add_flow.sh \
   [--collect false]
 ```
 
-注意:`--money` 只传正数,系统自动处理正负。内部转账时必须传 `--account-to-id`。
+**参数说明**:
+- `--money`:**只传正数**,系统根据 actionId 的 handle 自动处理正负
+- `--account-to-id`:**仅** handle=2(内部转账)时传,其他情况不要传
+- `--note`:用户的备注。脚本内部会自动追加来源标识,LLM 不需要管
+- `--collect`:可选,默认 false
+- **不需要传 createDate**,脚本自动设置当前时间
 
 ### batch_add_flow(批量添加流水)
 
@@ -413,7 +537,16 @@ bash {baseDir}/scripts/query_flows.sh \
   --end-date 2026-03-31
 ```
 
-返回 `downloadUrl`,直接展示给用户下载。
+**返回字段**:
+- `success`:bool
+- `fileName`:生成的实际文件名(含时间戳后缀)
+- `notice`:提示文本
+
+⚠️ **没有 downloadUrl 字段**。文件生成在服务器 `Resource/excel/screen/` 目录,需要用户:
+- 通过 EasyAccounts 前端的下载页面获取
+- 或联系运维拷贝
+
+LLM 应该把 `fileName` + `notice` 一起告诉用户,**不要承诺给链接**。
 
 ---
 
@@ -428,6 +561,9 @@ bash {baseDir}/scripts/query_flows.sh \
 
 ## 错误处理
 
-- **HTTP 401 / code != 0**:可能是未登录或 token 过期,提示用户重新执行 login
-- **缺少必要参数**:检查上下文,如不确定先调用相应的查询接口(accounts/types/actions)
-- **分类不可用**:如果用户选了一级分类但它有子分类,提示用户选择具体的二级分类
+- **HTTP 401**:服务端开启了登录但未提供 token,或 token 已过期(默认 30 分钟)。引导用户提供账号密码后调 login.sh,然后重试
+- **业务错误 code != 0**:看 msg 字段,通常是参数错误或业务规则限制
+- **缺少必要参数**:不要瞎猜,先调用对应的查询接口(accounts/types/actions/flows)拿到准确 ID
+- **分类不可用**:LLM 选了有子分类的一级分类,后端会拒绝。重新让用户从子分类里选
+- **删除请求**:本 skill 不支持,引导前端处理(见【流程 F】)
+- **批量操作部分失败**:batch_add_flow 返回的 `failedList` 含失败索引和原因,LLM 应总结哪些条成功、哪些失败,失败的让用户决定是否手动重试
