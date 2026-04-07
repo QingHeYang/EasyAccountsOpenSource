@@ -141,6 +141,7 @@ const toAccountIcon = computed(() => getAccountIcon(props.flow.toAName))
           <span v-if="flow.hasImages" class="tag tag-image">图</span>
           <span v-if="flow.from === 'ai'" class="tag tag-ai">AI</span>
           <span v-if="flow.from === 'mcp'" class="tag tag-mcp">MCP</span>
+          <span v-if="flow.from === 'Claw'" class="tag tag-claw">Claw</span>
           <span v-if="flow.collect" class="tag tag-star">★</span>
         </div>
       </div>
@@ -255,6 +256,11 @@ const toAccountIcon = computed(() => getAccountIcon(props.flow.toAName))
 
 .tag-mcp {
   background: var(--color-income);
+  color: #fff;
+}
+
+.tag-claw {
+  background: #FF6B7A;
   color: #fff;
 }
 
