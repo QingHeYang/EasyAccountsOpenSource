@@ -1,0 +1,365 @@
+databaseChangeLog:
+
+  # =========================================================================
+  # v2.7.0 · 定时记账规则表
+  # =========================================================================
+  - changeSet:
+      id: 2.7.0-create-scheduled-flow-rule
+      author: claude
+      changes:
+        - createTable:
+            tableName: scheduled_flow_rule
+            remarks: "定时记账规则表"
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                  remarks: "规则名称"
+
+              # 记账完整字段（与 flow 对齐）
+              - column:
+                  name: money
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                  remarks: "金额，字符串存储与 flow.money 一致"
+              - column:
+                  name: type_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: "分类 ID"
+              - column:
+                  name: action_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: "收支动作 ID"
+              - column:
+                  name: account_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: "主账户 ID"
+              - column:
+                  name: account_to_id
+                  type: INT
+                  remarks: "转账目标账户 ID，转账时必填"
+              - column:
+                  name: note
+                  type: VARCHAR(200)
+                  remarks: "备注"
+
+              # 周期配置
+              - column:
+                  name: cycle_type
+                  type: TINYINT
+                  constraints:
+                    nullable: false
+                  remarks: "周期类型：1=每日 2=每周 3=每月 4=每年"
+              - column:
+                  name: cycle_dates
+                  type: VARCHAR(255)
+                  remarks: "周期内具体日期 JSON，按 cycle_type 解释：每日=null；每周=[1-7];每月=[1-31];每年=[\"MM-DD\",...]"
+              - column:
+                  name: run_time
+                  type: VARCHAR(8)
+                  constraints:
+                    nullable: false
+                  remarks: "执行时间 HH:mm:ss，默认秒为 00"
+
+              # 起止与状态
+              - column:
+                  name: start_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+                  remarks: "开始日期，创建时必须 ≥ today+1"
+              - column:
+                  name: end_date
+                  type: DATE
+                  remarks: "结束日期，NULL 表示永久"
+              - column:
+                  name: is_permanent
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "是否永久：0=否 1=是"
+              - column:
+                  name: status
+                  type: TINYINT
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+                  remarks: "状态：1=未开始 2=开始 3=暂停 4=完成 5=失效"
+
+              # 调度游标
+              - column:
+                  name: next_run_date
+                  type: DATE
+                  remarks: "下次执行日"
+              - column:
+                  name: last_run_date
+                  type: DATE
+                  remarks: "上次执行日"
+
+              # 提醒配置（per 规则）
+              - column:
+                  name: reminder_enabled
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "是否提醒：0=否 1=是"
+              - column:
+                  name: email_enabled
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "是否发送邮件：0=否 1=是"
+
+              - column:
+                  name: create_time
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+                  remarks: "创建时间"
+
+  # v2.7.0: 规则表索引（按状态 + 下次执行日筛选，调度任务高频使用）
+  - changeSet:
+      id: 2.7.0-create-scheduled-flow-rule-index
+      author: claude
+      changes:
+        - createIndex:
+            indexName: idx_sfr_status_next_run
+            tableName: scheduled_flow_rule
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: next_run_date
+
+  # =========================================================================
+  # v2.7.0 · 定时记账执行日志表
+  # =========================================================================
+  - changeSet:
+      id: 2.7.0-create-scheduled-flow-log
+      author: claude
+      changes:
+        - createTable:
+            tableName: scheduled_flow_log
+            remarks: "定时记账执行日志表，每次调度执行写一条"
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: rule_id
+                  type: INT
+                  constraints:
+                    nullable: false
+                  remarks: "关联 scheduled_flow_rule.id"
+              - column:
+                  name: execute_time
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+                  remarks: "执行时刻"
+              - column:
+                  name: success
+                  type: TINYINT(1)
+                  constraints:
+                    nullable: false
+                  remarks: "是否成功：0=失败 1=成功"
+              - column:
+                  name: flow_id
+                  type: INT
+                  remarks: "成功时关联生成的 flow.id"
+              - column:
+                  name: fail_category
+                  type: TINYINT
+                  remarks: "失败分类：1=主数据类（账户停用/分类停用或归档）2=其他类；成功为 NULL"
+              - column:
+                  name: fail_reason
+                  type: VARCHAR(500)
+                  remarks: "失败原因文本，成功为 NULL"
+
+  - changeSet:
+      id: 2.7.0-create-scheduled-flow-log-index
+      author: claude
+      changes:
+        - createIndex:
+            indexName: idx_sfl_rule_time
+            tableName: scheduled_flow_log
+            columns:
+              - column:
+                  name: rule_id
+              - column:
+                  name: execute_time
+                  descending: true
+
+  # =========================================================================
+  # v2.7.0 · 用户信息通知表（本地通知，与云端公告 NoticeService 不同）
+  # =========================================================================
+  - changeSet:
+      id: 2.7.0-create-user-notice
+      author: claude
+      changes:
+        - createTable:
+            tableName: user_notice
+            remarks: "用户级信息通知表，承载定时记账事前提醒等本地生成的通知"
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: type
+                  type: TINYINT
+                  constraints:
+                    nullable: false
+                  remarks: "通知类型：1=定时记账事前提醒（预留扩展）"
+              - column:
+                  name: title
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+                  remarks: "通知标题"
+              - column:
+                  name: content
+                  type: VARCHAR(500)
+                  constraints:
+                    nullable: false
+                  remarks: "通知内容"
+              - column:
+                  name: related_rule_id
+                  type: INT
+                  remarks: "事前提醒时指向 scheduled_flow_rule.id"
+              - column:
+                  name: related_run_date
+                  type: DATE
+                  remarks: "事前提醒时指向预计执行日，用于执行后自动清理对应提醒"
+              - column:
+                  name: is_read
+                  type: TINYINT(1)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+                  remarks: "是否已读：0=未读 1=已读"
+              - column:
+                  name: create_time
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+                  remarks: "创建时间"
+
+  - changeSet:
+      id: 2.7.0-create-user-notice-index
+      author: claude
+      changes:
+        - createIndex:
+            indexName: idx_un_read_create
+            tableName: user_notice
+            columns:
+              - column:
+                  name: is_read
+              - column:
+                  name: create_time
+                  descending: true
+
+  # =========================================================================
+  # v2.7.0 · 全局应用配置表（k-v）
+  # =========================================================================
+  - changeSet:
+      id: 2.7.0-create-app-config
+      author: claude
+      changes:
+        - createTable:
+            tableName: app_config
+            remarks: "全局应用配置 k-v 表，按 domain 区分业务域"
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: domain
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                  remarks: "业务域，例：scheduled_flow"
+              - column:
+                  name: config_key
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                  remarks: "配置键，在同一 domain 下唯一"
+              - column:
+                  name: config_value
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                  remarks: "配置值，字符串存储"
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+                  remarks: "最近更新时间"
+
+  # v2.7.0: (domain, config_key) 唯一约束
+  - changeSet:
+      id: 2.7.0-create-app-config-unique
+      author: claude
+      changes:
+        - addUniqueConstraint:
+            tableName: app_config
+            columnNames: domain, config_key
+            constraintName: uk_app_config_domain_key
+
+  # v2.7.0: 写入定时记账全局提醒默认配置
+  - changeSet:
+      id: 2.7.0-seed-app-config-scheduled-flow-reminder
+      author: claude
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO app_config (domain, config_key, config_value, updated_at) VALUES
+                ('scheduled_flow', 'remind_before_days', '1',     NOW()),
+                ('scheduled_flow', 'remind_time',        '09:00', NOW())
+
+  # v2.7.0: 规则失效时清空账户/分类引用字段，允许 account_id / type_id 为 NULL
+  # 语义：失效 = 状态置 INVALID + 引用字段置 NULL；前端拿到 null 即知道该字段需补齐
+  - changeSet:
+      id: 2.7.0-relax-rule-account-type-nullable
+      author: claude
+      changes:
+        - dropNotNullConstraint:
+            tableName: scheduled_flow_rule
+            columnName: account_id
+            columnDataType: INT
+        - dropNotNullConstraint:
+            tableName: scheduled_flow_rule
+            columnName: type_id
+            columnDataType: INT
