@@ -39,6 +39,14 @@
       "date": "2026-02-02",
       "url": "",
       "expire": ""
+    },
+    {
+      "id": 6,
+      "title": "🦞 OpenClaw EasyAccounts Skill发布",
+      "content": "EasyAccounts Skills已上线，目前支持使用OpenClaw对接EasyAccounts进行记账，配合任意 Excel skill 还能批量导入微信、支付宝、银行账单。欢迎把玩。",
+      "date": "2026-04-08",
+      "url": "https://github.com/QingHeYang/EasyAccounts-Skills",
+      "expire": ""
     }
   ]
 }
