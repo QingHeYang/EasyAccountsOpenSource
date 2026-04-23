@@ -1,7 +1,6 @@
 .DS_Store
 .vscode
 upload-image.sh
-CLAUDE.md
 *.log
 question/*
 *.tar.gz
