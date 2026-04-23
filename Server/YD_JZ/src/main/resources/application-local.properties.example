@@ -122,13 +122,13 @@ spring.liquibase.change-log=classpath:/db/changelog/db.changelog-master.yaml
 # =====================================================
 # 版本信息
 # =====================================================
-version.release=2.6.1-local
-version.code=2610
-version.font_branch=4.0.1-local
-version.backend_branch=2.6.1-local
-version.mysql_branch=2.5.0-local
-version.agent_branch=1.1.0-local
-version.webhook_branch=1.0.0-local
+version.release=2.7.0-local
+version.code=2700
+version.font_branch=4.1.0-local
+version.backend_branch=2.7.0-local
+version.mysql_branch=2.7.0-local
+version.agent_branch=1.2.0-local
+version.webhook_branch=1.1.0-local
 
 # 云端版本通知 JSON 地址（用于检查更新）
 version.notice.url=https://blue-out-share.oss-cn-zhangjiakou.aliyuncs.com/version-notice.json
