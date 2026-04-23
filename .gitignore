@@ -118,3 +118,6 @@ tmpclaude-*/
 # Vite缓存
 .vite/
 **/.vite/
+
+# easyaccounts skill 已提取为独立仓库 (https://github.com/QingHeYang/EasyAccounts-Skills)
+skills/easyaccounts/
