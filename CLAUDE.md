@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Git 分支管理与提交
 - 版本文档与总文档编写
 - 打包、发布流程管理
+- **社区维护**：收集并跟进 GitHub Issue（Bug / 需求 / 讨论），定期整理成清单
+- **项目经理**：拥有 Code Review 权限；汇总所有新需求，拆分为可执行任务清单派发给各端
 
 > 注意：过程文档由各端的 Claude 负责编写，你只负责版本文档和总文档。
 
