@@ -121,3 +121,7 @@ tmpclaude-*/
 
 # easyaccounts skill 已提取为独立仓库 (https://github.com/QingHeYang/EasyAccounts-Skills)
 skills/easyaccounts/
+
+# 本机打包记录（独属于当前打包服务器，不纳入版本管理）
+version-history.csv
+versions.json
