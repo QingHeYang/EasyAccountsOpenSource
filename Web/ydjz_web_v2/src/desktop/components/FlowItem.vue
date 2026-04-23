@@ -86,6 +86,7 @@ function onDelete(e: Event) {
         </el-tag>
         <el-tag v-if="flow.from === 'ai'" size="small" class="ai-tag">AI</el-tag>
         <el-tag v-if="flow.from === 'mcp'" size="small" class="mcp-tag">MCP</el-tag>
+        <el-tag v-if="flow.from === 'Claw'" size="small" class="claw-tag">Claw</el-tag>
         <el-tag v-if="flow.exempt" size="small" type="info">不计入</el-tag>
       </div>
     </div>
@@ -203,6 +204,12 @@ function onDelete(e: Event) {
 
 .mcp-tag {
   background: var(--color-income);
+  border: none;
+  color: #fff;
+}
+
+.claw-tag {
+  background: #FF6B7A;
   border: none;
   color: #fff;
 }
