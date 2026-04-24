@@ -57,7 +57,8 @@ public class ScheduledFlowRuleStateMachine {
                 }
                 break;
             case SYS_INVALIDATE:
-                if (from == ScheduledFlowConst.STATUS_RUNNING) {
+                // 产品 §5.3：账户/分类停用归档时，引用它的任何非失效规则都应进入失效
+                if (from != ScheduledFlowConst.STATUS_INVALID) {
                     return ScheduledFlowConst.STATUS_INVALID;
                 }
                 break;

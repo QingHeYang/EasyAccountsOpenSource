@@ -2,6 +2,7 @@ databaseChangeLog:
 
   # =========================================================================
   # v2.7.0 · 定时记账规则表
+  # account_id / type_id 允许 NULL —— 规则失效时会清空这两个引用字段
   # =========================================================================
   - changeSet:
       id: 2.7.0-create-scheduled-flow-rule
@@ -35,25 +36,21 @@ databaseChangeLog:
               - column:
                   name: type_id
                   type: INT
-                  constraints:
-                    nullable: false
-                  remarks: "分类 ID"
+                  remarks: "分类 ID；失效清空允许 NULL"
               - column:
                   name: action_id
                   type: INT
                   constraints:
                     nullable: false
-                  remarks: "收支动作 ID"
+                  remarks: "收支动作 ID；action 不会失效，保持 NOT NULL"
               - column:
                   name: account_id
                   type: INT
-                  constraints:
-                    nullable: false
-                  remarks: "主账户 ID"
+                  remarks: "主账户 ID；失效清空允许 NULL"
               - column:
                   name: account_to_id
                   type: INT
-                  remarks: "转账目标账户 ID，转账时必填"
+                  remarks: "转账目标账户 ID；转账场景必填、失效可清空"
               - column:
                   name: note
                   type: VARCHAR(200)
@@ -136,7 +133,7 @@ databaseChangeLog:
                     nullable: false
                   remarks: "创建时间"
 
-  # v2.7.0: 规则表索引（按状态 + 下次执行日筛选，调度任务高频使用）
+  # v2.7.0: 规则表索引（扫描任务高频按 status + next_run_date 筛选）
   - changeSet:
       id: 2.7.0-create-scheduled-flow-rule-index
       author: claude
@@ -286,7 +283,7 @@ databaseChangeLog:
                   descending: true
 
   # =========================================================================
-  # v2.7.0 · 全局应用配置表（k-v）
+  # v2.7.0 · 全局应用配置表（k-v，按 domain 区分业务域）
   # =========================================================================
   - changeSet:
       id: 2.7.0-create-app-config
@@ -348,18 +345,3 @@ databaseChangeLog:
               INSERT INTO app_config (domain, config_key, config_value, updated_at) VALUES
                 ('scheduled_flow', 'remind_before_days', '1',     NOW()),
                 ('scheduled_flow', 'remind_time',        '09:00', NOW())
-
-  # v2.7.0: 规则失效时清空账户/分类引用字段，允许 account_id / type_id 为 NULL
-  # 语义：失效 = 状态置 INVALID + 引用字段置 NULL；前端拿到 null 即知道该字段需补齐
-  - changeSet:
-      id: 2.7.0-relax-rule-account-type-nullable
-      author: claude
-      changes:
-        - dropNotNullConstraint:
-            tableName: scheduled_flow_rule
-            columnName: account_id
-            columnDataType: INT
-        - dropNotNullConstraint:
-            tableName: scheduled_flow_rule
-            columnName: type_id
-            columnDataType: INT

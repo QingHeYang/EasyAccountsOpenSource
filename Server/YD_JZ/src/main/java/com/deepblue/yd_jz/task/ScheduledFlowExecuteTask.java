@@ -166,10 +166,14 @@ public class ScheduledFlowExecuteTask {
     }
 
     private static LocalDate toLocalDate(Date date) {
-        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        if (date == null) return null;
+        // 用 getTime() 兼容 java.sql.Date（Hibernate 从 DATE 列读回的就是 java.sql.Date，
+        // 它重写了 toInstant() 抛 UnsupportedOperationException）
+        return new java.sql.Date(date.getTime()).toLocalDate();
     }
 
     private static Date toDate(LocalDate localDate) {
+        if (localDate == null) return null;
         return Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 }

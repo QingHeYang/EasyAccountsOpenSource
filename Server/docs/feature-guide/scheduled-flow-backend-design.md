@@ -501,6 +501,111 @@ findRules(status=开始, reminder_enabled=1, next_run_date=targetRunDate)
 
 ---
 
+## 十一、实测迭代后的设计修订（2026-04-24 自测完后）
+
+原方案代码落地 + 端到端自测后，以下设计点有过迭代，以本节为准。
+
+### 11.1 `dirty` 字段移除
+
+初版加了 `scheduled_flow_rule.dirty` 用来实现"从非执行态回到开始必须先编辑过"。产品澄清后取消：
+- 完成 → 开始：用户本来就要改 startDate
+- 失效 → 开始：用户本来就要补齐失效字段
+- 暂停 → 开始：本来就是用户主动按的
+
+start 接口改成**字段合法性校验**（endDate 没过 + 账户分类可用），用户不改字段直接点开始会被自然拦下。
+
+表结构、Entity、状态机、Review R7 已同步清理。
+
+### 11.2 开始日期"必须 ≥ today+1"校验下放前端
+
+产品原规则 §2.1：开始日期必须晚于今天。后端 `validateStartDateAfterToday` 保留方法但**不调**（方便测试 + 用户可以立即启动"今天刚建但之后周期"的规则）。前端做 UX 校验。
+
+### 11.3 失效挂钩覆盖范围扩大
+
+原设计：只把 `status=RUNNING` 的规则置失效。实测发现 `status=NOT_START` 的规则引用的账户被停用不会被挂钩处理。
+
+现设计：
+- Repository 查询去掉 status 过滤（INVALID 规则的 accountId/typeId 已经为 null，天然不命中查询）
+- 状态机 `SYS_INVALIDATE` 前置放宽：**除 INVALID 外都允许**
+- 效果：账户/分类停用时，所有引用它的非失效规则都会被置失效
+
+### 11.4 提醒扫描区间化 + 即时补发
+
+原设计：
+- `findRulesForReminder(status=RUNNING, next=today+N)` 单点匹配
+
+问题：用户建规则 `startDate=明天`、`remindBeforeDays=3`，提醒窗口已在开启区间（next=明天 < today+3），但单点查询要求 `next=today+3`，永远不命中 → 用户收不到提醒。
+
+现设计：
+- 查询改区间 `next_run_date ∈ [today, today+N]`
+- 活跃状态扩到 `(NOT_START, RUNNING)`
+- 新增 `ReminderService.checkAndDispatch(rule)`：资格判断 + 防重复 + 派发的单一入口
+- `ScheduledFlowRuleService.createRule / updateRule / startRule` 末尾**立即调一次** `checkAndDispatch`，覆盖"新建/修改后即时补发"场景
+- 常规扫描由 `ReminderDispatchTask` 每天 remind_time 那一分钟批量扫一次
+
+### 11.5 通知清理 7 处（从初版 2 处扩展）
+
+初版只在"执行成功"和"删规则"两处清理。实测后扩到 7 处（确保用户永远不会看到误导性通知）：
+
+| 触发点 | 清理范围 | 新旧 |
+|---|---|---|
+| 执行成功 | 删当天执行日那条 | 原有 |
+| 规则删除 | 删全部 | 原有 |
+| 规则更新 | 删全部 + 补发新的 | **新增** |
+| 规则暂停 | 删全部 | **新增** |
+| 规则失效（账户/分类） | 删全部 | **新增** |
+| 规则自然完成 | 删全部 | **新增** |
+| 扫描推游标（错过） | 精确删旧 runDate 那条 | **新增** |
+
+### 11.6 `baselineForRecompute` 加入 `lastRunDate`
+
+原公式：`base = max(today, startDate) - 1`
+
+问题：已执行过的每日规则 PUT 修改时，公式把 `base` 算成 `today-1` → `next=today`，回退到已执行过的日期，导致分支 A 卡几次后明天被跳过（漏一天）。
+
+现公式：`base = max(today-1, startDate-1, lastRunDate)`
+- 已执行过的规则 `next` 严格大于 `lastRunDate`，不回退
+- 未执行过的规则走原逻辑
+
+### 11.7 `Flow.from` 列名确认
+
+原 Review R4：文档写 `from_source`，Bean 写 `from`，不一致待核实。
+
+实测结论：**DB 列名是 `from_source`**，`FlowSelectProvider` 用 `AS fromSource` 别名 + `BeanUtils.copyProperties` 对齐，Bean 字段 `from` 通过显式 SQL 映射生效。此 R4 已关闭。
+
+### 11.8 接口数 18 → 20
+
+新增 2 条删执行日志接口：
+- `DELETE /scheduledFlow/log/{id}` 单条删
+- `DELETE /scheduledFlow/log?ruleId=x` 按规则批量清
+
+配合：规则删除时**不再**级联删日志（改为保留做审计），日志表里孤儿行在 DTO 层用 `[规则已删除]` 兜底。
+
+### 11.9 Windows 编码坑
+
+中文字符串（如 `【定时】`、`[已删除]`）在 Windows 下 javac 默认用 GBK 编码读 UTF-8 源文件导致乱码。处理：
+- note 尾标改成跟现有外部来源一致的格式 ` #定时`（常用汉字，无全角方括号）
+- 兜底标签 `[规则已删除]`（半角方括号，跟 `【】` 等特殊字符区分）
+- 根治需要 IDE 统一 File Encoding=UTF-8（用户侧一次性设置）
+
+### 11.10 Review 点最终状态
+
+| Review 点 | 状态 |
+|---|---|
+| R1 cycle_dates JSON | ✅ 落地 JSON |
+| ~~R2 app_config 表结构~~ | 已落地（k-v + domain 字段） |
+| R3 Flow.from="scheduled" | ✅ 落地 |
+| R4 DB 列名核实 | ✅ 确认 `from_source` |
+| R5 规则删除级联日志 | ❌ 改为保留日志（审计） |
+| R6 通知路径 `/notice` | ✅ 落地 |
+| ~~R7 dirty 字段~~ | 已移除 |
+| R8 cron 1 分钟 | ✅ 落地 |
+| R9 主数据事件直调 | ✅ 落地（含循环依赖 allow-circular 兜底） |
+| R10 FlowService.doAddFlow 复用 | ✅ 落地 |
+| R11 新增停用归档错误码 | ✅ 落地 `ACCOUNT_DISABLED/TYPE_DISABLED/TYPE_ARCHIVED` |
+
+---
+
 ## 文档边界声明
 
 本文档由**后端开发 Claude** 起草，供**项目主管 Review**。

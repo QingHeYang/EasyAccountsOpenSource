@@ -10,6 +10,7 @@ import static com.deepblue.yd_jz.utils.ScheduledFlowConst.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 // v2.7.0: 状态机单测，覆盖 5 种事件 × 合法/非法前置状态
+// dev-log §十一.3 后 SYS_INVALIDATE 放宽为"非 INVALID 均可"
 class ScheduledFlowRuleStateMachineTest {
 
     // ─────────────────────────────────────────
@@ -45,9 +46,25 @@ class ScheduledFlowRuleStateMachineTest {
         assertTransit(STATUS_RUNNING, Event.SYS_COMPLETE, STATUS_COMPLETED);
     }
 
+    // SYS_INVALIDATE 前置：任何非 INVALID 状态都允许
+    @Test
+    void sysInvalidate_fromNotStart_toInvalid() {
+        assertTransit(STATUS_NOT_START, Event.SYS_INVALIDATE, STATUS_INVALID);
+    }
+
     @Test
     void sysInvalidate_fromRunning_toInvalid() {
         assertTransit(STATUS_RUNNING, Event.SYS_INVALIDATE, STATUS_INVALID);
+    }
+
+    @Test
+    void sysInvalidate_fromPaused_toInvalid() {
+        assertTransit(STATUS_PAUSED, Event.SYS_INVALIDATE, STATUS_INVALID);
+    }
+
+    @Test
+    void sysInvalidate_fromCompleted_toInvalid() {
+        assertTransit(STATUS_COMPLETED, Event.SYS_INVALIDATE, STATUS_INVALID);
     }
 
     // ─────────────────────────────────────────
@@ -104,14 +121,10 @@ class ScheduledFlowRuleStateMachineTest {
         assertIllegal(STATUS_INVALID, Event.SYS_COMPLETE);
     }
 
+    // INVALID → INVALID 是唯一对 SYS_INVALIDATE 非法的前置（已经失效不用再失效）
     @Test
-    void sysInvalidate_fromNotStart_throws() {
-        assertIllegal(STATUS_NOT_START, Event.SYS_INVALIDATE);
-    }
-
-    @Test
-    void sysInvalidate_fromPaused_throws() {
-        assertIllegal(STATUS_PAUSED, Event.SYS_INVALIDATE);
+    void sysInvalidate_fromInvalid_throws() {
+        assertIllegal(STATUS_INVALID, Event.SYS_INVALIDATE);
     }
 
     // ─────────────────────────────────────────

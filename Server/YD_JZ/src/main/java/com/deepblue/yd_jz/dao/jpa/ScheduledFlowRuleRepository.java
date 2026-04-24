@@ -16,20 +16,22 @@ public interface ScheduledFlowRuleRepository extends JpaRepository<ScheduledFlow
            "WHERE r.status = :status AND r.nextRunDate <= :date")
     List<ScheduledFlowRule> findDueRules(Integer status, Date date);
 
-    // 提醒扫描：找 status=开始、reminder_enabled=1、next_run_date = 指定日期
+    // 提醒扫描：找活跃态（未开始/开始）且 reminder_enabled=1
+    // next_run_date 在 [lower, upper] 区间内
+    // 区间查询覆盖"用户设置 1 天后执行、3 天前提醒"这种"提醒窗口已经开启"的边界情况
     @Query("SELECT r FROM ScheduledFlowRule r " +
-           "WHERE r.status = :status AND r.reminderEnabled = true AND r.nextRunDate = :date")
-    List<ScheduledFlowRule> findRulesForReminder(Integer status, Date date);
+           "WHERE r.status IN :statuses AND r.reminderEnabled = true " +
+           "AND r.nextRunDate >= :lower AND r.nextRunDate <= :upper")
+    List<ScheduledFlowRule> findRulesForReminder(List<Integer> statuses, Date lower, Date upper);
 
-    // 主数据失效挂钩：按账户 id 查引用规则（含 account_to_id）
+    // 主数据失效挂钩：按账户 id 查所有引用规则（失效后 accountId 已置 null，天然不会再命中）
     @Query("SELECT r FROM ScheduledFlowRule r " +
-           "WHERE r.status = :status AND (r.accountId = :accountId OR r.accountToId = :accountId)")
-    List<ScheduledFlowRule> findActiveRulesByAccountId(Integer status, Integer accountId);
+           "WHERE r.accountId = :accountId OR r.accountToId = :accountId")
+    List<ScheduledFlowRule> findRulesByAccountId(Integer accountId);
 
-    // 主数据失效挂钩：按分类 id 查引用规则
-    @Query("SELECT r FROM ScheduledFlowRule r " +
-           "WHERE r.status = :status AND r.typeId = :typeId")
-    List<ScheduledFlowRule> findActiveRulesByTypeId(Integer status, Integer typeId);
+    // 主数据失效挂钩：按分类 id 查所有引用规则
+    @Query("SELECT r FROM ScheduledFlowRule r WHERE r.typeId = :typeId")
+    List<ScheduledFlowRule> findRulesByTypeId(Integer typeId);
 
     // 启动时兜底：所有 status=开始 的规则（启动扫描会顺便推所有过期游标）
     List<ScheduledFlowRule> findByStatus(Integer status);

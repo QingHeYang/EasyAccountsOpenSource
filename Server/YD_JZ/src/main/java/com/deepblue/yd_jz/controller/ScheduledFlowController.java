@@ -136,6 +136,20 @@ public class ScheduledFlowController {
         return res;
     }
 
+    @Operation(summary = "删除单条执行日志")
+    @DeleteMapping("/log/{id}")
+    public BaseDto deleteLog(@PathVariable Integer id) {
+        ruleService.deleteLog(id);
+        return BaseDto.setSuccessBean();
+    }
+
+    @Operation(summary = "按规则清空所有执行日志")
+    @DeleteMapping("/log")
+    public BaseDto clearLogsByRule(@RequestParam Integer ruleId) {
+        ruleService.clearLogsByRule(ruleId);
+        return BaseDto.setSuccessBean();
+    }
+
     // ════════════════════════ 全局提醒配置 ════════════════════════
 
     @Operation(summary = "获取全局提醒配置")

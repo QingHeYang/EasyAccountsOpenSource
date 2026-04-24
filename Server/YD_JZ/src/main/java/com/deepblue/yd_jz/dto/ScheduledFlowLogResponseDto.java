@@ -12,7 +12,7 @@ public class ScheduledFlowLogResponseDto {
 
     private Integer id;
     private Integer ruleId;
-    private String ruleName;       // 冗余展示
+    private String ruleName;       // 冗余展示；规则已删除时为"[规则已删除]"
     private String executeTime;
     private boolean success;
     private Integer flowId;
@@ -29,7 +29,7 @@ public class ScheduledFlowLogResponseDto {
         d.setFlowId(e.getFlowId());
         d.setFailCategory(e.getFailCategory());
         d.setFailReason(e.getFailReason());
-        if (e.getRule() != null) d.setRuleName(e.getRule().getName());
+        d.setRuleName(e.getRule() != null ? e.getRule().getName() : "[规则已删除]");
         return d;
     }
 

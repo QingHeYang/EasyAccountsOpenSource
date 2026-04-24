@@ -25,7 +25,8 @@ public class ScheduledFlowConst {
 
     // ── Flow.from 枚举值 ────────────────────
     public static final String FLOW_FROM_SCHEDULED = "scheduled";
-    public static final String NOTE_TAG_SCHEDULED  = "【定时】";
+    // note 尾部拼接的定时标记，与外部来源（如 Claw "#Claw记账"）的格式风格一致
+    public static final String NOTE_TAG_SCHEDULED  = " #定时";
 
     // ── app_config 配置 ─────────────────────
     public static final String CONFIG_DOMAIN_SCHEDULED_FLOW = "scheduled_flow";

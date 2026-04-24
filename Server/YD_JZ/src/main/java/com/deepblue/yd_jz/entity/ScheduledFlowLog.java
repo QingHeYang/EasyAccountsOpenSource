@@ -1,6 +1,8 @@
 package com.deepblue.yd_jz.entity;
 
 import lombok.Data;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -35,11 +37,14 @@ public class ScheduledFlowLog {
     @Column(name = "fail_reason", length = 500)
     private String failReason;
 
+    // v2.7.0: 规则删除后日志保留，此时 rule_id 指向已不存在的记录，@NotFound IGNORE 让关联返回 null 而非抛异常
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rule_id", insertable = false, updatable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private ScheduledFlowRule rule;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "flow_id", insertable = false, updatable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private FlowJpaEntity flow;
 }

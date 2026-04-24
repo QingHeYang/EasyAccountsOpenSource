@@ -58,6 +58,9 @@ public class ScheduledFlowRuleService {
     @Autowired
     private FlowService flowService;
 
+    @Autowired
+    private ReminderService reminderService;
+
     // =====================================================================
     // CRUD
     // =====================================================================
@@ -65,7 +68,7 @@ public class ScheduledFlowRuleService {
     @Transactional(rollbackFor = Exception.class)
     public ScheduledFlowRule createRule(ScheduledFlowRule input) {
         validateFields(input);
-        validateStartDateAfterToday(input.getStartDate());
+        // 开始日期 > today 的限制交由前端控制，后端不拦，方便测试
         validateMasterDataUsable(input);
 
         input.setId(null);
@@ -76,7 +79,10 @@ public class ScheduledFlowRuleService {
         input.setLastRunDate(null);
         input.setNextRunDate(toDate(computeFirstRunDate(input)));
 
-        return ruleRepo.save(input);
+        ScheduledFlowRule saved = ruleRepo.save(input);
+        // 立即补发：覆盖"提醒窗口已经开启"的场景（如 startDate=明天 + 提醒前 3 天）
+        reminderService.checkAndDispatch(saved);
+        return saved;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -85,10 +91,7 @@ public class ScheduledFlowRuleService {
         validateFields(patch);
         validateMasterDataUsable(patch);
 
-        // 仅在用户修改了 startDate 时，才校验"不早于明天"
-        if (!toLocalDate(existing.getStartDate()).equals(toLocalDate(patch.getStartDate()))) {
-            validateStartDateAfterToday(patch.getStartDate());
-        }
+        // 开始日期 > today 的限制交由前端控制，后端不拦，方便测试
 
         existing.setName(patch.getName());
         existing.setMoney(patch.getMoney());
@@ -109,15 +112,31 @@ public class ScheduledFlowRuleService {
         // 字段改了就重算游标（不管当前状态；运行态等启动时也会重算）
         existing.setNextRunDate(toDate(computeNextRunDateAfter(existing, baselineForRecompute(existing))));
 
-        return ruleRepo.save(existing);
+        ScheduledFlowRule saved = ruleRepo.save(existing);
+        // 规则字段改动后旧通知里写的"将于 X 日自动记账"可能已对不上新的 nextRunDate，
+        // 全清再补发，避免误导
+        noticeRepo.deleteByRelatedRuleId(id);
+        reminderService.checkAndDispatch(saved);
+        return saved;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteRule(Integer id) {
         requireRule(id);
-        logRepo.deleteByRuleId(id);
+        // v2.7.0: 执行日志保留（审计用途，用户可通过 DELETE /scheduledFlow/log/{id} 主动清理）
+        // 通知没意义了，级联删
         noticeRepo.deleteByRelatedRuleId(id);
         ruleRepo.deleteById(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteLog(Integer logId) {
+        logRepo.deleteById(logId);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void clearLogsByRule(Integer ruleId) {
+        logRepo.deleteByRuleId(ruleId);
     }
 
     public ScheduledFlowRule getRule(Integer id) {
@@ -142,14 +161,20 @@ public class ScheduledFlowRuleService {
         rule.setNextRunDate(toDate(computeNextRunDateAfter(rule, baselineForRecompute(rule))));
 
         ScheduledFlowRuleStateMachine.transit(rule, ScheduledFlowRuleStateMachine.Event.USER_START);
-        return ruleRepo.save(rule);
+        ScheduledFlowRule saved = ruleRepo.save(rule);
+        // 启动时可能刚好在提醒窗口内，补发一次
+        reminderService.checkAndDispatch(saved);
+        return saved;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public ScheduledFlowRule pauseRule(Integer id) {
         ScheduledFlowRule rule = requireRule(id);
         ScheduledFlowRuleStateMachine.transit(rule, ScheduledFlowRuleStateMachine.Event.USER_PAUSE);
-        return ruleRepo.save(rule);
+        ScheduledFlowRule saved = ruleRepo.save(rule);
+        // 暂停期间不会执行，清理未触发的事前提醒避免误导
+        noticeRepo.deleteByRelatedRuleId(id);
+        return saved;
     }
 
     // =====================================================================
@@ -223,19 +248,33 @@ public class ScheduledFlowRuleService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void advanceCursor(ScheduledFlowRule rule, LocalDate today, boolean markExecuted) {
+        // 记下旧 nextRunDate，推完后用来清理"对应那一天"的旧通知
+        Date oldNextRunDate = rule.getNextRunDate();
+
         if (markExecuted) {
             rule.setLastRunDate(toDate(today));
         }
         LocalDate next = CycleCalculator.nextRunDate(
                 rule.getCycleType(), rule.getCycleDates(), today);
+        boolean completed = false;
         if (rule.getEndDate() != null && next.isAfter(toLocalDate(rule.getEndDate()))) {
             rule.setNextRunDate(null);
             ScheduledFlowRuleStateMachine.transit(
                     rule, ScheduledFlowRuleStateMachine.Event.SYS_COMPLETE);
+            completed = true;
         } else {
             rule.setNextRunDate(toDate(next));
         }
         ruleRepo.save(rule);
+
+        if (completed) {
+            // 自然完成：全清通知（后续不会再执行）
+            noticeRepo.deleteByRelatedRuleId(rule.getId());
+        } else if (oldNextRunDate != null) {
+            // 推游标后 "旧 runDate 对应的通知" 已经没意义（那天不会再执行了）
+            // executeRuleOrThrow 的成功路径其实已经清过一次，这里是幂等兜底
+            noticeRepo.deleteByRelatedRuleIdAndRelatedRunDate(rule.getId(), oldNextRunDate);
+        }
     }
 
     /**
@@ -269,8 +308,7 @@ public class ScheduledFlowRuleService {
 
     @Transactional(rollbackFor = Exception.class)
     public void invalidateByAccount(Integer accountId) {
-        List<ScheduledFlowRule> rules = ruleRepo.findActiveRulesByAccountId(
-                ScheduledFlowConst.STATUS_RUNNING, accountId);
+        List<ScheduledFlowRule> rules = ruleRepo.findRulesByAccountId(accountId);
         for (ScheduledFlowRule rule : rules) {
             // 置空被停用账户的引用字段（主账户 / 转账目标账户 任一命中就置空）
             if (accountId.equals(rule.getAccountId())) {
@@ -281,19 +319,21 @@ public class ScheduledFlowRuleService {
             }
             ScheduledFlowRuleStateMachine.transit(rule, ScheduledFlowRuleStateMachine.Event.SYS_INVALIDATE);
             ruleRepo.save(rule);
+            // 规则已失效，剩余未触发的事前提醒已经没意义，清理掉
+            noticeRepo.deleteByRelatedRuleId(rule.getId());
             log.info("rule {} invalidated, account {} cleared", rule.getId(), accountId);
         }
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void invalidateByType(Integer typeId) {
-        List<ScheduledFlowRule> rules = ruleRepo.findActiveRulesByTypeId(
-                ScheduledFlowConst.STATUS_RUNNING, typeId);
+        List<ScheduledFlowRule> rules = ruleRepo.findRulesByTypeId(typeId);
         for (ScheduledFlowRule rule : rules) {
             // 置空分类引用
             rule.setTypeId(null);
             ScheduledFlowRuleStateMachine.transit(rule, ScheduledFlowRuleStateMachine.Event.SYS_INVALIDATE);
             ruleRepo.save(rule);
+            noticeRepo.deleteByRelatedRuleId(rule.getId());
             log.info("rule {} invalidated, type {} cleared", rule.getId(), typeId);
         }
     }
@@ -402,13 +442,24 @@ public class ScheduledFlowRuleService {
 
     /**
      * update / start 时重算游标的基准日期
-     * - 如果 startDate 还在未来 → from = startDate - 1（首次会落在 startDate 或之后）
-     * - 如果 startDate 已过    → from = 今天（next 会落在今天之后最近的符合周期日）
+     * base = max(today-1, startDate-1, lastRunDate)
+     *   - startDate 在未来：base ≥ startDate-1 → next 落在 startDate 或之后
+     *   - startDate 已过：   base ≥ today-1    → next 落在 today 或之后
+     *   - 已执行过：         base ≥ lastRunDate → next 严格大于上次执行日，**不回退重执行**
+     * 关键：已执行过的规则要把 lastRunDate 作为基准下限，否则 PUT 会让 next 退回到已执行过的日期
      */
     private LocalDate baselineForRecompute(ScheduledFlowRule rule) {
-        LocalDate startDate = toLocalDate(rule.getStartDate());
         LocalDate today = LocalDate.now();
-        return startDate.isAfter(today) ? startDate.minusDays(1) : today;
+        LocalDate startDate = toLocalDate(rule.getStartDate());
+        LocalDate anchor = startDate.isAfter(today) ? startDate : today;
+        LocalDate base = anchor.minusDays(1);
+        if (rule.getLastRunDate() != null) {
+            LocalDate lastRun = toLocalDate(rule.getLastRunDate());
+            if (lastRun.isAfter(base)) {
+                base = lastRun;
+            }
+        }
+        return base;
     }
 
     private LocalDate computeNextRunDateAfter(ScheduledFlowRule rule, LocalDate from) {
@@ -430,10 +481,14 @@ public class ScheduledFlowRuleService {
     }
 
     private static LocalDate toLocalDate(Date date) {
-        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        if (date == null) return null;
+        // 用 getTime() 兼容 java.sql.Date（Hibernate 从 DATE 列读回的就是 java.sql.Date，
+        // 它重写了 toInstant() 抛 UnsupportedOperationException）
+        return new java.sql.Date(date.getTime()).toLocalDate();
     }
 
     private static Date toDate(LocalDate localDate) {
+        if (localDate == null) return null;
         return Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 }
