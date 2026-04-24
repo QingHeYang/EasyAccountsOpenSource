@@ -170,6 +170,12 @@ onMounted(() => {
           is-link
           to="/setting/template"
         />
+        <van-cell
+          title="定时记账"
+          icon="clock-o"
+          is-link
+          to="/setting/scheduled-flow"
+        />
       </van-cell-group>
 
       <!-- 系统管理 -->

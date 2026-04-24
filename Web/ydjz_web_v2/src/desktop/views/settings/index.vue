@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -14,7 +14,8 @@ import {
   MagicStick,
   Setting,
   FolderOpened,
-  Bell
+  Bell,
+  AlarmClock
 } from '@element-plus/icons-vue'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
@@ -33,6 +34,7 @@ import AiSettings from './AiSettings.vue'
 import SystemInfo from './SystemInfo.vue'
 import BackupManager from './BackupManager.vue'
 import NoticeDrawer from './NoticeDrawer.vue'
+import ScheduledFlowManager from './ScheduledFlowManager.vue'
 
 const router = useRouter()
 
@@ -122,7 +124,8 @@ const dataItems = [
   { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: CreditCard },
   { key: 'account', title: '账户管理', desc: '管理银行卡、现金等账户', icon: Wallet },
   { key: 'type', title: '分类管理', desc: '管理收支分类', icon: PriceTag },
-  { key: 'template', title: '快记模板', desc: '快速记账模板', icon: DocumentCopy },
+  { key: 'template', title: '快记模板', desc: '快速记账预填模板', icon: DocumentCopy },
+  { key: 'scheduledFlow', title: '定时记账', desc: '周期性自动生成真实流水', icon: AlarmClock },
 ]
 
 // 系统管理项
@@ -141,6 +144,7 @@ const showActionDrawer = ref(false)
 const showAccountDrawer = ref(false)
 const showTypeDrawer = ref(false)
 const showTemplateDrawer = ref(false)
+const showScheduledFlowDrawer = ref(false)
 const showAiDrawer = ref(false)
 const showBackupDrawer = ref(false)
 
@@ -153,6 +157,8 @@ function openDrawer(key: string) {
     showTypeDrawer.value = true
   } else if (key === 'template') {
     showTemplateDrawer.value = true
+  } else if (key === 'scheduledFlow') {
+    showScheduledFlowDrawer.value = true
   } else if (key === 'ai') {
     // AI 配置未完成时显示提示
     if (!aiConfigured.value) {
@@ -209,9 +215,36 @@ function openDrawer(key: string) {
   }
 }
 
+// ScheduledFlowManager ref，用于从通知中心跳转时打开指定规则
+const scheduledFlowRef = ref<InstanceType<typeof ScheduledFlowManager> | null>(null)
+
+async function openScheduledRuleById(ruleId: number) {
+  showScheduledFlowDrawer.value = true
+  await nextTick()
+  scheduledFlowRef.value?.openRuleById(ruleId)
+}
+
+function handleOpenScheduledRuleEvent(e: Event) {
+  const ruleId = (e as CustomEvent).detail?.ruleId
+  if (ruleId) openScheduledRuleById(Number(ruleId))
+}
+
 onMounted(() => {
   loadSystemConfig()
   checkAiService()
+
+  // 通知跳转：首次进入设置页时读 sessionStorage
+  const stored = sessionStorage.getItem('pendingOpenScheduledRule')
+  if (stored) {
+    sessionStorage.removeItem('pendingOpenScheduledRule')
+    openScheduledRuleById(Number(stored))
+  }
+  // 已在设置页内时用全局事件触发
+  window.addEventListener('open-scheduled-rule', handleOpenScheduledRuleEvent)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('open-scheduled-rule', handleOpenScheduledRuleEvent)
 })
 </script>
 
@@ -418,6 +451,7 @@ onMounted(() => {
     <AccountManager v-model:visible="showAccountDrawer" />
     <TypeManager v-model:visible="showTypeDrawer" />
     <TemplateManager v-model:visible="showTemplateDrawer" />
+    <ScheduledFlowManager ref="scheduledFlowRef" v-model:visible="showScheduledFlowDrawer" />
     <AiSettings v-model:visible="showAiDrawer" />
     <SystemInfo
       v-model:visible="showSystemInfo"

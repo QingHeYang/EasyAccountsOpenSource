@@ -136,6 +136,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/setting/AiSettings.vue'),
     meta: { title: 'AI+ 设置' },
   },
+  // 定时记账
+  {
+    path: '/setting/scheduled-flow',
+    name: 'SettingScheduledFlow',
+    component: () => import('./views/setting/ScheduledFlow.vue'),
+    meta: { title: '定时记账' },
+  },
+  {
+    path: '/setting/scheduled-flow/add',
+    name: 'SettingScheduledFlowAdd',
+    component: () => import('./views/setting/ScheduledFlowAdd.vue'),
+    meta: { title: '新建规则' },
+  },
   // 系统信息
   {
     path: '/setting/system',

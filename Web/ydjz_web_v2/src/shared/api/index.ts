@@ -20,6 +20,15 @@ export { imageApi } from './image'
 export { analysisApi } from './analysis'
 export { aiApi } from './ai'
 export { backupApi } from './backup'
+export { noticeApi, NoticeType } from './notice'
+export {
+  scheduledFlowApi,
+  CycleType,
+  RuleStatus,
+  FailCategory,
+  parseCycleDates,
+  stringifyCycleDates,
+} from './scheduledFlow'
 
 // 类型导出
 export type { LoginParams, LoginResult } from './auth'
@@ -47,3 +56,12 @@ export type {
   AiConversation,
   AiMessagesResponse,
 } from './ai'
+export type { UserNotice, NoticeListQuery } from './notice'
+export type {
+  ScheduledFlowRule,
+  ScheduledFlowRuleParams,
+  ScheduledFlowPreview,
+  ScheduledFlowLog,
+  ScheduledFlowLogQuery,
+  ReminderConfig,
+} from './scheduledFlow'
