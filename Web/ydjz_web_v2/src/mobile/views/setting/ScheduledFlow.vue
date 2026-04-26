@@ -103,19 +103,16 @@ function onAddRule() {
   router.push('/setting/scheduled-flow/add')
 }
 
-function onRuleClick(_rule: ScheduledFlowRule) {
-  // TODO(下一轮): 跳转到编辑页
-  showToast('编辑页下一轮开发')
+function onRuleClick(rule: ScheduledFlowRule) {
+  router.push(`/setting/scheduled-flow/edit/${rule.id}`)
 }
 
 function onOpenReminderConfig() {
-  // TODO(下一轮): 提醒设置页
-  showToast('提醒设置页下一轮开发')
+  router.push('/setting/scheduled-flow/reminder-config')
 }
 
 function onOpenLogs() {
-  // TODO(下一轮): 执行记录页
-  showToast('执行记录页下一轮开发')
+  router.push('/setting/scheduled-flow/logs')
 }
 
 async function onToggleRuleStatus(rule: ScheduledFlowRule) {
@@ -139,8 +136,8 @@ async function onToggleRuleStatus(rule: ScheduledFlowRule) {
       if (!isHandledError(err)) showToast('暂停失败')
     }
   } else {
-    // 暂停 / 完成 / 失效 → 必须先编辑再启动（编辑页下轮做）
-    showToast('请在编辑页确认后启动')
+    // 暂停 / 完成 / 失效 → 跳编辑页确认后顺势启动
+    router.push(`/setting/scheduled-flow/edit/${rule.id}?start=1`)
   }
 }
 

@@ -4,10 +4,18 @@ import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { homeApi, type HomeInfo } from '@shared/api/home'
 import { aiApi } from '@shared/api/ai'
+import { useNoticeStore } from '@shared/stores/notice'
 import logoUrl from '@shared/assets/logo.png'
 import ChartOverlay from '@mobile/components/ChartOverlay.vue'
 
 const router = useRouter()
+const noticeStore = useNoticeStore()
+const unreadCount = computed(() => noticeStore.unreadCount)
+const unreadDisplay = computed(() => (unreadCount.value > 99 ? '99+' : String(unreadCount.value)))
+
+function openNotifications() {
+  router.push('/notifications')
+}
 
 // AI 服务可用状态
 const aiServiceAvailable = ref(false)
@@ -84,12 +92,15 @@ async function checkAiService() {
 onMounted(() => {
   fetchHomeInfo()
   checkAiService()
+  noticeStore.refresh()
 })
 
 onActivated(() => {
   // 激活时重新计算滚动状态
   handleScroll()
   window.addEventListener('scroll', handleScroll, { passive: true })
+  // 从通知中心 / 编辑页返回时同步未读数（用户可能在那边标记/删除了）
+  noticeStore.refresh()
 })
 
 onDeactivated(() => {
@@ -290,6 +301,29 @@ function toAI() {
           <span class="title-text">EasyAccounts</span>
         </template>
       </div>
+
+      <!-- 通知铃铛 -->
+      <button
+        class="bell-btn"
+        type="button"
+        title="消息通知"
+        @click="openNotifications"
+      >
+        <svg
+          class="bell-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
+        <span v-if="unreadCount > 0" class="bell-badge">{{ unreadDisplay }}</span>
+      </button>
     </div>
 
     <!-- 页面内容 -->
@@ -574,6 +608,49 @@ function toAI() {
   font-weight: 700;
   color: var(--color-text-primary);
   letter-spacing: -0.5px;
+}
+
+/* 通知铃铛（顶栏右上角） */
+.bell-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-card);
+  border: none;
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  padding: 0;
+  cursor: pointer;
+}
+
+.bell-btn:active {
+  opacity: 0.7;
+}
+
+.bell-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.bell-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--color-expense);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--color-bg-page);
 }
 
 /* 浮动 AI+ 按钮 */

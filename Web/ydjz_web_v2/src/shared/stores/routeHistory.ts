@@ -82,6 +82,18 @@ export const useRouteHistoryStore = defineStore('routeHistory', () => {
   }
 
   /**
+   * 按断言批量移除
+   *
+   * 适合"页面提交成功后跳列表"的场景：
+   * - 项目自维护 history 不区分 push/replace，submit 后简单 router.replace
+   *   会留下 add/edit 路径，导致从列表点返回时回到旧的 add/edit
+   * - 在跳转前先调本方法把这类路径清掉
+   */
+  function removeWhere(predicate: (path: string) => boolean) {
+    history.value = history.value.filter(p => !predicate(p))
+  }
+
+  /**
    * 获取历史栈长度
    */
   function size(): number {
@@ -95,6 +107,7 @@ export const useRouteHistoryStore = defineStore('routeHistory', () => {
     getPrevious,
     clear,
     remove,
+    removeWhere,
     size,
   }
 })

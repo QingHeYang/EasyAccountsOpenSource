@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import {
   showToast,
   showConfirmDialog,
@@ -8,9 +8,11 @@ import {
   closeToast,
 } from 'vant'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import { useRouteHistoryStore } from '@shared/stores/routeHistory'
 import {
   scheduledFlowApi,
   CycleType,
+  parseCycleDates,
   stringifyCycleDates,
   type ScheduledFlowRuleParams,
 } from '@shared/api/scheduledFlow'
@@ -20,7 +22,47 @@ import { accountApi, type Account, AccountType } from '@shared/api/account'
 import { typeApi, type TypeWithChildren } from '@shared/api/type'
 
 const router = useRouter()
+const route = useRoute()
 const { smartBack } = useSmartBack()
+const routeHistory = useRouteHistoryStore()
+
+/**
+ * 提交/删除成功后跳回列表前调用
+ *
+ * 项目自维护 history 不区分 push/replace（routeHistory.push 在 afterEach 拦截所有导航），
+ * 只 router.replace 到列表的话，栈里仍残留 add/edit 路径，从列表 smartBack 时会回到旧 add/edit。
+ * 跳转前清掉本组件可能产生的所有 add/edit 路径，列表 → 设置 的返回链就干净了。
+ */
+function pruneAddEditHistory() {
+  routeHistory.removeWhere(
+    (p) =>
+      p.startsWith('/setting/scheduled-flow/add') ||
+      p.startsWith('/setting/scheduled-flow/edit')
+  )
+}
+
+/* ---------------- 编辑 / 启动前 模式 ---------------- */
+
+const editingId = computed<number | null>(() => {
+  const raw = route.params.id
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+})
+
+const isEditing = computed(() => editingId.value !== null)
+/** 由列表页"开始"按钮跳转时带 ?start=1 进入：保存后顺势 startRule */
+const pendingStartAfterSave = ref(route.query.start === '1')
+
+const pageTitle = computed(() => {
+  if (pendingStartAfterSave.value) return '确认并启动'
+  return isEditing.value ? '编辑规则' : '新建规则'
+})
+
+const submitLabel = computed(() => {
+  if (pendingStartAfterSave.value) return '保存并启动'
+  return isEditing.value ? '保存' : '创建规则'
+})
 
 /* ---------------- 表单状态 ---------------- */
 
@@ -351,6 +393,48 @@ const yearDayColumn = computed(() => {
   }))
 })
 
+/* ---------------- W3：未来执行日预览（每月 / 每年） ----------------
+   纯前端计算，跟后端"月末回退 + 闰年处理"对齐，每改配置实时刷新 */
+
+const futureRunDates = computed<string[]>(() => {
+  const f = form.value
+  const now = new Date()
+  if (f.cycleType === CycleType.MONTHLY && f.cycleDatesMonthly.length) {
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const y = next.getFullYear()
+    const m0 = next.getMonth()
+    // 该月实际天数（精确处理大小月）
+    const maxDay = new Date(y, m0 + 1, 0).getDate()
+    const uniq = new Set<string>()
+    for (const d of f.cycleDatesMonthly) {
+      const actual = Math.min(d, maxDay)
+      uniq.add(`${y}-${pad2(m0 + 1)}-${pad2(actual)}`)
+    }
+    return Array.from(uniq).sort()
+  }
+  if (f.cycleType === CycleType.YEARLY && f.cycleDatesYearly.length) {
+    const nextYear = now.getFullYear() + 1
+    const uniq = new Set<string>()
+    for (const mmdd of f.cycleDatesYearly) {
+      const m = Number(mmdd.substring(0, 2))
+      const d = Number(mmdd.substring(3, 5))
+      if (!m || m < 1 || m > 12) continue
+      // 精确闰年处理：用 next year 算 2 月天数
+      const maxDay = new Date(nextYear, m, 0).getDate()
+      const actual = Math.min(d, maxDay)
+      uniq.add(`${nextYear}-${pad2(m)}-${pad2(actual)}`)
+    }
+    return Array.from(uniq).sort()
+  }
+  return []
+})
+
+const futureRunDatesLabel = computed(() => {
+  if (form.value.cycleType === CycleType.MONTHLY) return '下个月执行日'
+  if (form.value.cycleType === CycleType.YEARLY) return '下一年执行日'
+  return ''
+})
+
 // 执行时间
 function openTimePicker() {
   const [h, m] = (form.value.runTime || '09:00').split(':')
@@ -484,22 +568,133 @@ async function onSubmit() {
   submitting.value = true
   showLoadingToast({ message: '提交中...', forbidClick: true, duration: 0 })
   try {
-    await scheduledFlowApi.createRule(params)
-    closeToast()
-    showToast('创建成功')
+    if (isEditing.value && editingId.value) {
+      await scheduledFlowApi.updateRule(editingId.value, params)
+      if (pendingStartAfterSave.value) {
+        try {
+          await scheduledFlowApi.startRule(editingId.value)
+          closeToast()
+          showToast('已保存并启动')
+        } catch (err) {
+          closeToast()
+          if (!isHandledError(err)) showToast('已保存，启动失败，请回列表手动启动')
+        }
+      } else {
+        closeToast()
+        showToast('保存成功')
+      }
+    } else {
+      await scheduledFlowApi.createRule(params)
+      closeToast()
+      showToast('创建成功')
+    }
+    pruneAddEditHistory()
     router.replace('/setting/scheduled-flow')
   } catch (err) {
     closeToast()
-    if (!isHandledError(err)) showToast('创建失败')
+    if (!isHandledError(err)) {
+      showToast(isEditing.value ? '保存失败' : '创建失败')
+    }
   } finally {
     submitting.value = false
   }
 }
 
+/* ---------------- 编辑模式：加载详情并回填 ---------------- */
+
+async function loadEditingRule(id: number) {
+  showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
+  try {
+    const res = await scheduledFlowApi.getRule(id)
+    const rule = res.data.data
+    if (!rule) {
+      closeToast()
+      showToast('规则不存在')
+      smartBack('/setting/scheduled-flow')
+      return
+    }
+
+    // 并行拉依赖（actions / accounts / 该 action 下的 types）
+    await Promise.all([
+      fetchActions(),
+      fetchAccounts(),
+      rule.actionId ? fetchTypesByAction(rule.actionId) : Promise.resolve(),
+    ])
+    closeToast()
+
+    // 竞态保护：路由切走则放弃回填
+    if (editingId.value !== id) return
+
+    const action = actions.value.find((a) => a.id === rule.actionId) ?? null
+    const account = accounts.value.find((a) => a.id === rule.accountId) ?? null
+    const accountTo = rule.accountToId
+      ? accounts.value.find((a) => a.id === rule.accountToId) ?? null
+      : null
+
+    form.value = {
+      name: rule.name,
+      money: rule.money,
+      note: rule.note || '',
+      selectedAction: action,
+      selectedAccount: account,
+      selectedAccountTo: accountTo,
+      selectedType: rule.typeName ? { id: rule.typeId, tname: rule.typeName } : null,
+      cycleType: rule.cycleType,
+      cycleDatesWeekly:
+        rule.cycleType === CycleType.WEEKLY ? parseCycleDates<number>(rule.cycleDates) : [],
+      cycleDatesMonthly:
+        rule.cycleType === CycleType.MONTHLY ? parseCycleDates<number>(rule.cycleDates) : [],
+      cycleDatesYearly:
+        rule.cycleType === CycleType.YEARLY ? parseCycleDates<string>(rule.cycleDates) : [],
+      runTime: (rule.runTime || '09:00').substring(0, 5),
+      startDate: (rule.startDate || '').substring(0, 10),
+      endDate: (rule.endDate || '').substring(0, 10),
+      reminderEnabled: rule.reminderEnabled,
+      emailEnabled: rule.emailEnabled,
+    }
+  } catch (err) {
+    closeToast()
+    if (!isHandledError(err)) showToast('加载规则失败')
+  }
+}
+
+/* ---------------- 删除（编辑模式） ---------------- */
+
+async function onDelete() {
+  if (!editingId.value) return
+  const id = editingId.value
+  const name = form.value.name || `规则 #${id}`
+  try {
+    await showConfirmDialog({
+      title: '删除规则',
+      message: `确定删除"${name}"吗？相关执行日志和未读通知会一并清除，不可恢复。`,
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  showLoadingToast({ message: '删除中...', forbidClick: true, duration: 0 })
+  try {
+    await scheduledFlowApi.deleteRule(id)
+    closeToast()
+    showToast('已删除')
+    pruneAddEditHistory()
+    router.replace('/setting/scheduled-flow')
+  } catch (err) {
+    closeToast()
+    if (!isHandledError(err)) showToast('删除失败')
+  }
+}
+
 onMounted(() => {
   window.scrollTo(0, 0)
-  fetchActions()
-  fetchAccounts()
+  if (isEditing.value && editingId.value) {
+    loadEditingRule(editingId.value)
+  } else {
+    fetchActions()
+    fetchAccounts()
+  }
 })
 </script>
 
@@ -510,22 +705,33 @@ onMounted(() => {
       <div class="header-left" @click="onBack">
         <van-icon name="arrow-left" size="20" />
       </div>
-      <div class="header-title">新建规则</div>
+      <div class="header-title">{{ pageTitle }}</div>
       <div class="header-right-placeholder"></div>
     </div>
 
     <div class="page-body">
+      <!-- 启动前编辑提示（query.start=1 进入时显示） -->
+      <div v-if="pendingStartAfterSave" class="start-banner">
+        <van-icon name="info-o" size="16" class="start-banner-icon" />
+        <div class="start-banner-text">
+          <div class="start-banner-title">请确认规则配置</div>
+          <div class="start-banner-desc">保存后系统将自动启动此规则</div>
+        </div>
+      </div>
+
       <!-- 规则名称（放最顶） -->
       <van-cell-group inset class="form-group">
         <van-field
           v-model="form.name"
-          label="规则名称"
           placeholder="例：房贷月供"
-          required
           maxlength="20"
           input-align="right"
           clearable
-        />
+        >
+          <template #label>
+            <span class="cell-title-required">规则名称</span>
+          </template>
+        </van-field>
       </van-cell-group>
 
       <!-- 账单信息：金额 + 收支 + 账户 + 分类 + 备注 -->
@@ -533,12 +739,13 @@ onMounted(() => {
         <van-field
           :model-value="form.money"
           @update:model-value="onMoneyChange"
-          label="金额"
           placeholder="0.00"
           type="number"
-          required
           input-align="right"
         >
+          <template #label>
+            <span class="cell-title-required">金额</span>
+          </template>
           <template #left-icon>
             <span class="field-prefix">¥</span>
           </template>
@@ -704,6 +911,21 @@ onMounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- W3：未来执行日预览（仅 MONTHLY / YEARLY 显示） -->
+        <div v-if="futureRunDates.length" class="inline-cell future-preview">
+          <div class="future-preview-header">
+            <van-icon name="clock-o" size="13" />
+            <span>{{ futureRunDatesLabel }}（共 {{ futureRunDates.length }} 天）</span>
+          </div>
+          <div class="future-preview-pills">
+            <span
+              v-for="d in futureRunDates"
+              :key="d"
+              class="future-preview-pill"
+            >{{ d }}</span>
+          </div>
+        </div>
       </van-cell-group>
 
       <!-- 执行时间 -->
@@ -791,7 +1013,22 @@ onMounted(() => {
         class="submit-btn"
         @click="onSubmit"
       >
-        创建规则
+        {{ submitLabel }}
+      </van-button>
+
+      <!-- 删除按钮（仅编辑模式） -->
+      <van-button
+        v-if="isEditing"
+        type="danger"
+        plain
+        block
+        round
+        :disabled="submitting"
+        class="delete-btn"
+        @click="onDelete"
+      >
+        <van-icon name="delete-o" />
+        删除规则
       </van-button>
     </div>
 
@@ -1009,6 +1246,47 @@ onMounted(() => {
 
 .page-body {
   padding: 76px 16px 32px;
+}
+
+/* 启动前编辑提示 banner */
+.start-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(250, 173, 20, 0.14) 0%,
+    rgba(250, 173, 20, 0.06) 100%
+  );
+  border: 1px solid rgba(250, 173, 20, 0.3);
+  border-radius: 12px;
+}
+
+.start-banner-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #faad14;
+}
+
+.start-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.start-banner-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.start-banner-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 
 /* 表单分组（紧凑版 Vant cell 风） */
@@ -1255,12 +1533,57 @@ onMounted(() => {
   line-height: 1.4;
 }
 
+/* W3：未来执行日预览（嵌在周期 cell-group 末尾的 inline-cell） */
+.future-preview {
+  background: rgba(82, 196, 26, 0.06);
+  border-top: 1px solid var(--color-border);
+}
+
+.future-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-income);
+  margin-bottom: 8px;
+}
+
+.future-preview-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.future-preview-pill {
+  padding: 4px 10px;
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  border: 1px solid rgba(82, 196, 26, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 提交按钮 */
 .submit-btn {
   margin-top: 8px;
   height: 44px;
   font-size: 15px;
   font-weight: 600;
+}
+
+/* 删除按钮（编辑模式） */
+.delete-btn {
+  margin-top: 10px;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.delete-btn .van-icon {
+  margin-right: 4px;
+  vertical-align: -2px;
 }
 
 /* ========= 选择器弹层样式 ========= */

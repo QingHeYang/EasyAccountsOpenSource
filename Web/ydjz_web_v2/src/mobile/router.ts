@@ -149,6 +149,24 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/setting/ScheduledFlowAdd.vue'),
     meta: { title: '新建规则' },
   },
+  {
+    path: '/setting/scheduled-flow/edit/:id',
+    name: 'SettingScheduledFlowEdit',
+    component: () => import('./views/setting/ScheduledFlowAdd.vue'),
+    meta: { title: '编辑规则' },
+  },
+  {
+    path: '/setting/scheduled-flow/logs',
+    name: 'SettingScheduledFlowLogs',
+    component: () => import('./views/setting/ScheduledFlowLogs.vue'),
+    meta: { title: '执行记录' },
+  },
+  {
+    path: '/setting/scheduled-flow/reminder-config',
+    name: 'SettingScheduledFlowReminderConfig',
+    component: () => import('./views/setting/ScheduledFlowReminderConfig.vue'),
+    meta: { title: '提醒设置' },
+  },
   // 系统信息
   {
     path: '/setting/system',
@@ -189,6 +207,13 @@ const routes: RouteRecordRaw[] = [
     name: 'AI',
     component: () => import('./views/AI.vue'),
     meta: { title: 'AI 助手' },
+  },
+  // 通知中心（顶层入口：Board 铃铛 + Setting 「消息通知」cell）
+  {
+    path: '/notifications',
+    name: 'Notifications',
+    component: () => import('./views/NotificationCenter.vue'),
+    meta: { title: '消息通知' },
   },
 ]
 
