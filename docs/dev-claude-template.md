@@ -4,7 +4,7 @@
 > 项目主管 Claude 在根目录启动，不使用本模板，请参阅根 `CLAUDE.md`。
 >
 > **使用方法**：复制本文件到对应子目录 `{模块}/CLAUDE.md`，按提示填空即可。
-> 对应实例：`Server/CLAUDE.md`、`Web/CLAUDE.md`、`ai/KoalaqHub/CLAUDE.md`
+> 对应实例：`Server/CLAUDE.md`、`Web/CLAUDE.md`、`ai/CLAUDE.md`
 
 ---
 

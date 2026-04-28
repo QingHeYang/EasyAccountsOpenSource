@@ -16,8 +16,9 @@
 | **存在时长** | 上古 Bug，长期挂着 |
 | **用户感知** | 偶尔点了"导出 Excel"卡住、超时、报错 |
 | **本次处理** | v2.7.0 修复 |
-| **dev-log** | ⏳ 待开发 Claude 在 `Server/docs/dev-log/dev-log-2026-04-XX.md` 中详细记录修复方案与根因 |
-| **关联文件** | 涉及 Server 端 Excel 生成相关 service（具体由 dev-log 说明） |
+| **根因** | OSIV + 双 ORM（JPA + MyBatis）混用导致 Hikari 池等待超时 |
+| **dev-log** | [`Server/docs/dev-log/dev-log-2026-04-28.md`](../../Server/docs/dev-log/dev-log-2026-04-28.md) §5 |
+| **关联文件** | `Server/YD_JZ/src/main/java/com/deepblue/yd_jz/service/AutoExcelExecuteService.java`（+@Transactional） |
 
 ### B2 · 配置类项目（分类 / 收支 / 账户）路由栈管理
 
