@@ -30,12 +30,13 @@ EasyAccounts 是一个个人财务管理应用，包含以下模块：
 
 | 模块 | 技术栈 | 说明 |
 |------|--------|------|
-| **Server** | Spring Boot 3.x, Java 17, MySQL | 后端服务，双重数据访问（JPA + MyBatis） |
+| **Server** | Spring Boot 3.x, Java 17, MySQL | 后端服务，双重数据访问（JPA + MyBatis）；邮件发送内嵌（v2.7.0 起 WebHook 已废弃） |
 | **Web** | Vue 3 + TypeScript, Vant UI | 前端（移动端 + 桌面 Electron） |
 | **AI** | Python + MCP 架构 | AI 服务端 |
-| **WebHook** | FastAPI Python | 钩子服务，用户可自定义操作 |
 
-这是 EasyAccounts 的开源版本。当前版本：v2.6.0
+这是 EasyAccounts 的开源版本。当前版本：v2.7.0
+
+> ⚠️ **v2.7.0 起 WebHook 模块已移除**：邮件发送能力已内聚到 Server，原 `WebHook/` 目录、`easyaccounts-webhook` 镜像、`version.webhook_branch` 配置项已全部废弃。老用户升级需在前端"系统设置 → 邮件"重新配置 SMTP。
 
 ---
 
@@ -106,7 +107,6 @@ main                    # 正式版 - 稳定发布
 | `version.font_branch` | 前端版本 | `easyaccounts-web` |
 | `version.backend_branch` | 后端版本 | `easyaccounts-server` |
 | `version.agent_branch` | AI Agent 版本 | `easyaccounts-ai` |
-| `version.webhook_branch` | WebHook 版本 | `easyaccounts-webhook` |
 | `version.mysql_branch` | 数据库版本 | - |
 
 ### 打包流程
@@ -203,17 +203,6 @@ cp .env.example .env
 python -m koalaq_hub
 ```
 
-### WebHook 服务
-```bash
-cd WebHook
-
-# Python 环境
-pip install -r requirements.txt
-
-# 运行服务
-python main.py
-```
-
 ## 架构和关键组件
 
 ### Server（后端）
@@ -246,11 +235,6 @@ python main.py
   - `.env` - 环境变量（LLM API Key、端口等）
   - `resource/config/agent.ini` - Agent 配置
   - `resource/config/llm_config.ini` - LLM 配置
-
-### WebHook（钩子服务）
-- **FastAPI**: Python Web 框架
-- 用户可自定义的事件钩子
-- 支持邮件通知等扩展功能
 
 ### 核心功能
 - 财务交易记录（流水）
@@ -298,7 +282,7 @@ python main.py
 ### 环境要求
 - **Server**: Java 17 + Maven
 - **Web**: Node.js v16
-- **AI / WebHook**: Python 3.9+
+- **AI**: Python 3.10+
 
 ### 注意事项
 - `Server/excel_template/` 中的 Excel 模板不应修改

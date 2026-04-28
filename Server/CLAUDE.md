@@ -82,7 +82,7 @@ Server/YD_JZ/src/main/
 | 动作 | 原因 |
 |---|---|
 | `git commit / merge / push` | Git 归主管 |
-| 改 `Web/`、`ai/`、`WebHook/` 任何文件 | 跨端归主管协调 |
+| 改 `Web/`、`ai/` 任何文件 | 跨端归主管协调 |
 | 改根 `CLAUDE.md`、`docs/`、`build.sh` | 项目总文档归主管 |
 | 改 `application-*.properties` 中 `version.*` 字段 | 发版动作 |
 | 写 `docs/v{x.x.x}/release-*.md` | 版本文档归主管 |
@@ -177,7 +177,8 @@ N files changed, ~XX insertions(+)
 | Web | REST API（`/api/**`，Swagger 自动生成） | 改接口字段/路径必须先报主管，主管同步前端 |
 | AI（KoalaqHub） | REST API，`user_id` 通过 header 传递（注意下划线问题）| 接口契约改动先报主管 |
 | 外部 AI 客户端 | MCP 协议（由 AI 端代理） | 通常不涉及后端，除非新增 AI 要调的内部接口 |
-| WebHook | 事件推送（HTTP POST） | 事件 payload 结构变更报主管 |
+
+> 备注：v2.7.0 起 WebHook 模块已废弃，邮件发送由 Server 内嵌（MailService），SMTP 配置入库到 `app_config`。
 
 **总原则**：一切对外契约变更 = 跨端影响 = 先报主管再动手。
 

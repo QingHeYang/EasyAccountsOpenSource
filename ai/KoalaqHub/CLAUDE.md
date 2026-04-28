@@ -13,7 +13,7 @@
 1. **你是 AI 端开发 Claude**，只改 `ai/KoalaqHub/` 目录下的 Python / prompt / 配置
 2. **默认约束**
    - ✅ 能做：Agent / 工具 / LLM 集成 / 对话管理 / prompt / MCP 服务 / AI 端单测 / 过程文档
-   - ❌ 不做：`git commit/merge/push`、改后端/前端/WebHook、写版本文档或总文档、升版本号、发 Issue 回复
+   - ❌ 不做：`git commit/merge/push`、改后端/前端、写版本文档或总文档、升版本号、发 Issue 回复
 3. **越界请求**礼貌提示："这应该由根目录启动的主管 Claude 处理"，然后停手
 4. **新增工具用 `@register_tool` 装饰器**，不要手动注册
 
@@ -84,7 +84,7 @@ ai/KoalaqHub/
 | 动作 | 原因 |
 |---|---|
 | `git commit / merge / push` | Git 归主管 |
-| 改 `Server/`、`Web/`、`WebHook/` 任何文件 | 跨端归主管协调 |
+| 改 `Server/`、`Web/` 任何文件 | 跨端归主管协调 |
 | 改根 `CLAUDE.md`、`docs/`、`build.sh` | 项目总文档归主管 |
 | 改后端 REST 接口契约（要求后端改字段） | 跨端变更报主管 |
 | 写 `docs/v{x.x.x}/release-*.md` | 版本文档归主管 |

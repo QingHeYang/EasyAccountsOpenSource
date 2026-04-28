@@ -13,7 +13,7 @@
 1. **你是前端开发 Claude**，只改 `Web/` 目录下的 Vue / TS / 样式 / 前端配置
 2. **默认约束**
    - ✅ 能做：Vue 3 组件 / 路由 / API 封装 / Pinia store / 样式 / 前端单测 / 过程文档（dev-log）
-   - ❌ 不做：`git commit/merge/push`、改后端/AI/WebHook、写版本文档或总文档、升版本号、发 Issue 回复
+   - ❌ 不做：`git commit/merge/push`、改后端/AI、写版本文档或总文档、升版本号、发 Issue 回复
 3. **越界请求**礼貌提示："这应该由根目录启动的主管 Claude 处理"，然后停手
 4. **桌面端 Element Plus、移动端 Vant、共享层在 `shared/`** — 别把 UI 库跨层引用
 
@@ -362,7 +362,7 @@ pnpm lint       # 代码检查
 | 动作 | 原因 |
 |---|---|
 | `git commit / merge / push` | Git 归主管 |
-| 改 `Server/`、`ai/`、`WebHook/` 任何文件 | 跨端归主管协调 |
+| 改 `Server/`、`ai/` 任何文件 | 跨端归主管协调 |
 | 改根 `CLAUDE.md`、`docs/`、`build.sh` | 项目总文档归主管 |
 | 调整 REST / WebSocket 接口契约（路径/字段） | 契约变更归主管协调后端/AI |
 | 写 `docs/v{x.x.x}/release-*.md` | 版本文档归主管 |

@@ -4,7 +4,7 @@
 > 项目主管 Claude 在根目录启动，不使用本模板，请参阅根 `CLAUDE.md`。
 >
 > **使用方法**：复制本文件到对应子目录 `{模块}/CLAUDE.md`，按提示填空即可。
-> 对应实例：`Server/CLAUDE.md`、`Web/CLAUDE.md`、`ai/KoalaqHub/CLAUDE.md`、`WebHook/CLAUDE.md`
+> 对应实例：`Server/CLAUDE.md`、`Web/CLAUDE.md`、`ai/KoalaqHub/CLAUDE.md`
 
 ---
 
@@ -55,7 +55,7 @@
 | 动作 | 原因 |
 |---|---|
 | `git commit / merge / push` | Git 操作归主管 Claude |
-| 改别的端的代码（Web / AI / WebHook） | 跨端改动找主管协调 |
+| 改别的端的代码（Web / AI 等其他端） | 跨端改动找主管协调 |
 | 写版本文档（`docs/v{x.x.x}/release-*.md`） | 版本文档由主管写 |
 | 改根 `CLAUDE.md`、`docs/roadmap-*.md` | 总文档由主管维护 |
 | 升级版本号（`application-*.properties` 中的 `version.*`） | 发版动作，主管权限 |
@@ -93,7 +93,6 @@
 | Server ↔ Web | REST API（Swagger 自动生成） | 后端改动后告知主管，主管同步前端任务单 |
 | Server ↔ AI | REST API + `user_id` header / URL query | 接口契约由主管拉齐 |
 | AI ↔ Web | WebSocket / SSE / MCP | 新增工具/协议先走主管 |
-| 任意端 ↔ WebHook | HTTP POST 事件 | 事件定义由主管维护 |
 
 **总原则**：接口变更 = 跨端影响 = 先报主管。
 
@@ -104,7 +103,7 @@
 - 版本号源文件：`Server/YD_JZ/src/main/resources/application-server.properties`
 - 版本管理记录：根 `versions.json`（本机打包记录，已 gitignore）
 - 发版流程文档：根 `CLAUDE.md` 的"打包规则"章节
-- Docker 镜像命名：`easyaccounts-{server|web|ai|webhook}`
+- Docker 镜像命名：`easyaccounts-{server|web|ai|mysql}`
 
 这些**只读**，不要改。
 
