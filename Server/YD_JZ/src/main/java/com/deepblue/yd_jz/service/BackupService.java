@@ -3,7 +3,6 @@ package com.deepblue.yd_jz.service;
 import com.deepblue.yd_jz.exception.BusinessException;
 import com.deepblue.yd_jz.exception.ErrorCode;
 import com.deepblue.yd_jz.utils.LogUtils;
-import com.deepblue.yd_jz.utils.FileMakeWebHook;
 import com.deepblue.yd_jz.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +41,7 @@ public class BackupService {
     private String systemOs;
 
     @Autowired
-    private FileMakeWebHook fileMakeWebHook;
+    private MailService mailService;
 
     /**
      * 根据操作系统构建命令
@@ -211,9 +210,9 @@ public class BackupService {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "备份失败: " + (errorMsg.isEmpty() ? "退出码 " + exitCode : errorMsg));
             }
 
-            // 4. 检查文件是否生成并发送 WebHook
+            // 4. 检查文件是否生成并发送邮件（v2.7.0：内聚到 Server，不再走 WebHook）
             if (FileUtils.isExist(filePath)) {
-                fileMakeWebHook.sendFile(new File(filePath), "sql", fileName);
+                mailService.sendSqlBackup(new File(filePath));
                 LogUtils.log_print("数据库备份成功: " + fileName);
                 log.info("数据库备份成功: {}", fileName);
             } else {

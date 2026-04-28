@@ -21,7 +21,12 @@ public class ScheduledFlowConst {
     public static final int FAIL_OTHER       = 2;  // 其他类（余额不足/代码异常等）
 
     // ── 通知类型 ─────────────────────────────
-    public static final int NOTICE_TYPE_PRE_REMIND = 1;  // 事前提醒
+    public static final int NOTICE_TYPE_PRE_REMIND          = 1;  // 定时记账事前提醒
+    // v2.7.0 (auto-excel): 自动月度 Excel 相关通知
+    public static final int NOTICE_TYPE_AUTO_EXCEL_REMIND    = 2;  // 自动月度 Excel 提前提醒
+    public static final int NOTICE_TYPE_AUTO_EXCEL_GENERATED = 3;  // 自动月度 Excel 已生成
+    public static final int NOTICE_TYPE_AUTO_EXCEL_NO_FLOW   = 4;  // 当月无流水，已跳过
+    public static final int NOTICE_TYPE_AUTO_EXCEL_FAILED    = 5;  // 自动生成失败
 
     // ── Flow.from 枚举值 ────────────────────
     public static final String FLOW_FROM_SCHEDULED = "scheduled";

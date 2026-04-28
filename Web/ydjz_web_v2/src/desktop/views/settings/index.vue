@@ -31,7 +31,7 @@ import AccountManager from './AccountManager.vue'
 import TypeManager from './TypeManager.vue'
 import TemplateManager from './TemplateManager.vue'
 import AiSettings from './AiSettings.vue'
-import SystemInfo from './SystemInfo.vue'
+import SystemSettings from './SystemSettings.vue'
 import BackupManager from './BackupManager.vue'
 import NoticeDrawer from './NoticeDrawer.vue'
 import ScheduledFlowManager from './ScheduledFlowManager.vue'
@@ -52,7 +52,6 @@ const versions = ref<VersionInfo>({
   backendBranch: '',
   mysqlBranch: '',
   agentBranch: '',
-  webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
 const backupConfig = ref<BackupConfig | null>(null)
@@ -70,8 +69,8 @@ const changelogHtml = computed(() => {
   return md.render(updateInfo.value.changelog)
 })
 
-// 系统信息抽屉
-const showSystemInfo = ref(false)
+// 系统设置抽屉
+const showSystemSettings = ref(false)
 
 // 公告抽屉
 const showNoticeDrawer = ref(false)
@@ -131,7 +130,7 @@ const dataItems = [
 // 系统管理项
 const systemItems = [
   { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick },
-  { key: 'systemInfo', title: '系统信息', desc: '版本、认证与备份信息', icon: Setting },
+  { key: 'systemSettings', title: '系统设置', desc: '鉴权 / 邮件 / 提醒 / 备份 / 版本', icon: Setting },
 ]
 
 // 检测 AI 服务
@@ -208,8 +207,8 @@ function openDrawer(key: string) {
       return
     }
     showAiDrawer.value = true
-  } else if (key === 'systemInfo') {
-    showSystemInfo.value = true
+  } else if (key === 'systemSettings') {
+    showSystemSettings.value = true
   } else if (key === 'backup') {
     showBackupDrawer.value = true
   }
@@ -298,14 +297,14 @@ onUnmounted(() => {
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
-          <!-- 系统信息卡片 -->
-          <div class="data-card" @click="openDrawer('systemInfo')">
+          <!-- 系统设置卡片 -->
+          <div class="data-card" @click="openDrawer('systemSettings')">
             <div class="card-icon system-icon">
               <el-icon :size="24"><Setting /></el-icon>
             </div>
             <div class="card-info">
-              <div class="card-title">系统信息</div>
-              <div class="card-desc">版本、认证与备份信息</div>
+              <div class="card-title">系统设置</div>
+              <div class="card-desc">鉴权 / 邮件 / 提醒 / 备份 / 版本</div>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
@@ -453,11 +452,9 @@ onUnmounted(() => {
     <TemplateManager v-model:visible="showTemplateDrawer" />
     <ScheduledFlowManager ref="scheduledFlowRef" v-model:visible="showScheduledFlowDrawer" />
     <AiSettings v-model:visible="showAiDrawer" />
-    <SystemInfo
-      v-model:visible="showSystemInfo"
+    <SystemSettings
+      v-model:visible="showSystemSettings"
       :versions="versions"
-      :auth-config="authConfig"
-      :backup-config="backupConfig"
     />
     <BackupManager v-model:visible="showBackupDrawer" />
     <NoticeDrawer ref="noticeDrawerRef" v-model:visible="showNoticeDrawer" />

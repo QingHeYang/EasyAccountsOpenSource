@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showDialog, showLoadingToast, closeToast } from 'vant'
+import { showDialog, showLoadingToast, closeToast, showToast } from 'vant'
 import MD5 from 'crypto-js/md5'
 import { authApi } from '@shared/api/auth'
+import { ApiCode } from '@shared/types'
 import { useThemeStore } from '@shared/stores/theme'
 import logoUrl from '@shared/assets/logo.png'
 
@@ -76,6 +77,17 @@ async function onSubmit() {
     const redirect = (route.query.redirect as string) || '/board'
     router.replace(redirect)
   } catch (err: any) {
+    // 418：登录时用户不存在 → 引导切换到注册模式
+    if (err?.code === ApiCode.NOT_REGISTERED && isLogin.value) {
+      closeToast()
+      showToast(err.message || '用户尚未注册，已切换到注册模式')
+      router.replace({
+        path: '/auth',
+        query: { ...route.query, mode: '0' },
+      })
+      password.value = ''
+      return
+    }
     showDialog({
       title: '请求失败',
       message: err.message || '网络错误',

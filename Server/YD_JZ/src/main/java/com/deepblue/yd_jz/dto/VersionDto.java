@@ -15,7 +15,7 @@ public class VersionDto {
         private String backendBranch;
         private String mysqlBranch;
         private String agentBranch;
-        private String webhookBranch;
+        // v2.7.0 (config-ui): 移除 webhookBranch —— WebHook 容器已退场
         private String release;
         private Integer versionCode;  // v2.6.0: 版本码
     }

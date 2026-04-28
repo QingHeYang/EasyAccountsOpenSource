@@ -15,6 +15,13 @@ spring.datasource.username=root
 spring.datasource.password=你的数据库密码
 spring.datasource.driverClassName=com.mysql.cj.jdbc.Driver
 
+# v2.7.0: Hikari 连接池调优 —— 防止 stale 连接累积撞 MySQL max_connections 上限
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.minimum-idle=1
+spring.datasource.hikari.max-lifetime=600000
+spring.datasource.hikari.keepalive-time=300000
+spring.datasource.hikari.connection-timeout=5000
+
 # MyBatis 驼峰命名转换
 mybatis.configuration.map-underscore-to-camel-case=true
 
@@ -67,25 +74,25 @@ sqlRestoreCmd=D:/你的mysql路径/bin/mysql -h localhost -P 3306 -uroot -p你�
 sqlDropCreateCmd=D:/你的mysql路径/bin/mysql -h localhost -P 3306 -uroot -p你的数据库密码 -e "DROP DATABASE IF EXISTS yd_jz; CREATE DATABASE yd_jz;"
 
 # 备份定时任务 cron 表达式（默认晚上 22 点）
-cron.sqlBackupTime=0 0 22 * * ?
+# v2.7.0 (config-ui): cron.sqlBackupTime 已下沉到 app_config.backup.*
 
 # =====================================================
 # 认证配置
 # =====================================================
 # 是否启用登录认证
-auth.enable=false
+# v2.7.0 (config-ui): auth.enable 已下沉到 app_config.auth.login_enable
 
 # Token 过期时间（分钟）
-auth.expired=30
+# v2.7.0 (config-ui): auth.expired 已下沉到 app_config.auth.token_expired_minutes
 
 # 单设备登录模式：true=新登录踢掉旧设备，false=多设备共享Token
-auth.single_login=true
+# v2.7.0 (config-ui): auth.single_login 已下沉到 app_config.auth.single_login
 
 # =====================================================
 # 外部服务
 # =====================================================
-# WebHook 服务地址
-webhook_url=http://localhost:8083/webhook
+# v2.7.0 (config-ui)：WebHook 容器已退场，邮件发送内聚到 Server，
+# SMTP 配置走 app_config.mail.*，请在前端"系统设置-邮件"中填写
 
 # =====================================================
 # AI 服务配置（可选）
@@ -128,7 +135,7 @@ version.font_branch=4.1.0-local
 version.backend_branch=2.7.0-local
 version.mysql_branch=2.7.0-local
 version.agent_branch=1.2.0-local
-version.webhook_branch=1.1.0-local
+# v2.7.0 (config-ui): version.webhook_branch 移除 —— WebHook 容器退场
 
 # 云端版本通知 JSON 地址（用于检查更新）
 version.notice.url=https://blue-out-share.oss-cn-zhangjiakou.aliyuncs.com/version-notice.json

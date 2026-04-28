@@ -1,11 +1,13 @@
 package com.deepblue.yd_jz.utils;
 
 import com.deepblue.yd_jz.dto.VersionDto;
+import com.deepblue.yd_jz.service.AuthConfigService;
+import com.deepblue.yd_jz.service.BackupConfigService;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -30,9 +32,6 @@ public class VersionUtils {
     @Value("${version.agent_branch}")
     private String agentBranch;
 
-    @Value("${version.webhook_branch}")
-    private String webhookBranch;
-
     @Value("${version.release}")
     private String release;
 
@@ -42,17 +41,12 @@ public class VersionUtils {
     @Value("${version.notice.url:}")
     private String versionNoticeUrl;
 
-    @Value("${auth.enable:false}")
-    private Boolean authEnable;
+    // v2.7.0 (config-ui): auth.* / cron.sqlBackupTime 已下沉到 app_config，改读 ConfigService
+    @Autowired
+    private AuthConfigService authConfigService;
 
-    @Value("${auth.expired:30}")
-    private Integer authExpired;
-
-    @Value("${auth.single_login:true}")
-    private Boolean authSingleLogin;
-
-    @Value("${cron.sqlBackupTime:}")
-    private String cronSqlBackupTime;
+    @Autowired
+    private BackupConfigService backupConfigService;
 
     private static final Gson GSON = new Gson();
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
@@ -68,33 +62,28 @@ public class VersionUtils {
         versions.setBackendBranch(backendBranch);
         versions.setMysqlBranch(mysqlBranch);
         versions.setAgentBranch(agentBranch);
-        versions.setWebhookBranch(webhookBranch);
         versions.setRelease(release);
         versions.setVersionCode(versionCode);
         versionDto.setVersions(versions);
 
-        // 登录配置
+        // 登录配置（v2.7.0: 来自 app_config.auth.*）
         VersionDto.Auth auth = new VersionDto.Auth();
-        auth.setEnable(authEnable);
-        auth.setExpiredMinutes(authExpired);
-        auth.setSingleLogin(authSingleLogin);
+        auth.setEnable(authConfigService.isLoginEnable());
+        auth.setExpiredMinutes(authConfigService.getTokenExpiredMinutes());
+        auth.setSingleLogin(authConfigService.isSingleLogin());
         versionDto.setAuth(auth);
 
-        // 备份配置
+        // 备份配置（v2.7.0: 来自 app_config.backup.*；BackupConfigService.get() 已校验合法性）
         VersionDto.Backup backup = new VersionDto.Backup();
-        backup.setCron(cronSqlBackupTime);
-        if (cronSqlBackupTime == null || cronSqlBackupTime.trim().isEmpty()) {
+        try {
+            String cron = backupConfigService.getCron();
+            backup.setCron(cron);
+            backup.setValid(backupConfigService.isEnabled());
+            backup.setDescription(backupConfigService.isEnabled() ? "已配置自动备份" : "自动备份已关闭");
+        } catch (Exception e) {
+            backup.setCron("");
             backup.setValid(false);
-            backup.setDescription("未配置备份时间");
-        } else {
-            try {
-                CronExpression.parse(cronSqlBackupTime);
-                backup.setValid(true);
-                backup.setDescription("已配置自动备份");
-            } catch (IllegalArgumentException e) {
-                backup.setValid(false);
-                backup.setDescription("cron表达式无效: " + e.getMessage());
-            }
+            backup.setDescription("备份配置非法：" + e.getMessage());
         }
         versionDto.setBackup(backup);
 

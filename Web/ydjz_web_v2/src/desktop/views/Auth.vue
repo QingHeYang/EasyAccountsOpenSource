@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import MD5 from 'crypto-js/md5'
 import { authApi } from '@shared/api/auth'
+import { ApiCode } from '@shared/types'
 import logoUrl from '@shared/assets/logo.png'
 
 const route = useRoute()
@@ -80,6 +81,18 @@ async function onSubmit() {
     const redirect = (route.query.redirect as string) || '/'
     router.replace(redirect)
   } catch (err: any) {
+    // 418：登录时用户不存在 → 引导切换到注册模式
+    if (err?.code === ApiCode.NOT_REGISTERED && isLogin.value) {
+      ElMessage.warning(err.message || '用户尚未注册，已切换到注册模式')
+      // 切到注册模式（保留 redirect query 等其它参数）
+      router.replace({
+        path: '/auth',
+        query: { ...route.query, mode: '0' },
+      })
+      // 清空密码，引导用户重新设置（用户名保留）
+      password.value = ''
+      return
+    }
     ElMessageBox.alert(err.message || '网络错误', '请求失败', {
       type: 'error'
     })

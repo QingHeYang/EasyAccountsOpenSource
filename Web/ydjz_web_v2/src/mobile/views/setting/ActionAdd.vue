@@ -7,7 +7,7 @@ import { useSmartBack } from '@shared/composables/useSmartBack'
 
 const route = useRoute()
 const router = useRouter()
-const { smartBack } = useSmartBack()
+const { smartBack, replaceAfterSubmit } = useSmartBack()
 
 // 编辑模式
 const actionId = computed(() => {
@@ -127,7 +127,7 @@ async function onSubmit() {
 
     closeToast()
     showToast(isEdit.value ? '保存成功' : '添加成功')
-    router.push('/setting/action')
+    replaceAfterSubmit('/setting/action')
   } catch (err) {
     closeToast()
     showToast('操作失败')

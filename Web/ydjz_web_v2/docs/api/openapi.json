@@ -169,6 +169,256 @@
         }
       }
     },
+    "/system/config/scheduledFlow": {
+      "get": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "读取定时记账全局提醒配置",
+        "operationId": "getScheduledFlow",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoReminderConfigDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "更新定时记账全局提醒配置（remindBeforeDays 1-5；remindTime HH:mm）",
+        "operationId": "updateScheduledFlow",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderConfigDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoReminderConfigDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/mail": {
+      "get": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "读取邮件配置（password 字段始终为空，前端用 isPasswordSet 判断是否已设置）",
+        "operationId": "getMail",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoMailConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "更新邮件配置（partial：未传字段不修改；password 空串=清空）",
+        "operationId": "updateMail",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailConfigUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoMailConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/backup": {
+      "get": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "读取备份配置（含拼出的 cron，前端展示 / 调试用）",
+        "operationId": "getBackup",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoBackupConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "更新备份配置（变更后自动重排调度，无需重启）",
+        "operationId": "updateBackup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupConfigUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoBackupConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/autoExcel": {
+      "get": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "读取自动月度 Excel 配置（含计算出的 nextRunDate / targetYearMonth）",
+        "operationId": "getAutoExcel",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoAutoExcelConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "更新自动月度 Excel 配置（变更后自动重排调度，无需重启）",
+        "operationId": "updateAutoExcel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoExcelConfigUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoAutoExcelConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/auth": {
+      "get": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "读取认证配置",
+        "operationId": "getAuth",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoAuthConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "更新认证配置（变更后下一个请求即生效，无需重启）",
+        "operationId": "updateAuth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthConfigUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoAuthConfigResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/scheduledFlow/rule/{id}": {
       "get": {
         "tags": [
@@ -257,56 +507,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseDto"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/scheduledFlow/config/reminder": {
-      "get": {
-        "tags": [
-          "定时记账"
-        ],
-        "summary": "获取全局提醒配置",
-        "operationId": "getReminderConfig",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseDtoReminderConfigDto"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "定时记账"
-        ],
-        "summary": "更新全局提醒配置",
-        "operationId": "updateReminderConfig",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReminderConfigDto"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "OK",
@@ -627,6 +827,90 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/BaseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/mail/test": {
+      "post": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "测试发邮件：用当前配置发一封测试邮件给收件人列表，把 SMTP 异常文本返回给前端",
+        "operationId": "testMail",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoSendResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/mail/testAll": {
+      "post": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "一键测试所有 8 类邮件（验证 HTML 模板渲染）—— 注意：mail.send_sql_backup / send_excel 都需为 true",
+        "operationId": "testAllMails",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoListMapStringObject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/autoExcel/sendReminder": {
+      "post": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "立即派发一次提醒（用于测试；走防重逻辑，已发过则不重发）",
+        "operationId": "sendAutoExcelReminderNow",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/config/autoExcel/runNow": {
+      "post": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "立即触发一次自动生成（不等下次 cron），方便测试 / 用户手动补发",
+        "operationId": "runAutoExcelNow",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoVoid"
                 }
               }
             }
@@ -1484,6 +1768,27 @@
         }
       }
     },
+    "/system/config/overview": {
+      "get": {
+        "tags": [
+          "系统设置"
+        ],
+        "summary": "系统设置整体概览（一处覆盖 mail/backup/auth/scheduled_flow 4 域，password/收件人邮箱不暴露）",
+        "operationId": "overview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDtoSystemConfigOverviewDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/scheduledFlow/rule/{id}/preview": {
       "get": {
         "tags": [
@@ -1582,6 +1887,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/BaseDtoListScheduledFlowLogResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "定时记账"
+        ],
+        "summary": "按规则清空所有执行日志",
+        "operationId": "clearLogsByRule",
+        "parameters": [
+          {
+            "name": "ruleId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDto"
                 }
               }
             }
@@ -2181,6 +2516,38 @@
         }
       }
     },
+    "/scheduledFlow/log/{id}": {
+      "delete": {
+        "tags": [
+          "定时记账"
+        ],
+        "summary": "删除单条执行日志",
+        "operationId": "deleteLog",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/notice/{id}": {
       "delete": {
         "tags": [
@@ -2410,6 +2777,296 @@
           }
         }
       },
+      "ReminderConfigDto": {
+        "type": "object",
+        "properties": {
+          "remindBeforeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remindTime": {
+            "type": "string"
+          }
+        }
+      },
+      "BaseDtoReminderConfigDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReminderConfigDto"
+          }
+        }
+      },
+      "MailConfigUpdateDto": {
+        "type": "object",
+        "properties": {
+          "smtpServer": {
+            "type": "string"
+          },
+          "smtpPort": {
+            "type": "string"
+          },
+          "fromEmail": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "toList": {
+            "type": "string"
+          },
+          "sendSqlBackup": {
+            "type": "boolean"
+          },
+          "sendExcel": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BaseDtoMailConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MailConfigResponseDto"
+          }
+        }
+      },
+      "MailConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "smtpServer": {
+            "type": "string"
+          },
+          "smtpPort": {
+            "type": "string"
+          },
+          "fromEmail": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "isPasswordSet": {
+            "type": "boolean"
+          },
+          "toList": {
+            "type": "string"
+          },
+          "sendSqlBackup": {
+            "type": "boolean"
+          },
+          "sendExcel": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BackupConfigUpdateDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "frequency": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "dayOfWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "BackupConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "frequency": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "dayOfWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cron": {
+            "type": "string"
+          }
+        }
+      },
+      "BaseDtoBackupConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BackupConfigResponseDto"
+          }
+        }
+      },
+      "AutoExcelConfigUpdateDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "time": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "sendEmail": {
+            "type": "boolean"
+          },
+          "remindEnabled": {
+            "type": "boolean"
+          },
+          "remindBeforeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remindEmailEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AutoExcelConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "time": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "sendEmail": {
+            "type": "boolean"
+          },
+          "remindEnabled": {
+            "type": "boolean"
+          },
+          "remindBeforeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remindEmailEnabled": {
+            "type": "boolean"
+          },
+          "lastRunDate": {
+            "type": "string"
+          },
+          "nextRunDate": {
+            "type": "string"
+          },
+          "targetYearMonth": {
+            "type": "string"
+          }
+        }
+      },
+      "BaseDtoAutoExcelConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AutoExcelConfigResponseDto"
+          }
+        }
+      },
+      "AuthConfigUpdateDto": {
+        "type": "object",
+        "properties": {
+          "loginEnable": {
+            "type": "boolean"
+          },
+          "singleLogin": {
+            "type": "boolean"
+          },
+          "tokenExpiredMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AuthConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "loginEnable": {
+            "type": "boolean"
+          },
+          "singleLogin": {
+            "type": "boolean"
+          },
+          "tokenExpiredMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "BaseDtoAuthConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AuthConfigResponseDto"
+          }
+        }
+      },
       "ScheduledFlowRuleRequestDto": {
         "type": "object",
         "properties": {
@@ -2561,18 +3218,6 @@
           }
         }
       },
-      "ReminderConfigDto": {
-        "type": "object",
-        "properties": {
-          "remindBeforeDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "remindTime": {
-            "type": "string"
-          }
-        }
-      },
       "FlowAddRequestDto": {
         "type": "object",
         "properties": {
@@ -2689,6 +3334,68 @@
           "accountType": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "BaseDtoSendResult": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SendResult"
+          }
+        }
+      },
+      "SendResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "BaseDtoListMapStringObject": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "BaseDtoVoid": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
           }
         }
       },
@@ -2833,13 +3540,13 @@
           "hasImages": {
             "type": "boolean"
           },
-          "aname": {
-            "type": "string"
-          },
           "tname": {
             "type": "string"
           },
           "hname": {
+            "type": "string"
+          },
+          "aname": {
             "type": "string"
           },
           "fdate": {
@@ -3225,6 +3932,163 @@
           }
         }
       },
+      "AuthOverview": {
+        "type": "object",
+        "properties": {
+          "loginEnable": {
+            "type": "boolean"
+          },
+          "singleLogin": {
+            "type": "boolean"
+          },
+          "tokenExpiredMinutes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AutoExcelOverview": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "time": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "sendEmail": {
+            "type": "boolean"
+          },
+          "remindEnabled": {
+            "type": "boolean"
+          },
+          "remindBeforeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remindEmailEnabled": {
+            "type": "boolean"
+          },
+          "lastRunDate": {
+            "type": "string"
+          },
+          "nextRunDate": {
+            "type": "string"
+          },
+          "targetYearMonth": {
+            "type": "string"
+          },
+          "humanReadable": {
+            "type": "string"
+          }
+        }
+      },
+      "BackupOverview": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "frequency": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "dayOfWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "humanReadable": {
+            "type": "string"
+          }
+        }
+      },
+      "BaseDtoSystemConfigOverviewDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SystemConfigOverviewDto"
+          }
+        }
+      },
+      "MailOverview": {
+        "type": "object",
+        "properties": {
+          "isConfigured": {
+            "type": "boolean"
+          },
+          "smtpServer": {
+            "type": "string"
+          },
+          "fromEmail": {
+            "type": "string"
+          },
+          "toListCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sendSqlBackup": {
+            "type": "boolean"
+          },
+          "sendExcel": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ScheduledFlowOverview": {
+        "type": "object",
+        "properties": {
+          "remindBeforeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remindTime": {
+            "type": "string"
+          }
+        }
+      },
+      "SystemConfigOverviewDto": {
+        "type": "object",
+        "properties": {
+          "mail": {
+            "$ref": "#/components/schemas/MailOverview"
+          },
+          "backup": {
+            "$ref": "#/components/schemas/BackupOverview"
+          },
+          "auth": {
+            "$ref": "#/components/schemas/AuthOverview"
+          },
+          "scheduledFlow": {
+            "$ref": "#/components/schemas/ScheduledFlowOverview"
+          },
+          "autoExcel": {
+            "$ref": "#/components/schemas/AutoExcelOverview"
+          }
+        }
+      },
       "BaseDtoScheduledFlowPreviewDto": {
         "type": "object",
         "properties": {
@@ -3317,21 +4181,6 @@
           },
           "failReason": {
             "type": "string"
-          }
-        }
-      },
-      "BaseDtoReminderConfigDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "msg": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/ReminderConfigDto"
           }
         }
       },
@@ -3477,9 +4326,6 @@
             "type": "string"
           },
           "agentBranch": {
-            "type": "string"
-          },
-          "webhookBranch": {
             "type": "string"
           },
           "release": {

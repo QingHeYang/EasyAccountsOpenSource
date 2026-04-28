@@ -147,7 +147,8 @@ export interface ScheduledFlowLogQuery {
   size?: number
 }
 
-/** 全局提醒配置 */
+/** 全局提醒配置（v2.7.0 起接口迁移到 /system/config/scheduledFlow，
+ *  调用方请使用 systemConfigApi.getScheduledFlow / updateScheduledFlow） */
 export interface ReminderConfig {
   /** 提醒前 N 天，N ∈ [1, 5]，不支持当天提醒 */
   remindBeforeDays: number
@@ -281,20 +282,6 @@ export const scheduledFlowApi = {
     })
   },
 
-  /* 全局提醒配置 */
-
-  /** 获取全局提醒配置 */
-  getReminderConfig() {
-    return getRequest().get<ApiResponse<ReminderConfig>>(
-      '/scheduledFlow/config/reminder'
-    )
-  },
-
-  /** 更新全局提醒配置 */
-  updateReminderConfig(params: ReminderConfig) {
-    return getRequest().put<ApiResponse<void>>(
-      '/scheduledFlow/config/reminder',
-      params
-    )
-  },
+  /* 全局提醒配置已迁移到 systemConfigApi（systemConfig.ts），
+     新代码请用 systemConfigApi.getScheduledFlow / updateScheduledFlow */
 }

@@ -3,12 +3,25 @@ import type { ApiResponse } from '../types'
 
 /** 通知类型
  *
- * 目前只有 SCHEDULED_REMINDER；未来扩展（回收站、AI 错误等）再追加 2、3…
- * 前端按 type 分 icon / 跳转。
+ * 前端按 type 分 icon / 颜色 / 跳转。
+ *
+ * - 1：定时记账事前提醒 → 跳转规则编辑（relatedRuleId）
+ * - 2：自动月度 Excel 提前提醒 → 跳转设置「自动 Excel」
+ * - 3：自动月度 Excel 已生成 → 跳转明细页 / 下载入口
+ * - 4：当月无流水，已跳过自动 Excel 生成 → 仅展示，不跳转
+ * - 5：自动 Excel 生成失败 → 跳转设置「自动 Excel」（让用户检查配置）
  */
 export enum NoticeType {
   /** 定时记账事前提醒（执行前 N 天触发） */
   SCHEDULED_REMINDER = 1,
+  /** 自动月度 Excel 提前提醒（执行前 N 天触发） */
+  AUTO_EXCEL_REMIND = 2,
+  /** 自动月度 Excel 已生成 */
+  AUTO_EXCEL_GENERATED = 3,
+  /** 当月无流水，自动 Excel 已跳过本次生成 */
+  AUTO_EXCEL_SKIPPED = 4,
+  /** 自动 Excel 生成失败 */
+  AUTO_EXCEL_FAILED = 5,
 }
 
 /** 用户通知（对应后端 UserNoticeResponseDto）
@@ -22,9 +35,9 @@ export interface UserNotice {
   type: NoticeType
   title: string
   content: string
-  /** 关联的定时规则 ID（type=SCHEDULED_REMINDER 时有值） */
+  /** 关联的定时规则 ID（type=SCHEDULED_REMINDER 时有值；自动 Excel 类通知不携带） */
   relatedRuleId?: number
-  /** 关联的执行日期 */
+  /** 关联日期：定时记账=执行日；自动 Excel=目标月或生成日 */
   relatedRunDate?: string
   /** 是否已读 */
   read: boolean

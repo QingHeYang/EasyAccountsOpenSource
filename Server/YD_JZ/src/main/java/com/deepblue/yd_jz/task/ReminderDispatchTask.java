@@ -3,6 +3,7 @@ package com.deepblue.yd_jz.task;
 import com.deepblue.yd_jz.dao.jpa.ScheduledFlowRuleRepository;
 import com.deepblue.yd_jz.entity.ScheduledFlowRule;
 import com.deepblue.yd_jz.service.AppConfigService;
+import com.deepblue.yd_jz.service.AutoExcelReminderService;
 import com.deepblue.yd_jz.service.ReminderService;
 import com.deepblue.yd_jz.utils.ScheduledFlowConst;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,9 @@ public class ReminderDispatchTask {
 
     @Autowired
     private ReminderService reminderService;
+
+    @Autowired
+    private AutoExcelReminderService autoExcelReminderService;
 
     @Scheduled(cron = "0 * * * * ?")
     public void scan() {
@@ -67,6 +71,13 @@ public class ReminderDispatchTask {
             } catch (Exception e) {
                 log.error("派发提醒失败 rule={}: {}", rule.getId(), e.getMessage(), e);
             }
+        }
+
+        // v2.7.0 (auto-excel): 顺手扫一下自动月度 Excel 提醒（同一时刻，无需另开 task）
+        try {
+            autoExcelReminderService.checkAndDispatch();
+        } catch (Exception e) {
+            log.error("派发 auto_excel 提醒失败: {}", e.getMessage(), e);
         }
     }
 
