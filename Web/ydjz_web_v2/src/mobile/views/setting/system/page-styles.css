@@ -1,0 +1,330 @@
+/* ============================================================
+ * 移动端系统设置子页面共享样式
+ *
+ * 由 5 个子页面（鉴权 / 邮件 / 提醒 / 备份 / 月度报表）共用：
+ *   - 顶部固定 page-header
+ *   - body padding
+ *   - 自定义 segmented（vant 没有 segmented，自己做）
+ *   - 1-28 day-grid（月度报表执行日号 / 备份月内日号）
+ *   - 通用 hint 样式
+ * ============================================================ */
+
+/* === page 容器 === */
+.sys-mob-page {
+  min-height: 100vh;
+  background: var(--color-bg-page);
+}
+
+/* === 顶部固定 header === */
+.sys-mob-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(245, 245, 245, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+html.dark .sys-mob-header {
+  background: rgba(10, 10, 10, 0.8);
+}
+
+.sys-mob-header-left,
+.sys-mob-header-right {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--color-text-primary);
+}
+
+.sys-mob-header-left {
+  background: var(--color-bg-card);
+}
+
+.sys-mob-header-left:active,
+.sys-mob-header-right:active {
+  opacity: 0.7;
+}
+
+.sys-mob-header-right.is-info {
+  background: var(--color-bg-card);
+  cursor: pointer;
+}
+
+.sys-mob-header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sys-mob-body {
+  padding: 76px 0 32px;
+}
+
+/* 子页面里 cell-group inset 之间统一加间距，避免坨在一起 */
+.sys-mob-body .van-cell-group--inset {
+  margin-bottom: 12px;
+}
+
+.sys-mob-body .van-cell-group--inset:last-child {
+  margin-bottom: 0;
+}
+
+/* === 自定义 segmented：浅灰胶囊 + 选中白底蓝边 === */
+.sys-mob-segmented {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.sys-mob-segmented .seg-item {
+  padding: 6px 14px;
+  min-width: 48px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.sys-mob-segmented .seg-item:active {
+  opacity: 0.85;
+}
+
+.sys-mob-segmented .seg-item.active {
+  background: var(--color-bg-card);
+  border-color: var(--color-transfer);
+  color: var(--color-transfer);
+  font-weight: 600;
+}
+
+html.dark .sys-mob-segmented {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+html.dark .sys-mob-segmented .seg-item.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(116, 192, 252, 0.6);
+  color: #74C0FC;
+}
+
+/* segmented 占整行宽度（每项 flex:1） */
+.sys-mob-segmented.is-block {
+  display: flex;
+  width: 100%;
+}
+
+.sys-mob-segmented.is-block .seg-item {
+  flex: 1;
+  text-align: center;
+  min-width: 0; /* 覆盖默认 min-width:48px，让 flex:1 能压缩 */
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* === cell 内"label 在上 + 控件在下"的纵向布局
+ * 用于 segmented 项数较多（如提前 1-5 天）放不进 cell 右侧 value 区时 === */
+.sys-mob-block-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.sys-mob-block-cell .block-label {
+  font-size: 14px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+/* === 通用 1-28 日号 grid === */
+.sys-mob-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.sys-mob-day-cell {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-page);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-mob-day-cell:active {
+  opacity: 0.75;
+}
+
+.sys-mob-day-cell.active {
+  background: var(--color-transfer);
+  border-color: var(--color-transfer);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* === 提示卡片（顶部 info、警告、说明） === */
+.sys-mob-hint {
+  display: flex;
+  gap: 10px;
+  margin: 12px 16px;
+  padding: 12px 14px;
+  background: var(--color-transfer-bg);
+  border: 1px solid rgba(24, 144, 255, 0.18);
+  border-radius: 12px;
+}
+
+.sys-mob-hint .hint-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-transfer);
+}
+
+.sys-mob-hint .hint-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.sys-mob-hint .hint-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.sys-mob-hint .hint-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.sys-mob-hint.is-warn {
+  background: rgba(250, 173, 20, 0.1);
+  border-color: rgba(250, 173, 20, 0.25);
+}
+
+.sys-mob-hint.is-warn .hint-icon {
+  color: #d48806;
+}
+
+/* === cell 通用调整 === */
+.sys-mob-cell-value-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-transfer);
+  letter-spacing: 0.5px;
+}
+
+/* === 时间值（mono + 主题蓝） === */
+.sys-mob-time-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-transfer);
+  letter-spacing: 0.5px;
+}
+
+/* === 状态横幅（已配置 / 未配置） === */
+.sys-mob-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.sys-mob-status.is-ok {
+  background: rgba(82, 196, 26, 0.1);
+  color: var(--color-income);
+}
+
+.sys-mob-status .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+html.dark .sys-mob-status {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .sys-mob-status.is-ok {
+  background: rgba(105, 219, 124, 0.12);
+  color: #69db7c;
+}
+
+/* 禁用 cell：灰显且不响应点击 */
+.sys-mob-cell-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 主操作按钮（"立即生成"等） */
+.sys-mob-primary-btn {
+  margin: 16px;
+  width: calc(100% - 32px);
+}
+
+/* "清除"按钮（替代输入框，例如已设授权码） */
+.sys-mob-clear-btn {
+  margin: 12px 14px;
+  width: calc(100% - 28px);
+}
+
+/* === 底部固定保存栏（移动端 form 通用） === */
+.sys-mob-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
+}
+
+.sys-mob-footer .van-button {
+  flex: 1;
+  height: 42px;
+}
+
+/* 当页面有 sys-mob-footer 时，page-body 底部多留出按钮高度，避免被遮挡 */
+.sys-mob-body-with-footer {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+html.dark .sys-mob-footer {
+  background: var(--color-bg-card);
+  border-top-color: rgba(255, 255, 255, 0.08);
+}

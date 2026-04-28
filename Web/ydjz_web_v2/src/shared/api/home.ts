@@ -57,8 +57,6 @@ export interface VersionInfo {
   mysqlBranch: string
   /** AI Agent 版本 */
   agentBranch: string
-  /** WebHook 版本 */
-  webhookBranch: string
 }
 
 /** 更新信息 */

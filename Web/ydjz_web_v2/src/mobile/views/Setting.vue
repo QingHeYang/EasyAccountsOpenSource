@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { useThemeStore } from '@shared/stores/theme'
 import { useNoticeStore } from '@shared/stores/notice'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig } from '@shared/api/home'
 import MarkdownIt from 'markdown-it'
@@ -13,7 +12,6 @@ import logoUrl from '@shared/assets/logo.png'
 import NoticePopup from '../components/NoticePopup.vue'
 
 const router = useRouter()
-const themeStore = useThemeStore()
 
 // 通知中心未读数（共享 store，跟 Board 顶栏铃铛同源）
 const noticeStore = useNoticeStore()
@@ -31,19 +29,6 @@ const aiHealth = ref<AiHealthResponse | null>(null)
 const aiServiceAvailable = computed(() => aiHealth.value !== null)
 const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === true)
 
-// 主题相关
-const themeText = computed(() => {
-  const map = { light: '浅色', dark: '深色', system: '跟随系统' }
-  return map[themeStore.mode]
-})
-
-function onThemeChange() {
-  const modes = ['light', 'dark', 'system'] as const
-  const idx = modes.indexOf(themeStore.mode)
-  const next = modes[(idx + 1) % modes.length]
-  themeStore.set(next)
-}
-
 // 关于弹窗
 const showAbout = ref(false)
 const versions = ref<VersionInfo>({
@@ -53,7 +38,6 @@ const versions = ref<VersionInfo>({
   backendBranch: '',
   mysqlBranch: '',
   agentBranch: '',
-  webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
 const updateInfo = ref<UpdateInfo | null>(null)
@@ -213,7 +197,7 @@ onActivated(() => {
           </template>
         </van-cell>
         <van-cell
-          title="系统信息"
+          title="系统设置"
           icon="setting-o"
           is-link
           to="/setting/system"

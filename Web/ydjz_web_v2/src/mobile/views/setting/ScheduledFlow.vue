@@ -107,10 +107,6 @@ function onRuleClick(rule: ScheduledFlowRule) {
   router.push(`/setting/scheduled-flow/edit/${rule.id}`)
 }
 
-function onOpenReminderConfig() {
-  router.push('/setting/scheduled-flow/reminder-config')
-}
-
 function onOpenLogs() {
   router.push('/setting/scheduled-flow/logs')
 }
@@ -152,25 +148,17 @@ onMounted(loadRules)
         <van-icon name="arrow-left" size="20" />
       </div>
       <div class="header-title">定时记账</div>
-      <div class="header-right" @click="onAddRule">
-        <van-icon name="plus" size="20" />
+      <div class="header-right-group">
+        <div class="header-icon-btn" title="执行记录" @click="onOpenLogs">
+          <van-icon name="notes-o" size="20" />
+        </div>
+        <div class="header-icon-btn" title="新建规则" @click="onAddRule">
+          <van-icon name="plus" size="20" />
+        </div>
       </div>
     </div>
 
     <div class="page-body">
-      <!-- 快捷入口：提醒设置 + 执行记录 -->
-      <div class="quick-actions">
-        <div class="quick-action" @click="onOpenReminderConfig">
-          <van-icon name="setting-o" size="18" class="quick-action-icon" />
-          <span>提醒设置</span>
-          <van-icon name="arrow" size="14" class="quick-action-arrow" />
-        </div>
-        <div class="quick-action" @click="onOpenLogs">
-          <van-icon name="notes-o" size="18" class="quick-action-icon" />
-          <span>执行记录</span>
-          <van-icon name="arrow" size="14" class="quick-action-arrow" />
-        </div>
-      </div>
 
       <!-- 规则列表 -->
       <div v-if="rules.length" class="rule-list">
@@ -291,7 +279,7 @@ onMounted(loadRules)
 }
 
 .header-left,
-.header-right {
+.header-icon-btn {
   width: 40px;
   height: 40px;
   display: flex;
@@ -303,8 +291,13 @@ onMounted(loadRules)
 }
 
 .header-left:active,
-.header-right:active {
+.header-icon-btn:active {
   opacity: 0.7;
+}
+
+.header-right-group {
+  display: flex;
+  gap: 8px;
 }
 
 .header-title {
@@ -318,13 +311,6 @@ onMounted(loadRules)
 }
 
 /* 快捷入口条 */
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
 .quick-action {
   display: flex;
   align-items: center;
@@ -503,5 +489,26 @@ onMounted(loadRules)
 
 html.dark .scheduled-flow-page .page-header {
   background: rgba(10, 10, 10, 0.8);
+}
+
+/* 暗色模式：暂停 / 开始 按钮（vant plain 默认白底太亮，改成半透明色叠加） */
+html.dark .scheduled-flow-page .rule-toggle-btn.van-button--warning.van-button--plain {
+  background: rgba(255, 151, 106, 0.12);
+  border-color: rgba(255, 151, 106, 0.4);
+  color: #ffa07a;
+}
+
+html.dark .scheduled-flow-page .rule-toggle-btn.van-button--warning.van-button--plain:active {
+  background: rgba(255, 151, 106, 0.2);
+}
+
+html.dark .scheduled-flow-page .rule-toggle-btn.van-button--primary.van-button--plain {
+  background: rgba(116, 192, 252, 0.12);
+  border-color: rgba(116, 192, 252, 0.4);
+  color: #74c0fc;
+}
+
+html.dark .scheduled-flow-page .rule-toggle-btn.van-button--primary.van-button--plain:active {
+  background: rgba(116, 192, 252, 0.2);
 }
 </style>

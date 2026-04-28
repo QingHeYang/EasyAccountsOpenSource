@@ -11,7 +11,7 @@ import { useSmartBack } from '@shared/composables/useSmartBack'
 
 const route = useRoute()
 const router = useRouter()
-const { smartBack } = useSmartBack()
+const { smartBack, replaceAfterSubmit } = useSmartBack()
 
 // 编辑模式
 const templateId = computed(() => {
@@ -367,7 +367,7 @@ async function onSubmit() {
 
     closeToast()
     showToast(isEdit.value ? '保存成功' : '添加成功')
-    router.push('/setting/template')
+    replaceAfterSubmit('/setting/template')
   } catch (err) {
     closeToast()
     showToast('操作失败')
@@ -385,7 +385,7 @@ async function onDelete() {
 
     await templateApi.delete(templateId.value!)
     showToast('已删除')
-    router.push('/setting/template')
+    replaceAfterSubmit('/setting/template')
   } catch {
     // 取消
   }

@@ -8,7 +8,6 @@ import {
   closeToast,
 } from 'vant'
 import { useSmartBack } from '@shared/composables/useSmartBack'
-import { useRouteHistoryStore } from '@shared/stores/routeHistory'
 import {
   scheduledFlowApi,
   CycleType,
@@ -23,23 +22,7 @@ import { typeApi, type TypeWithChildren } from '@shared/api/type'
 
 const router = useRouter()
 const route = useRoute()
-const { smartBack } = useSmartBack()
-const routeHistory = useRouteHistoryStore()
-
-/**
- * 提交/删除成功后跳回列表前调用
- *
- * 项目自维护 history 不区分 push/replace（routeHistory.push 在 afterEach 拦截所有导航），
- * 只 router.replace 到列表的话，栈里仍残留 add/edit 路径，从列表 smartBack 时会回到旧 add/edit。
- * 跳转前清掉本组件可能产生的所有 add/edit 路径，列表 → 设置 的返回链就干净了。
- */
-function pruneAddEditHistory() {
-  routeHistory.removeWhere(
-    (p) =>
-      p.startsWith('/setting/scheduled-flow/add') ||
-      p.startsWith('/setting/scheduled-flow/edit')
-  )
-}
+const { smartBack, replaceAfterSubmit } = useSmartBack()
 
 /* ---------------- 编辑 / 启动前 模式 ---------------- */
 
@@ -478,6 +461,11 @@ function clearEndDate() {
   form.value.endDate = ''
 }
 
+// 跳转到邮件配置页
+function goMailConfig() {
+  router.push('/setting/system/mail')
+}
+
 // 提醒：勾选邮件提醒时弹窗确认
 async function onEmailEnabledChange(val: boolean) {
   if (!val) return
@@ -485,7 +473,7 @@ async function onEmailEnabledChange(val: boolean) {
     await showConfirmDialog({
       title: '开启邮件提醒',
       message:
-        '邮件通知依赖 WebHook 邮件服务。请确认已在部署时启用邮件发送；未配置时即使打开也不会收到邮件。',
+        '邮件通知需要在「系统设置 → 邮件」中配置邮箱才能收到。未配置时即使打开也不会收到邮件。',
       confirmButtonText: '我已确认',
       cancelButtonText: '取消',
     })
@@ -588,8 +576,7 @@ async function onSubmit() {
       closeToast()
       showToast('创建成功')
     }
-    pruneAddEditHistory()
-    router.replace('/setting/scheduled-flow')
+    replaceAfterSubmit('/setting/scheduled-flow')
   } catch (err) {
     closeToast()
     if (!isHandledError(err)) {
@@ -679,8 +666,7 @@ async function onDelete() {
     await scheduledFlowApi.deleteRule(id)
     closeToast()
     showToast('已删除')
-    pruneAddEditHistory()
-    router.replace('/setting/scheduled-flow')
+    replaceAfterSubmit('/setting/scheduled-flow')
   } catch (err) {
     closeToast()
     if (!isHandledError(err)) showToast('删除失败')
@@ -990,7 +976,10 @@ onMounted(() => {
           <template #title>
             <div class="switch-info">
               <div class="switch-title">同时发送邮件</div>
-              <div class="switch-desc">需要 WebHook 已配置邮件服务</div>
+              <div class="switch-desc">
+                需要先配置邮箱，
+                <span class="switch-link" @click.stop="goMailConfig">前往配置 →</span>
+              </div>
             </div>
           </template>
           <template #value>
@@ -1004,32 +993,30 @@ onMounted(() => {
         </van-cell>
       </van-cell-group>
 
-      <!-- 提交按钮 -->
-      <van-button
-        type="primary"
-        block
-        round
-        :loading="submitting"
-        class="submit-btn"
-        @click="onSubmit"
-      >
-        {{ submitLabel }}
-      </van-button>
-
-      <!-- 删除按钮（仅编辑模式） -->
-      <van-button
-        v-if="isEditing"
-        type="danger"
-        plain
-        block
-        round
-        :disabled="submitting"
-        class="delete-btn"
-        @click="onDelete"
-      >
-        <van-icon name="delete-o" />
-        删除规则
-      </van-button>
+      <!-- 操作按钮：编辑模式 [删除][保存] 横向；创建模式仅保存全宽 -->
+      <div class="form-actions">
+        <van-button
+          v-if="isEditing"
+          type="danger"
+          plain
+          round
+          :disabled="submitting"
+          class="action-btn delete-btn"
+          @click="onDelete"
+        >
+          <van-icon name="delete-o" />
+          删除规则
+        </van-button>
+        <van-button
+          type="primary"
+          round
+          :loading="submitting"
+          class="action-btn submit-btn"
+          @click="onSubmit"
+        >
+          {{ submitLabel }}
+        </van-button>
+      </div>
     </div>
 
     <!-- ========= 选择器弹层 ========= -->
@@ -1533,6 +1520,15 @@ onMounted(() => {
   line-height: 1.4;
 }
 
+.switch-link {
+  color: var(--color-transfer);
+  font-weight: 500;
+}
+
+.switch-link:active {
+  opacity: 0.7;
+}
+
 /* W3：未来执行日预览（嵌在周期 cell-group 末尾的 inline-cell） */
 .future-preview {
   background: rgba(82, 196, 26, 0.06);
@@ -1565,17 +1561,15 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
-/* 提交按钮 */
-.submit-btn {
-  margin-top: 8px;
-  height: 44px;
-  font-size: 15px;
-  font-weight: 600;
+/* 操作按钮容器：[删除][保存] 横向 / 仅保存时全宽 */
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
 }
 
-/* 删除按钮（编辑模式） */
-.delete-btn {
-  margin-top: 10px;
+.form-actions .action-btn {
+  flex: 1;
   height: 44px;
   font-size: 15px;
   font-weight: 600;
@@ -1716,5 +1710,16 @@ onMounted(() => {
 
 html.dark .scheduled-flow-add-page .page-header {
   background: rgba(10, 10, 10, 0.8);
+}
+
+/* 暗色模式：删除按钮（danger plain）默认白底太亮，改成半透明红 */
+html.dark .scheduled-flow-add-page .form-actions .action-btn.van-button--danger.van-button--plain {
+  background: rgba(245, 34, 45, 0.14);
+  border-color: rgba(245, 34, 45, 0.45);
+  color: #ff7875;
+}
+
+html.dark .scheduled-flow-add-page .form-actions .action-btn.van-button--danger.van-button--plain:active {
+  background: rgba(245, 34, 45, 0.22);
 }
 </style>

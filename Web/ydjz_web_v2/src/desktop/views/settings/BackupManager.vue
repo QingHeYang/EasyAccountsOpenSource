@@ -181,7 +181,7 @@ async function doRestore() {
           <span>手动备份</span>
         </div>
         <div class="section-body">
-          <p class="section-desc">立即创建数据库备份文件，备份完成后会通过 WebHook 发送通知。</p>
+          <p class="section-desc">立即创建数据库备份文件，备份完成后会自动发送邮件通知（需先在「系统设置 → 邮件」中配置）。</p>
 
           <el-button
             type="primary"

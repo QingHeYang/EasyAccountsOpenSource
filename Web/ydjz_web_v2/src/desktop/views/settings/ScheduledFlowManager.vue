@@ -11,7 +11,6 @@ import {
   Clock,
   Bell,
   InfoFilled,
-  Setting,
   Tickets,
   CircleCheckFilled,
   CircleCloseFilled,
@@ -30,7 +29,6 @@ import {
   stringifyCycleDates,
   type ScheduledFlowRule,
   type ScheduledFlowRuleParams,
-  type ReminderConfig,
   type ScheduledFlowLog,
 } from '@shared/api/scheduledFlow'
 import { isHandledError } from '@shared/api/request'
@@ -620,13 +618,13 @@ function onSelectType(type: TypeWithChildren, parent?: TypeWithChildren) {
   showTypePicker.value = false
 }
 
-/** 勾选"发送邮件"时弹确认：邮件通知依赖 WebHook 服务
- *  TODO(后端接口): 等后端提供 WebHook 邮件配置检测接口后，改为仅在"未配置"时弹出 */
+/** 勾选"发送邮件"时弹确认：邮件通知依赖系统邮件配置
+ *  TODO(后端接口): 等后端提供 mail 配置已就绪检测接口后，改为仅在"未配置"时弹出 */
 async function onEmailEnabledChange(val: boolean) {
   if (!val) return // 取消勾选无需提示
   try {
     await ElMessageBox.confirm(
-      '邮件通知依赖 WebHook 邮件服务。请确认已在部署时（docker-compose.yml）启用邮件发送；未配置时即使打开此开关也不会收到邮件。',
+      '邮件通知需要在「系统设置 → 邮件」中配置邮箱才能收到。未配置时即使打开此开关也不会收到邮件。',
       '开启邮件提醒',
       {
         confirmButtonText: '我已确认',
@@ -909,57 +907,6 @@ async function onClearLogsByRule() {
   }
 }
 
-/* ---------------- 提醒配置 ---------------- */
-
-const showReminderConfigDialog = ref(false)
-const loadingConfig = ref(false)
-const savingConfig = ref(false)
-const reminderForm = ref<ReminderConfig>({
-  remindBeforeDays: 3,
-  remindTime: '09:00',
-})
-
-async function openReminderConfig() {
-  showReminderConfigDialog.value = true
-  loadingConfig.value = true
-  try {
-    const res = await scheduledFlowApi.getReminderConfig()
-    const cfg = res.data.data
-    if (cfg) {
-      reminderForm.value = {
-        remindBeforeDays: cfg.remindBeforeDays || 3,
-        remindTime: (cfg.remindTime || '09:00').substring(0, 5),
-      }
-    }
-  } catch (err) {
-    if (!isHandledError(err)) ElMessage.error('加载提醒配置失败')
-  } finally {
-    loadingConfig.value = false
-  }
-}
-
-async function onSaveReminderConfig() {
-  const f = reminderForm.value
-  if (!f.remindBeforeDays || f.remindBeforeDays < 1 || f.remindBeforeDays > 5) {
-    ElMessage.warning('请选择 1~5 天')
-    return
-  }
-  if (!f.remindTime) {
-    ElMessage.warning('请选择提醒时间')
-    return
-  }
-  savingConfig.value = true
-  try {
-    await scheduledFlowApi.updateReminderConfig(f)
-    ElMessage.success('保存成功')
-    showReminderConfigDialog.value = false
-  } catch (err) {
-    if (!isHandledError(err)) ElMessage.error('保存失败')
-  } finally {
-    savingConfig.value = false
-  }
-}
-
 /** 暴露给父级：按 ID 打开规则的编辑对话框
  *  通知中心点击跳转时会从 settings/index.vue 调用这个方法 */
 async function openRuleById(id: number) {
@@ -986,7 +933,6 @@ function onDrawerVisibleChange(v: boolean) {
     showAccountPicker.value = false
     showTypePicker.value = false
     showYearDatePicker.value = false
-    showReminderConfigDialog.value = false
     showLogDialog.value = false
     showFlowEditor.value = false
   }
@@ -1016,13 +962,6 @@ function onDrawerVisibleChange(v: boolean) {
             class="header-icon-btn"
             title="执行记录"
             @click="openLogDialog"
-          />
-          <el-button
-            :icon="Setting"
-            circle
-            class="header-icon-btn"
-            title="提醒设置"
-            @click="openReminderConfig"
           />
         </div>
       </div>
@@ -1420,7 +1359,7 @@ function onDrawerVisibleChange(v: boolean) {
         <div class="form-item-inline">
           <div class="inline-info">
             <div class="inline-title">同时发送邮件</div>
-            <div class="inline-desc">需要 WebHook 已配置邮件通知服务</div>
+            <div class="inline-desc">需要在「系统设置 → 邮件」中配置邮箱</div>
           </div>
           <el-switch
             v-model="form.emailEnabled"
@@ -1607,59 +1546,6 @@ function onDrawerVisibleChange(v: boolean) {
       </div>
       <el-empty v-if="!ruleTypes.length" description="暂无分类" :image-size="60" />
     </div>
-  </el-dialog>
-
-  <!-- 提醒设置对话框 -->
-  <el-dialog
-    v-model="showReminderConfigDialog"
-    title="提醒设置"
-    width="440"
-    class="reminder-config-dialog"
-    append-to-body
-  >
-    <div class="reminder-config" v-loading="loadingConfig">
-      <div class="hint-card reminder-hint">
-        <el-icon :size="14" class="hint-icon"><InfoFilled /></el-icon>
-        <div class="hint-content">
-          <div class="hint-rule">全局生效</div>
-          <div class="hint-example">此配置对所有开启提醒的定时规则生效，单条规则无法单独覆盖</div>
-        </div>
-      </div>
-
-      <div class="form-item">
-        <label class="form-label">提前几天提醒 <span class="required">*</span></label>
-        <div class="days-group">
-          <div
-            v-for="n in 5"
-            :key="n"
-            class="days-item"
-            :class="{ active: reminderForm.remindBeforeDays === n }"
-            @click="reminderForm.remindBeforeDays = n"
-          >
-            {{ n }} 天
-          </div>
-        </div>
-      </div>
-
-      <div class="form-item">
-        <label class="form-label">提醒时间 <span class="required">*</span></label>
-        <el-time-picker
-          v-model="reminderForm.remindTime"
-          format="HH:mm"
-          value-format="HH:mm"
-          placeholder="选择时间"
-          size="large"
-          style="width: 100%"
-        />
-        <div class="input-hint">每天在这个时分触发应发的提醒</div>
-      </div>
-    </div>
-    <template #footer>
-      <el-button @click="showReminderConfigDialog = false">取消</el-button>
-      <el-button type="primary" :loading="savingConfig" @click="onSaveReminderConfig">
-        保存
-      </el-button>
-    </template>
   </el-dialog>
 
   <!-- 执行记录对话框（固定高度 + 扁平单行列表） -->

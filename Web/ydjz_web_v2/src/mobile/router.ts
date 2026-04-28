@@ -161,18 +161,42 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/setting/ScheduledFlowLogs.vue'),
     meta: { title: '执行记录' },
   },
-  {
-    path: '/setting/scheduled-flow/reminder-config',
-    name: 'SettingScheduledFlowReminderConfig',
-    component: () => import('./views/setting/ScheduledFlowReminderConfig.vue'),
-    meta: { title: '提醒设置' },
-  },
-  // 系统信息
+  // 系统设置（主页 + 5 个子域）
   {
     path: '/setting/system',
     name: 'SettingSystem',
-    component: () => import('./views/setting/SystemInfo.vue'),
-    meta: { title: '系统信息' },
+    component: () => import('./views/setting/SystemSettings.vue'),
+    meta: { title: '系统设置' },
+  },
+  {
+    path: '/setting/system/auth',
+    name: 'SettingSystemAuth',
+    component: () => import('./views/setting/system/AuthSettings.vue'),
+    meta: { title: '鉴权设置' },
+  },
+  {
+    path: '/setting/system/mail',
+    name: 'SettingSystemMail',
+    component: () => import('./views/setting/system/MailSettings.vue'),
+    meta: { title: '邮件设置' },
+  },
+  {
+    path: '/setting/system/reminder',
+    name: 'SettingSystemReminder',
+    component: () => import('./views/setting/system/ReminderSettings.vue'),
+    meta: { title: '提醒设置' },
+  },
+  {
+    path: '/setting/system/backup',
+    name: 'SettingSystemBackup',
+    component: () => import('./views/setting/system/BackupSettings.vue'),
+    meta: { title: '备份设置' },
+  },
+  {
+    path: '/setting/system/auto-excel',
+    name: 'SettingSystemAutoExcel',
+    component: () => import('./views/setting/system/AutoExcelSettings.vue'),
+    meta: { title: '月度报表' },
   },
   // 流水记账
   {

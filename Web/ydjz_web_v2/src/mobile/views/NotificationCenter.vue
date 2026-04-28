@@ -26,7 +26,12 @@ const filteredNotices = computed(() => {
 })
 
 /** 类型主题：颜色 / 图标 / 标签 / CSS 修饰类
- *  未来扩展（回收站、AI 错误等）在此追加 case，卡片样式会按 typeClass 自动切换 */
+ *
+ * 通知分两大类：
+ *  - 定时记账提醒（type=1）：可点击跳转到规则编辑
+ *  - 自动月度 Excel（type=2-5）：聚合一类，仅展示不响应点击
+ *    └─ 内部用 icon / 颜色区分细分状态（提醒 / 已生成 / 已跳过 / 失败）
+ */
 function getNoticeMeta(type: NoticeType) {
   switch (type) {
     case NoticeType.SCHEDULED_REMINDER:
@@ -37,6 +42,38 @@ function getNoticeMeta(type: NoticeType) {
         label: '定时',
         typeClass: 'type-scheduled',
       }
+    case NoticeType.AUTO_EXCEL_REMIND:
+      return {
+        icon: 'calendar-o',
+        color: 'var(--color-transfer)',
+        bg: 'rgba(24, 144, 255, 0.12)',
+        label: 'Excel 提醒',
+        typeClass: 'type-excel-remind',
+      }
+    case NoticeType.AUTO_EXCEL_GENERATED:
+      return {
+        icon: 'passed',
+        color: 'var(--color-income)',
+        bg: 'rgba(82, 196, 26, 0.12)',
+        label: 'Excel 已生成',
+        typeClass: 'type-excel-done',
+      }
+    case NoticeType.AUTO_EXCEL_SKIPPED:
+      return {
+        icon: 'underway-o',
+        color: 'var(--color-text-tertiary)',
+        bg: 'var(--color-bg-page)',
+        label: 'Excel 已跳过',
+        typeClass: 'type-excel-skip',
+      }
+    case NoticeType.AUTO_EXCEL_FAILED:
+      return {
+        icon: 'warning-o',
+        color: 'var(--color-expense)',
+        bg: 'rgba(245, 34, 45, 0.12)',
+        label: 'Excel 失败',
+        typeClass: 'type-excel-fail',
+      }
     default:
       return {
         icon: 'volume-o',
@@ -46,6 +83,11 @@ function getNoticeMeta(type: NoticeType) {
         typeClass: 'type-default',
       }
   }
+}
+
+/** 仅定时记账提醒（type=1）可点击跳转 */
+function isClickable(notice: UserNotice): boolean {
+  return notice.type === NoticeType.SCHEDULED_REMINDER && !!notice.relatedRuleId
 }
 
 /** 相对时间：刚刚 / X 分钟前 / X 小时前 / X 天前 / yyyy-MM-dd */
@@ -143,10 +185,11 @@ async function onDelete(notice: UserNotice) {
   }
 }
 
-/** 点卡片：未读则标记已读 + 有关联规则跳到规则编辑页 */
+/** 点卡片：未读则标记已读；仅定时记账类（type=1）才触发跳转，
+ *  自动 Excel 类（type=2-5）只标已读，不响应跳转 */
 function onCardClick(notice: UserNotice) {
-  if (!notice.read) onMarkRead(notice) // fire-and-forget，不阻塞跳转
-  if (notice.relatedRuleId) {
+  if (!notice.read) onMarkRead(notice) // fire-and-forget
+  if (isClickable(notice)) {
     router.push(`/setting/scheduled-flow/edit/${notice.relatedRuleId}`)
   }
 }
@@ -216,7 +259,7 @@ onMounted(() => {
           :key="notice.id"
           class="notice-card"
           :class="[
-            { unread: !notice.read },
+            { unread: !notice.read, 'not-clickable': !isClickable(notice) },
             getNoticeMeta(notice.type).typeClass,
           ]"
           @click="onCardClick(notice)"
@@ -467,8 +510,29 @@ onMounted(() => {
   border-left-color: #13C2C2;
 }
 
+.notice-card.type-excel-remind.unread {
+  border-left-color: var(--color-transfer);
+}
+
+.notice-card.type-excel-done.unread {
+  border-left-color: var(--color-income);
+}
+
+.notice-card.type-excel-skip.unread {
+  border-left-color: var(--color-text-tertiary);
+}
+
+.notice-card.type-excel-fail.unread {
+  border-left-color: var(--color-expense);
+}
+
 .notice-card.type-default.unread {
   border-left-color: var(--color-transfer);
+}
+
+/* 不可点击：取消 active 反馈 */
+.notice-card.not-clickable:active {
+  opacity: 1;
 }
 
 /* 顶行 */
@@ -553,6 +617,21 @@ onMounted(() => {
 .notice-card.type-scheduled .notice-chip {
   color: #13C2C2;
   background: rgba(19, 194, 194, 0.08);
+}
+
+.notice-card.type-excel-remind .notice-chip {
+  color: var(--color-transfer);
+  background: rgba(24, 144, 255, 0.08);
+}
+
+.notice-card.type-excel-done .notice-chip {
+  color: var(--color-income);
+  background: rgba(82, 196, 26, 0.08);
+}
+
+.notice-card.type-excel-fail .notice-chip {
+  color: var(--color-expense);
+  background: rgba(245, 34, 45, 0.08);
 }
 
 /* 空状态 */

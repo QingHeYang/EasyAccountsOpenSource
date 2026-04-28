@@ -109,8 +109,13 @@ function createAxiosInstance(baseURL: string, timeout: number): AxiosInstance {
         return response
       }
 
+      // 登录/注册接口豁免：这些接口的 418/4010/4011 是业务语义（用户不存在/密码错）
+      // 不是 token 失效，应由 Auth.vue 自己 catch 处理（提示原始 msg + 切 mode）
+      const url = response.config.url || ''
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register')
+
       // 认证相关错误（418/4010/4011）- 需要跳转登录页
-      if (AUTH_ERROR_CODES.includes(code)) {
+      if (AUTH_ERROR_CODES.includes(code) && !isAuthEndpoint) {
         // 418 未注册时清除 token
         if (code === ApiCode.NOT_REGISTERED) {
           localStorage.removeItem('token')
@@ -119,6 +124,12 @@ function createAxiosInstance(baseURL: string, timeout: number): AxiosInstance {
         globalHandlers.onUnauthorized?.(code)
         // 抛出认证错误，标记为已处理，业务代码可忽略
         return Promise.reject(new ApiError(code, '登录已过期，请重新登录', true, true))
+      }
+
+      // 登录/注册接口的 418/4010/4011：保留原始 msg，handled=false 让业务代码自己处理
+      // 不调 onError 避免和 Auth.vue 自己的弹窗双重提示
+      if (isAuthEndpoint && AUTH_ERROR_CODES.includes(code)) {
+        return Promise.reject(new ApiError(code, msg, false, false))
       }
 
       // 其他业务错误 - 调用全局错误回调
