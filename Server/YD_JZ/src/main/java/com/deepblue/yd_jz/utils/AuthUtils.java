@@ -1,6 +1,7 @@
 package com.deepblue.yd_jz.utils;
 
 import com.deepblue.yd_jz.entity.Auth;
+import com.deepblue.yd_jz.service.AuthConfigService;
 import lombok.extern.slf4j.Slf4j;
 import okio.Okio;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,35 +12,28 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+// v2.7.0 (config-ui): auth.enable / auth.expired 已下沉到 app_config.auth.*，改读 AuthConfigService
+// auth.folder 仍走 env（部署级路径常量）
 @Slf4j
 @Component
 public class AuthUtils {
 
     private static final Object FILE_LOCK = new Object();
 
-    @Value("${auth.enable}")
-    private boolean authEnable;
-
     @Value("${auth.folder}")
     private String authFolder;
 
-    @Value("${auth.expired}")
-    private long expired;
+    @Autowired
+    private AuthConfigService authConfigService;
 
     public int isAuth(String token) {
-        if (!authEnable) {
+        if (!authConfigService.isLoginEnable()) {
             return 200;
-        }else {
-            if(token == null) {
-                if (!isFileExist()) {
-                    return 418;
-                }else {
-                    return 401;
-                }
-            }else {
-                return isTokenValid(token);
-            }
         }
+        if (token == null) {
+            return isFileExist() ? 401 : 418;
+        }
+        return isTokenValid(token);
     }
 
     private boolean isFileExist() {
@@ -52,7 +46,6 @@ public class AuthUtils {
         File file = new File(authFolder + "/secret.key");
         synchronized (FILE_LOCK) {
             try {
-                //使用OKIO读取文件成为字符串
                 String key = Okio.buffer(Okio.source(file)).readUtf8();
                 Auth auth = Auth.decode(key);
                 if (auth == null) {
@@ -61,7 +54,8 @@ public class AuthUtils {
                 long currentTime = System.currentTimeMillis();
                 if (auth.getToken().equals(token) && auth.getExpireTime() > currentTime) {
                     // 滑动刷新：只在剩余时间 < 50% 时才刷新
-                    long totalDuration = expired * 60 * 1000;
+                    long expiredMinutes = authConfigService.getTokenExpiredMinutes();
+                    long totalDuration = expiredMinutes * 60 * 1000;
                     long remainingTime = auth.getExpireTime() - currentTime;
                     if (remainingTime < totalDuration / 2) {
                         long newExpireTime = currentTime + totalDuration;
@@ -81,11 +75,9 @@ public class AuthUtils {
         }
     }
 
-
     public Auth getAuth() {
         File file = new File(authFolder + "/secret.key");
         try {
-            //使用OKIO读取文件成为字符串
             String key = Okio.buffer(Okio.source(file)).readUtf8();
             return Auth.decode(key);
         } catch (IOException e) {
@@ -97,7 +89,6 @@ public class AuthUtils {
     public void saveAuth(Auth auth) {
         File file = new File(authFolder + "/secret.key");
         try {
-            //使用OKIO写入文件
             Okio.buffer(Okio.sink(file)).writeUtf8(auth.encode()).close();
         } catch (FileNotFoundException e) {
             log.error("Error writing key file: {}", e.getMessage());

@@ -2,14 +2,12 @@ package com.deepblue.yd_jz.controller;
 
 import com.deepblue.yd_jz.dao.jpa.ScheduledFlowLogRepository;
 import com.deepblue.yd_jz.dto.BaseDto;
-import com.deepblue.yd_jz.dto.ReminderConfigDto;
 import com.deepblue.yd_jz.dto.ScheduledFlowLogResponseDto;
 import com.deepblue.yd_jz.dto.ScheduledFlowPreviewDto;
 import com.deepblue.yd_jz.dto.ScheduledFlowRuleRequestDto;
 import com.deepblue.yd_jz.dto.ScheduledFlowRuleResponseDto;
 import com.deepblue.yd_jz.entity.ScheduledFlowLog;
 import com.deepblue.yd_jz.entity.ScheduledFlowRule;
-import com.deepblue.yd_jz.service.AppConfigService;
 import com.deepblue.yd_jz.service.ScheduledFlowRuleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,9 +33,6 @@ public class ScheduledFlowController {
 
     @Autowired
     private ScheduledFlowLogRepository logRepo;
-
-    @Autowired
-    private AppConfigService appConfigService;
 
     // ════════════════════════ 规则 CRUD ════════════════════════
 
@@ -150,24 +145,5 @@ public class ScheduledFlowController {
         return BaseDto.setSuccessBean();
     }
 
-    // ════════════════════════ 全局提醒配置 ════════════════════════
-
-    @Operation(summary = "获取全局提醒配置")
-    @GetMapping("/config/reminder")
-    public BaseDto<ReminderConfigDto> getReminderConfig() {
-        ReminderConfigDto dto = new ReminderConfigDto();
-        dto.setRemindBeforeDays(appConfigService.getRemindBeforeDays());
-        dto.setRemindTime(appConfigService.getRemindTime());
-        BaseDto<ReminderConfigDto> res = BaseDto.setSuccessBean();
-        res.setData(dto);
-        return res;
-    }
-
-    @Operation(summary = "更新全局提醒配置")
-    @PutMapping("/config/reminder")
-    public BaseDto updateReminderConfig(@RequestBody ReminderConfigDto dto) {
-        int days = dto.getRemindBeforeDays() == null ? 1 : dto.getRemindBeforeDays();
-        appConfigService.updateReminderConfig(days, dto.getRemindTime());
-        return BaseDto.setSuccessBean();
-    }
+    // v2.7.0 (config-ui): 全局提醒配置已迁移到 /system/config/scheduledFlow（GET / PUT），统一系统设置入口
 }

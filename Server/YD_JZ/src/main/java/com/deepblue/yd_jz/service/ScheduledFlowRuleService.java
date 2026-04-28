@@ -61,6 +61,19 @@ public class ScheduledFlowRuleService {
     @Autowired
     private ReminderService reminderService;
 
+    @Autowired
+    private MailConfigService mailConfigService;
+
+    /**
+     * 启用规则邮件提醒前必须先配好 SMTP，避免"以为开了实际收不到"。
+     * createRule / updateRule / startRule 只要 emailEnabled=true 都走这里。
+     */
+    private void requireMailConfiguredIfEmailEnabled(ScheduledFlowRule rule) {
+        if (rule.isEmailEnabled() && !mailConfigService.isMailConfigured()) {
+            throw new BusinessException(ErrorCode.MAIL_NOT_CONFIGURED);
+        }
+    }
+
     // =====================================================================
     // CRUD
     // =====================================================================
@@ -70,6 +83,7 @@ public class ScheduledFlowRuleService {
         validateFields(input);
         // 开始日期 > today 的限制交由前端控制，后端不拦，方便测试
         validateMasterDataUsable(input);
+        requireMailConfiguredIfEmailEnabled(input);
 
         input.setId(null);
         input.setRunTime(normalizeRunTime(input.getRunTime()));
@@ -80,8 +94,32 @@ public class ScheduledFlowRuleService {
         input.setNextRunDate(toDate(computeFirstRunDate(input)));
 
         ScheduledFlowRule saved = ruleRepo.save(input);
+        // 即时补发前必须 refetch，否则 ManyToOne 关联（account/type/action）尚未加载，
+        // 提醒正文里的"账户 / 分类"会显示成 "—"
+        saved = refetchWithAssociations(saved);
         // 立即补发：覆盖"提醒窗口已经开启"的场景（如 startDate=明天 + 提醒前 3 天）
         reminderService.checkAndDispatch(saved);
+        return saved;
+    }
+
+    /**
+     * save() 返回的对象 ManyToOne 关联（account/type/action）都是 null —— 因为我们只 set 了 accountId/typeId/actionId 字段。
+     * ruleRepo.findById() 不能修复：JPA L1 cache 命中直接返回同一个 entity 实例，没真去 DB 重读。
+     * 只能显式查关联实体并手动 set 上去（@ManyToOne(insertable=false,updatable=false) 不影响 Java setter）。
+     */
+    private ScheduledFlowRule refetchWithAssociations(ScheduledFlowRule saved) {
+        if (saved.getAccountId() != null && saved.getAccount() == null) {
+            accountRepo.findById(saved.getAccountId()).ifPresent(saved::setAccount);
+        }
+        if (saved.getTypeId() != null && saved.getType() == null) {
+            typeRepo.findById(saved.getTypeId()).ifPresent(saved::setType);
+        }
+        if (saved.getActionId() != null && saved.getAction() == null) {
+            actionRepo.findById(saved.getActionId()).ifPresent(saved::setAction);
+        }
+        if (saved.getAccountToId() != null && saved.getAccountTo() == null) {
+            accountRepo.findById(saved.getAccountToId()).ifPresent(saved::setAccountTo);
+        }
         return saved;
     }
 
@@ -90,6 +128,7 @@ public class ScheduledFlowRuleService {
         ScheduledFlowRule existing = requireRule(id);
         validateFields(patch);
         validateMasterDataUsable(patch);
+        requireMailConfiguredIfEmailEnabled(patch);
 
         // 开始日期 > today 的限制交由前端控制，后端不拦，方便测试
 
@@ -113,6 +152,7 @@ public class ScheduledFlowRuleService {
         existing.setNextRunDate(toDate(computeNextRunDateAfter(existing, baselineForRecompute(existing))));
 
         ScheduledFlowRule saved = ruleRepo.save(existing);
+        saved = refetchWithAssociations(saved);
         // 规则字段改动后旧通知里写的"将于 X 日自动记账"可能已对不上新的 nextRunDate，
         // 全清再补发，避免误导
         noticeRepo.deleteByRelatedRuleId(id);
@@ -156,12 +196,14 @@ public class ScheduledFlowRuleService {
         ScheduledFlowRule rule = requireRule(id);
         validateMasterDataUsable(rule);
         validateEndDateForStart(rule);
+        requireMailConfiguredIfEmailEnabled(rule);
 
         // 启动时总是重算游标
         rule.setNextRunDate(toDate(computeNextRunDateAfter(rule, baselineForRecompute(rule))));
 
         ScheduledFlowRuleStateMachine.transit(rule, ScheduledFlowRuleStateMachine.Event.USER_START);
         ScheduledFlowRule saved = ruleRepo.save(rule);
+        saved = refetchWithAssociations(saved);
         // 启动时可能刚好在提醒窗口内，补发一次
         reminderService.checkAndDispatch(saved);
         return saved;

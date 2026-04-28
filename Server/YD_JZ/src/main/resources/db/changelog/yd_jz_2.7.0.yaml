@@ -335,13 +335,46 @@ databaseChangeLog:
             columnNames: domain, config_key
             constraintName: uk_app_config_domain_key
 
-  # v2.7.0: 写入定时记账全局提醒默认配置
+  # v2.7.0: 写入 app_config 默认值
+  # - scheduled_flow：定时记账全局提醒（v2.7.0 主线已使用）
+  # - mail / backup / auth：v2.7.0 配置 UI 化新增三域
+  # INSERT IGNORE：用户手动改过同 key 时跳过，不报错
   - changeSet:
-      id: 2.7.0-seed-app-config-scheduled-flow-reminder
+      id: 2.7.0-seed-app-config
       author: claude
       changes:
         - sql:
             sql: |
-              INSERT INTO app_config (domain, config_key, config_value, updated_at) VALUES
+              INSERT IGNORE INTO app_config (domain, config_key, config_value, updated_at) VALUES
+                -- scheduled_flow：定时记账全局提醒
                 ('scheduled_flow', 'remind_before_days', '1',     NOW()),
-                ('scheduled_flow', 'remind_time',        '09:00', NOW())
+                ('scheduled_flow', 'remind_time',        '09:00', NOW()),
+                -- mail：SMTP 凭证（密码为 AES 密文，初始空表示未配置）+ 全局开关
+                ('mail',   'smtp_server',     '',      NOW()),
+                ('mail',   'smtp_port',       '465',   NOW()),
+                ('mail',   'from_email',      '',      NOW()),
+                ('mail',   'password',        '',      NOW()),
+                ('mail',   'to_list',         '',      NOW()),
+                ('mail',   'send_sql_backup', 'true',  NOW()),
+                ('mail',   'send_excel',      'true',  NOW()),
+                -- backup：cron 简化结构（frequency + time + dayOfWeek + dayOfMonth）
+                ('backup', 'enabled',         'true',  NOW()),
+                ('backup', 'frequency',       'daily', NOW()),
+                ('backup', 'time',            '22:00', NOW()),
+                ('backup', 'day_of_week',     '1',     NOW()),
+                ('backup', 'day_of_month',    '1',     NOW()),
+                -- auth：默认开启登录（开源版默认安全），首次访问会引导用户注册
+                ('auth',   'login_enable',          'true',  NOW()),
+                ('auth',   'single_login',          'true',  NOW()),
+                ('auth',   'token_expired_minutes', '30',    NOW()),
+                -- auto_excel：自动月度 Excel 生成（v2.7.0 配置 UI 化追加特性）
+                -- 默认关闭：用户首次进 UI 配置后再开启，避免新用户被陌生邮件意外打扰
+                ('auto_excel', 'enabled',              'false',      NOW()),
+                ('auto_excel', 'day_of_month',         '4',          NOW()),
+                ('auto_excel', 'time',                 '21:00',      NOW()),
+                ('auto_excel', 'target',               'LAST_MONTH', NOW()),
+                ('auto_excel', 'send_email',           'true',       NOW()),
+                ('auto_excel', 'remind_enabled',       'true',       NOW()),
+                ('auto_excel', 'remind_before_days',   '3',          NOW()),
+                ('auto_excel', 'remind_email_enabled', 'false',      NOW()),
+                ('auto_excel', 'last_run_date',        '',           NOW())

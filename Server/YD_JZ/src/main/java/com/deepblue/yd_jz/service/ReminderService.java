@@ -3,7 +3,6 @@ package com.deepblue.yd_jz.service;
 import com.deepblue.yd_jz.dao.jpa.TypeRepository;
 import com.deepblue.yd_jz.entity.ScheduledFlowRule;
 import com.deepblue.yd_jz.entity.Type;
-import com.deepblue.yd_jz.utils.NotificationWebHook;
 import com.deepblue.yd_jz.utils.ScheduledFlowConst;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.LinkedHashMap;
 
 // v2.7.0: 定时记账事前提醒派发服务
 // 单一入口 checkAndDispatch：判断资格 + 防重复 + 发送（站内 + 可选邮件）
@@ -27,7 +27,7 @@ public class ReminderService {
     private UserNoticeService noticeService;
 
     @Autowired
-    private NotificationWebHook notificationWebHook;
+    private MailService mailService;
 
     @Autowired
     private TypeRepository typeRepository;
@@ -55,17 +55,18 @@ public class ReminderService {
         if (noticeService.existsReminderFor(rule.getId(), runDateAsDate)) return;
 
         String title = "定时记账提醒：" + rule.getName();
-        String content = buildContent(rule, runDate, today);
 
-        // 站内通知：不带 EasyAccounts 前缀/签名（用户已经在 App 内，自带上下文）
+        // 站内通知用纯文本（用户在 App 内，自带上下文，不需要品牌外壳）
+        String plainContent = buildPlainContent(rule, runDate, today);
         noticeService.create(ScheduledFlowConst.NOTICE_TYPE_PRE_REMIND,
-                title, content, rule.getId(), runDateAsDate);
+                title, plainContent, rule.getId(), runDateAsDate);
 
-        // 邮件：加品牌标识（邮箱里要自证身份，否则用户收件箱看不出谁发的）
+        // 邮件用 envelope 结构化，由 MailService 渲染 HTML
         if (rule.isEmailEnabled()) {
-            String emailSubject = "[EasyAccounts] " + title;
-            String emailBody = content + "\n\n—— EasyAccounts 记账助手";
-            notificationWebHook.sendEmail(emailSubject, emailBody);
+            String summary = "您的定时记账规则「" + rule.getName() + "」即将自动执行：";
+            LinkedHashMap<String, String> fields = buildEmailFields(rule, runDate, today);
+            String advice = "如无异常，系统将按时自动生成这笔流水。";
+            mailService.sendScheduledReminder(rule.getName(), summary, fields, advice);
         }
 
         log.info("reminder dispatched: ruleId={}, runDate={}, email={}",
@@ -73,18 +74,9 @@ public class ReminderService {
     }
 
     /**
-     * 构造提醒正文（同时用于站内通知和邮件）
-     * 格式：
-     *   您的定时记账规则「房贷」即将自动执行：
-     *
-     *     执行时间：2026-05-24 09:00（2 天后）
-     *     记账金额：3500.00 元
-     *     账户：招商银行
-     *     分类：贷款支出/房贷
-     *
-     *   如无异常，系统将按时自动生成这笔流水。
+     * 站内通知正文（纯文本）。在 App 内展示，不需要品牌外壳。
      */
-    private String buildContent(ScheduledFlowRule rule, LocalDate runDate, LocalDate today) {
+    private String buildPlainContent(ScheduledFlowRule rule, LocalDate runDate, LocalDate today) {
         String runTimeShort = shortenRunTime(rule.getRunTime());
         String daysText = relativeDayText(today, runDate);
         String accountName = rule.getAccount() != null ? rule.getAccount().getAName() : "—";
@@ -96,6 +88,23 @@ public class ReminderService {
                "  账户：" + accountName + "\n" +
                "  分类：" + typeName + "\n\n" +
                "如无异常，系统将按时自动生成这笔流水。";
+    }
+
+    /**
+     * 邮件结构化字段（给 MailService HTML 模板用）。
+     */
+    private LinkedHashMap<String, String> buildEmailFields(ScheduledFlowRule rule, LocalDate runDate, LocalDate today) {
+        String runTimeShort = shortenRunTime(rule.getRunTime());
+        String daysText = relativeDayText(today, runDate);
+        String accountName = rule.getAccount() != null ? rule.getAccount().getAName() : "—";
+        String typeName = formatTypeName(rule);
+
+        LinkedHashMap<String, String> fields = new LinkedHashMap<>();
+        fields.put("执行时间", runDate + " " + runTimeShort + "（" + daysText + "）");
+        fields.put("记账金额", rule.getMoney() + " 元");
+        fields.put("账户", accountName);
+        fields.put("分类", typeName);
+        return fields;
     }
 
     /** HH:mm:ss → HH:mm */

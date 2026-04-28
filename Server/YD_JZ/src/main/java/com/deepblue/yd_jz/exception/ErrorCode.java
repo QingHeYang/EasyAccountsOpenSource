@@ -66,7 +66,11 @@ public enum ErrorCode {
     SYSTEM_ERROR(50001, "系统内部错误"),
     DATABASE_ERROR(50002, "数据库错误"),
     FILE_OPERATION_ERROR(50003, "文件操作错误"),
-    EXTERNAL_SERVICE_ERROR(50004, "外部服务调用失败");
+    EXTERNAL_SERVICE_ERROR(50004, "外部服务调用失败"),
+    // v2.7.0 (config-ui): 加解密相关
+    CRYPTO_FAILED(50005, "加解密失败"),
+    // v2.7.0 (config-ui): 启用邮件类功能时 SMTP 必须先配置完整
+    MAIL_NOT_CONFIGURED(42017, "邮件 SMTP 未配置完整，无法启用邮件功能；请先在「系统设置 - 邮件」中填写服务器、发件邮箱、密码、收件人");
 
     private final int code;
     private final String message;

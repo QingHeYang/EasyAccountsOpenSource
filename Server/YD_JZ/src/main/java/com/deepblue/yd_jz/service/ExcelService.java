@@ -45,7 +45,7 @@ public class ExcelService {
     AccountService accountService;
 
     @Autowired
-    FileMakeWebHook fileMakeWebHook;
+    MailService mailService;
 
     @Autowired
     DateUtils dateUtils;
@@ -170,14 +170,66 @@ public class ExcelService {
 
     private String uploadExcel(String excelPath, String excelFileName, String title) {
         if (FileUtils.isExist(excelPath)) {
-            return fileMakeWebHook.sendFile(new File(excelPath), "month_excel", excelFileName);
+            mailService.sendMonthExcel(new File(excelPath), title);
+            return "\n月度 Excel 已生成并发送邮件\n" + excelFileName + "|0";
         }else {
             return "\n文件上传失败\n"+excelPath+excelFileName+"不存在|1";
         }
     }
 
-    private void sendEmail(String fileUrl, String title) {
+    // ════════════════════════ v2.7.0 (auto-excel) 给自动模块用 ════════════════════════
 
+    /**
+     * 统计指定月的流水数量。
+     * 给 AutoExcelExecuteService 用来判断"无流水"分支。
+     * @param yearMonth yyyy-MM 格式，例如 "2026-04"
+     */
+    public int countMonthFlows(String yearMonth) {
+        if (yearMonth == null || !yearMonth.matches("^\\d{4}-\\d{2}$")) {
+            return 0;
+        }
+        List<Map<String, Object>> flows = flowDao.getFlowByMain(3, 0, yearMonth + "%");
+        return flows == null ? 0 : flows.size();
+    }
+
+    /**
+     * 仅生成月度 Excel 文件、不发邮件。
+     * 给 AutoExcelExecuteService 用来"先拿到文件再决定怎么发"。
+     * @param yearMonth yyyy-MM 格式
+     * @return 生成的 Excel 文件；解析失败或写入失败返回 null
+     */
+    public File makeMonthExcelFile(String yearMonth) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM");
+        try {
+            Date date = sdf.parse(yearMonth);
+            MonthExcelData monthExcelData = getExcelForMonth(date);
+            String excelFileName = yearMonth + "月账单_" + new Date().getTime() + ".xlsx";
+            String excelPath = excelFolder + excelFileName;
+
+            ExcelWriter excelWriter = EasyExcel.write().file(excelPath)
+                    .withTemplate(baseExcelPath)
+                    .inMemory(true)
+                    .registerWriteHandler(new ExcelWriteHandler(monthExcelData.getFlow(), 3))
+                    .build();
+            WriteSheet writeSheet = EasyExcel.writerSheet().build();
+            excelWriter.fill(monthExcelData, writeSheet);
+            excelWriter.fill(new FillWrapper("flow", monthExcelData.getFlow()), writeSheet);
+            excelWriter.fill(new FillWrapper("account", monthExcelData.getExcelAccounts()), writeSheet);
+            excelWriter.finish();
+
+            File f = new File(excelPath);
+            if (!f.exists()) {
+                log.error("makeMonthExcelFile: Excel 文件未生成 {}", excelPath);
+                return null;
+            }
+            return f;
+        } catch (ParseException e) {
+            log.error("makeMonthExcelFile: 解析 yearMonth 失败 [{}]: {}", yearMonth, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.error("makeMonthExcelFile: 写入 Excel 失败 [{}]: {}", yearMonth, e.getMessage());
+            return null;
+        }
     }
 
     public static class ExcelWriteHandler implements CellWriteHandler {

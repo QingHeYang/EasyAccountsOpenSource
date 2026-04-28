@@ -73,4 +73,20 @@ public class UserNoticeService {
     public boolean existsReminderFor(Integer ruleId, Date runDate) {
         return repo.findByRelatedRuleIdAndRelatedRunDate(ruleId, runDate) != null;
     }
+
+    /**
+     * 防重复（按 type + runDate）：用于 auto_excel 这类单条全局规则、无 ruleId 的提醒
+     */
+    public boolean existsForTypeAndDate(Integer type, Date runDate) {
+        return repo.findFirstByTypeAndRelatedRunDate(type, runDate) != null;
+    }
+
+    /**
+     * 按 type + runDate 删通知。auto_excel 执行成功后清当天的"提前提醒"，避免通知列表里
+     * "3 天后将生成"和"已生成"并排展示给用户造成困惑。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteByTypeAndRunDate(Integer type, Date runDate) {
+        repo.deleteByTypeAndRelatedRunDate(type, runDate);
+    }
 }
