@@ -24,6 +24,9 @@ const username = ref('')
 const password = ref('')
 const loading = ref(false)
 
+// password autocomplete：登录用 current-password，注册用 new-password
+const passwordAutocomplete = computed(() => isLogin.value ? 'current-password' : 'new-password')
+
 // 表单验证
 function validate(): string | null {
   const u = username.value.trim()
@@ -144,6 +147,7 @@ function onForgotPassword() {
             <van-field
               v-model="username"
               name="username"
+              autocomplete="username"
               label="用户名"
               placeholder="请输入用户名"
               :rules="[{ required: true, message: '请填写用户名' }]"
@@ -152,6 +156,7 @@ function onForgotPassword() {
             <van-field
               v-model="password"
               name="password"
+              :autocomplete="passwordAutocomplete"
               label="密码"
               type="password"
               placeholder="请输入密码"

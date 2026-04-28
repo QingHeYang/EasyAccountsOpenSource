@@ -111,12 +111,9 @@ function onForgotPassword() {
   )
 }
 
-// 回车提交
-function handleKeyEnter(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    onSubmit()
-  }
-}
+// password 输入框 autocomplete：登录用 current-password，注册用 new-password
+// 这样浏览器密码管理器才能正确识别表单语义（避免注册时误填旧密码）
+const passwordAutocomplete = computed(() => isLogin.value ? 'current-password' : 'new-password')
 </script>
 
 <template>
@@ -154,10 +151,12 @@ function handleKeyEnter(e: KeyboardEvent) {
         <h2 class="card-title">{{ title }}</h2>
         <p class="card-subtitle">{{ subtitle }}</p>
 
-        <el-form class="auth-form" @keydown="handleKeyEnter">
+        <el-form class="auth-form" @submit.prevent="onSubmit">
           <el-form-item>
             <el-input
               v-model="username"
+              name="username"
+              autocomplete="username"
               placeholder="请输入用户名"
               size="large"
               clearable
@@ -169,6 +168,8 @@ function handleKeyEnter(e: KeyboardEvent) {
             <el-input
               v-model="password"
               type="password"
+              name="password"
+              :autocomplete="passwordAutocomplete"
               placeholder="请输入密码"
               size="large"
               show-password
@@ -186,9 +187,9 @@ function handleKeyEnter(e: KeyboardEvent) {
             <el-button
               type="primary"
               size="large"
+              native-type="submit"
               :loading="loading"
               class="submit-btn"
-              @click="onSubmit"
             >
               {{ buttonText }}
             </el-button>

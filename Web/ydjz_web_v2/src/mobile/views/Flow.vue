@@ -5,6 +5,7 @@ import { showToast, showConfirmDialog, showLoadingToast, closeToast, showDialog 
 import { flowApi, type Flow, type FlowListResult } from '@shared/api/flow'
 import { useFlowFilterStore } from '@mobile/stores/flowFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
+import DayTrendOverlay, { type DayTrendPoint } from '@mobile/components/flow/DayTrendOverlay.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,12 @@ const filterStore = useFlowFilterStore()
 // 数据
 const loading = ref(false)
 const flowData = ref<FlowListResult | null>(null)
+// 趋势图独立数据源（始终拉当月全量，不受 handleType 筛选影响）
+const chartFlowData = ref<FlowListResult | null>(null)
+
+// 趋势图状态
+const chartType = ref<'outcome' | 'income' | 'both'>('outcome')
+const showTrendOverlay = ref(false)
 
 // 当前月份（优先级：路由参数 > store保存 > 当月）
 const currentDate = new Date()
@@ -201,15 +208,71 @@ const groupedFlows = computed(() => {
 async function fetchFlows() {
   loading.value = true
   try {
-    const res = await flowApi.getMonthList(handleType.value, orderType.value, chooseMonth.value)
-    if (res.data.code === 0) {
-      flowData.value = res.data.data
+    const listPromise = flowApi.getMonthList(handleType.value, orderType.value, chooseMonth.value)
+    // 趋势图始终需要全量数据；handleType=3 时复用列表请求避免重复
+    const chartPromise =
+      handleType.value === 3
+        ? null
+        : flowApi.getMonthList(3, 0, chooseMonth.value)
+
+    const [listRes, chartRes] = await Promise.all([listPromise, chartPromise])
+
+    if (listRes.data.code === 0) {
+      flowData.value = listRes.data.data
+    }
+    if (handleType.value === 3) {
+      chartFlowData.value = flowData.value
+    } else if (chartRes && chartRes.data.code === 0) {
+      chartFlowData.value = chartRes.data.data
     }
   } catch (err) {
     console.error('获取流水失败:', err)
   } finally {
     loading.value = false
   }
+}
+
+// 当月日级数据（喂给趋势图 overlay）
+const dayData = computed<DayTrendPoint[]>(() => {
+  const flows = chartFlowData.value?.flows || []
+  const map = new Map<string, { income: number; outcome: number }>()
+  for (const flow of flows) {
+    if (flow.exempt) continue
+    if (flow.handle === 2) continue
+    const acc = map.get(flow.fdate) || { income: 0, outcome: 0 }
+    const money = parseFloat(flow.money) || 0
+    if (flow.handle === 0) acc.income += money
+    else if (flow.handle === 1) acc.outcome += money
+    map.set(flow.fdate, acc)
+  }
+
+  const [yStr, mStr] = chooseMonth.value.split('-')
+  const year = parseInt(yStr)
+  const month = parseInt(mStr)
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const now = new Date()
+  const isCurrent = year === now.getFullYear() && month === now.getMonth() + 1
+  const lastDay = isCurrent ? now.getDate() : daysInMonth
+
+  const result: DayTrendPoint[] = []
+  for (let day = 1; day <= lastDay; day++) {
+    const dateStr = `${chooseMonth.value}-${String(day).padStart(2, '0')}`
+    const data = map.get(dateStr)
+    result.push({
+      day,
+      date: dateStr,
+      income: data ? data.income : null,
+      outcome: data ? data.outcome : null,
+    })
+  }
+  return result
+})
+
+// overlay 内切月份 → 联动整页
+function onTrendMonthChange(newMonth: string) {
+  if (newMonth === chooseMonth.value) return
+  chooseMonth.value = newMonth
+  fetchFlows()
 }
 
 // 月份切换
@@ -348,6 +411,9 @@ onBeforeUnmount(() => {
         {{ showMonthInHeader ? monthDisplay : '明细' }}
       </div>
       <div class="header-actions">
+        <div class="header-btn" @click="showTrendOverlay = true">
+          <van-icon name="bar-chart-o" size="20" />
+        </div>
         <div class="header-btn" @click="filterExpanded = !filterExpanded">
           <van-icon name="filter-o" size="20" />
           <span v-if="filterDesc" class="filter-dot"></span>
@@ -482,6 +548,14 @@ onBeforeUnmount(() => {
       <van-icon name="plus" size="24" />
     </div>
 
+    <!-- 日趋势横屏 overlay -->
+    <DayTrendOverlay
+      v-model:show="showTrendOverlay"
+      v-model:chart-type="chartType"
+      :month="chooseMonth"
+      :day-data="dayData"
+      @update:month="onTrendMonthChange"
+    />
   </div>
 </template>
 
