@@ -971,7 +971,7 @@ watch(selectedTag, () => {
           </div>
           <van-uploader
             v-model="fileList"
-            :max-count="3"
+            :max-count="9"
             :max-size="20 * 1024 * 1024"
             :after-read="onAfterRead"
             :before-delete="onDeleteImage"

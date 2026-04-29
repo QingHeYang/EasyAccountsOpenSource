@@ -467,6 +467,13 @@ html.dark .sys-dialog .el-segmented__item-selected {
 /* === input / 数字输入 / 时间选择器统一样式（抽屉内 + 对话框内） ===
  * 圆角 8 + 36px 高 + 主题蓝 focus 边框，与 segmented 32px 节奏对齐
  */
+/* 用 Element Plus 自带的 CSS 变量控制组件高度，避免手撕 inner.height
+ * 影响：el-input / el-input-number / el-date-picker 内部都会按这个高度渲染 */
+.system-settings-drawer,
+.sys-dialog {
+  --el-component-size: 36px;
+}
+
 .system-settings-drawer .el-input__wrapper,
 .sys-dialog .el-input__wrapper {
   border-radius: 8px;
@@ -485,10 +492,11 @@ html.dark .sys-dialog .el-segmented__item-selected {
   box-shadow: 0 0 0 1px var(--color-transfer) inset;
 }
 
+/* 不强行撑 height（通过 --el-component-size 让组件自己处理），
+ * 但显式 width: 100% 让 inner 横向充满 wrapper 内容区。 */
 .system-settings-drawer .el-input__inner,
 .sys-dialog .el-input__inner {
-  height: 36px;
-  line-height: 36px;
+  width: 100%;
   font-size: 13px;
   background: transparent !important;
   color: var(--color-text-primary);

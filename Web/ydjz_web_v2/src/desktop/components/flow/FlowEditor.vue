@@ -587,8 +587,8 @@ async function onUploadImage(e: Event) {
   if (!files?.length) return
 
   for (const file of Array.from(files)) {
-    if (fileList.value.length >= 3) {
-      ElMessage.warning('最多上传3张图片')
+    if (fileList.value.length >= 9) {
+      ElMessage.warning('最多上传9张图片')
       break
     }
 
@@ -704,8 +704,8 @@ async function processImageFiles(files: File[]) {
   }
 
   for (const file of imageFiles) {
-    if (fileList.value.length >= 3) {
-      ElMessage.warning('最多上传3张图片')
+    if (fileList.value.length >= 9) {
+      ElMessage.warning('最多上传9张图片')
       break
     }
 
@@ -1164,7 +1164,7 @@ function onClose() {
                 <el-icon class="is-loading"><Loading /></el-icon>
               </div>
             </div>
-            <label v-if="fileList.length < 3" class="upload-btn">
+            <label v-if="fileList.length < 9" class="upload-btn">
               <el-icon><Plus /></el-icon>
               <input
                 type="file"
@@ -1914,9 +1914,9 @@ function onClose() {
 /* 图片上传 */
 
 .upload-area {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  flex-wrap: wrap;
   position: relative;
   min-height: 80px;
   padding: 12px;
@@ -1947,8 +1947,8 @@ function onClose() {
 }
 
 .upload-preview {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: 10px;
   overflow: hidden;
   position: relative;
@@ -2015,8 +2015,8 @@ function onClose() {
 }
 
 .upload-btn {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   border: 2px dashed var(--color-border);
   border-radius: 10px;
   display: flex;
