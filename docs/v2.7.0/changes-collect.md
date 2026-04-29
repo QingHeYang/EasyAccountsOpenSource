@@ -57,10 +57,78 @@
 
 | 项 | 内容 |
 |---|---|
-| **来源** | 用户 xqq27 反馈（2026-04-20）："想对每日花销严格管控，看单月日支出及变化" |
+| **来源** | 用户反馈："想对每日花销严格管控，看单月日支出及变化" |
 | **用户诉求** | 每天打开 App 一眼看到"今天 -¥XXX"，并能拉整月趋势 |
 | **本次落地** | ① 明细页：日期行展示**当日支出总金额**<br>② 统计页：选定某月用**折线图**展示该月每日支出 |
-| **dev-log** | ⏳ 待 Server / Web Claude 在各自 `docs/dev-log/dev-log-2026-04-XX.md` 中记录 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part2.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part2.md) |
+
+### N2 · 明细抽屉图片上限 3 → 9 张
+
+| 项 | 内容 |
+|---|---|
+| **来源** | 用户反馈"3 张不够用" |
+| **用户感知** | 编辑流水时可贴更多图片（购物小票多张 / 出行多张），PC 端 3×3 网格展示 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md) §2 |
+
+---
+
+## 🐛 Bug 修复（续登）
+
+### B3 · AI 报错不展示错误信息（[Issue #29](https://github.com/QingHeYang/EasyAccounts/issues/29)）
+
+| 项 | 内容 |
+|---|---|
+| **影响** | AI 工具调用失败时前端无任何提示，用户看着对话卡住或者突然不动，无从排查 |
+| **本次处理** | AI 端工具失败从裸字符串升级为结构化错误（错误码 / 用户可读消息 / 提示 / 是否可重试），前端 / LLM 都能消费 |
+| **dev-log** | [`ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md`](../../ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md) Part 2 |
+
+### B4 · 删流水后图片留孤儿
+
+| 项 | 内容 |
+|---|---|
+| **影响** | 删流水后 `flow_image` 表关联和磁盘 `/Ledger/images/` 文件都不清理，长期会撑爆数据库和磁盘 |
+| **存在时长** | 早期版本累积，跨版本残留 |
+| **本次处理** | v2.7.0 修复（删 / 编辑流水都补上图片清理；并对历史孤儿数据做迁移清理） |
+| **dev-log** | [`Server/docs/dev-log/dev-log-2026-04-29.md`](../../Server/docs/dev-log/dev-log-2026-04-29.md) §2 |
+
+### B5 · 图片下载接口路径穿越漏洞
+
+| 项 | 内容 |
+|---|---|
+| **影响** | `GET /image/{fileName}` 缺少 fileName 校验，理论上恶意 URL 可以读取服务器任意文件 |
+| **风险等级** | 🔴 安全 |
+| **本次处理** | v2.7.0 修复（fileName 严格校验） |
+| **dev-log** | [`Server/docs/dev-log/dev-log-2026-04-29.md`](../../Server/docs/dev-log/dev-log-2026-04-29.md) §3 |
+
+### B6 · 邮件配置 SMTP 输入框暗黑模式样式异常
+
+| 项 | 内容 |
+|---|---|
+| **影响** | PC 端"系统设置 → 邮件 → 编辑"对话框暗黑模式下，input 内框超出外框 + 左右不充满 |
+| **本次处理** | input 高度策略改用 Element Plus 标准变量，避免手撕样式与暗黑模式冲突 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md) §1 |
+
+---
+
+## 🏗 架构 / 工程改进
+
+### E1 · AI 提示词与工具描述全面对齐后端业务语义
+
+| 项 | 内容 |
+|---|---|
+| **背景** | LLM 调后端工具准确率不高，根因是 AI 端工具描述与后端实际行为有偏差（约 9 处事实错误） |
+| **本次重构** | ① 后端落盘《AI 工具调用 · 后端 API 业务语义说明》（约 585 行，给 AI 端参考）<br>② AI 端重写内部工具 `*_DESC` + ToolParam description<br>③ AI 端重写 MCP `@mcp.tool` 函数 docstring<br>④ AI 端重写任务级提示词 `easy_accounts_instructions_inner.prompt` |
+| **用户感知** | 间接提升 —— AI 工具调用更准确，少误用接口 |
+| **关联文档** | [`Server/docs/feature-guide/ai-api-business-guide.md`](../../Server/docs/feature-guide/ai-api-business-guide.md) |
+| **dev-log** | [`Server/docs/dev-log/dev-log-2026-04-29.md`](../../Server/docs/dev-log/dev-log-2026-04-29.md) §1<br>[`ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md`](../../ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md) Part 1 |
+
+### E2 · AI 端连锁稳定性修复（流式 / 历史 / DS-R1 / httpx / .env）
+
+| 项 | 内容 |
+|---|---|
+| **影响** | 借 #29 主线修复时排查出多个稳定性问题：流式累积残缺 tool_call、历史污染回放、DS-R1 reasoning_content 协议、httpx timeout / 代理误判、.env 加载顺序 |
+| **本次处理** | 一并修复，AI 端整体抗压能力显著提升 |
+| **dev-log** | [`ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md`](../../ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md) Part 3 |
 
 ---
 

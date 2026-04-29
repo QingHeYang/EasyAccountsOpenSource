@@ -11,11 +11,11 @@
 
 | # | 标题 | 模块 | 优先级 | 状态 | 备注 |
 |---|------|------|--------|------|------|
-| [#23](https://github.com/QingHeYang/EasyAccounts/issues/23) | 外网无法访问 AI 助手 | Server / Web | 🔴 高 | 👤 **用户审计** | `user_id` header 被外层 nginx 丢弃（下划线问题）。AI 三件套统一由用户处理 |
+| [#23](https://github.com/QingHeYang/EasyAccounts/issues/23) | 外网无法访问 AI 助手 | Server / Web | 🔴 高 | ⏳ **待修** | `user_id` header 被外层 nginx 丢弃（下划线问题）。计划改走 URL query 参数 |
 | [#27](https://github.com/QingHeYang/EasyAccounts/issues/27) | 手机端分类多次添加后返回需点击多次 | Web（移动端） | 🟡 中 | ✅ **已修** | useSmartBack.replaceAfterSubmit 共享 API + 5 个 *Add 页面接入（v2.7.0-config-ui） |
 | [#28](https://github.com/QingHeYang/EasyAccounts/issues/28) | 内部转账：总金额不计入，分账单明细疑似也不计入 | Server | 🟡 中 | 待确认 | 需先确认是预期行为还是 bug |
-| [#29](https://github.com/QingHeYang/EasyAccounts/issues/29) | AI 报错不展示错误信息 | Web / AI | 🔴 高 | 👤 **用户审计** | AI 三件套统一由用户处理 |
-| [#31](https://github.com/QingHeYang/EasyAccounts/issues/31) | AI 使用智谱 GLM-4.6V-FlashX 时重复记账 | AI | 🔴 高 | 👤 **用户审计** | AI 三件套统一由用户处理 |
+| [#29](https://github.com/QingHeYang/EasyAccounts/issues/29) | AI 报错不展示错误信息 | Web / AI | 🔴 高 | ✅ **已修** | AI 工具失败结构化错误 + 借机修了 5 个连锁稳定性问题（流式/历史/DS-R1/httpx/.env） |
+| [#31](https://github.com/QingHeYang/EasyAccounts/issues/31) | AI 使用智谱 GLM-4.6V-FlashX 时重复记账 | AI | 🔴 高 | ❌ **不做** | 评估后判定不在 AI 端硬拦：重复参数不一定是 bug（用户可能买两杯同价咖啡），属 LLM 判断力问题 |
 
 ---
 
@@ -74,14 +74,14 @@
 | Bug | 路由栈管理修复（手机端分类返回） | #27 | ✅ |
 | Bug | Excel 生成超时死锁修复（上古 Bug） | — | ✅ |
 | 性能 | MySQL 连接池 + 缓冲区调优 | — | ✅ |
-| AI 修复 | AI 错误提示完善 | #29 | 👤 用户审计 |
-| AI 修复 | AI 重复记账防护 | #31 | 👤 用户审计 |
-| AI 修复 | 外网 AI 访问根治 | #23 | 👤 用户审计 |
+| AI 修复 | AI 错误提示完善（工具失败结构化错误 + 5 个连锁稳定性问题）| #29 | ✅ |
+| AI 修复 | AI 重复记账防护 | #31 | ❌ 评估不做（属 LLM 判断力，不在 AI 端硬拦）|
+| AI 修复 | 外网 AI 访问根治 | #23 | ⏳ 待修（user_id 改走 URL query）|
 | AI 安全 | 删除回收站 | #32 | ❌ 取消（硬删够用） |
 | 登录 | 授权设备记住密码 | #26 | ❌ 取消（已被鉴权 UI 化覆盖） |
 
 > **说明 1**：账单导入（支付宝/微信/银行）**不作为原生功能**开发，后续交由 **AI + Excel Skill** 接管。
-> **说明 2**：AI 三件套（#29/#31/#23）由用户统一审计处理，不归项目主管排程。
+> **说明 2**：AI 三件套审计结果 —— #29 已修 / #31 评估不做（属 LLM 判断力） / #23 待修。
 
 ### 🔮 v2.8.0 候选（已立项 plan，待开工）
 
@@ -130,11 +130,12 @@ Issue #23（外网 AI）+ #26（记住密码）+ #11（群晖教程）都源自�
 
 ### v2.7.0 发版前最后一公里
 
-- [ ] AI 三件套（#29/#31/#23）由用户审计完成
+- [x] AI 三件套审计：#29 已修 / #31 评估不做 / #23 待修
+- [ ] **#23 user_id 改走 URL query**（剩下唯一 AI 端待修项）
 - [ ] 联调抽测（前端建规则 → 等执行 → 看记录全流程）
 - [ ] 邮件抽测（在配过 SMTP 的环境下走一次）
 - [ ] `docs/v2.7.0/release-v2.7.0.md` 版本总文档（主管整理）
 - [ ] 各端 dev-guide 残留 WebHook 引用清理（各端 Claude）
-- [ ] `changes-collect.md` 把 dev-log 路径补回链接
+- [x] `changes-collect.md` 把 dev-log 路径补回链接
 - [ ] 抬升镜像版本号 + Tag + 镜像构建上传
 - [ ] 发布 Release Notes
