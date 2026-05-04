@@ -18,6 +18,7 @@ const filterStore = useAnalysisTypeFilterStore()
 
 // ==================== 状态 ====================
 const loading = ref(false)
+const loadFailed = ref(false)
 const selectedTypeId = ref<number | null>(null)
 const selectedTypeName = ref('')
 const allTypes = ref<TypeWithChildren[]>([])
@@ -201,6 +202,7 @@ async function fetchData() {
   if (!selectedTypeId.value) return
 
   loading.value = true
+  loadFailed.value = false
   showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
 
   try {
@@ -215,10 +217,13 @@ async function fetchData() {
     if (res.data.data?.typeName) {
       selectedTypeName.value = res.data.data.typeName.replace(/——/g, '/')
     }
+    // 成功才关 loading toast；失败让全局 onError 弹的 fail toast 自然显示
     closeToast()
   } catch (err) {
-    closeToast()
     console.error('获取分类统计失败', err)
+    // 网络错误：清空 + 标记失败
+    result.value = null
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -520,8 +525,19 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <van-empty v-if="!result && !loading" description="请选择分类查看统计" />
-      <van-empty v-else-if="result?.yearData?.length === 0" description="暂无数据" />
+      <van-empty
+        v-if="!result && !loading && loadFailed"
+        image="network"
+        description="加载失败，请重试"
+      />
+      <van-empty
+        v-else-if="!result && !loading"
+        description="请选择分类查看统计"
+      />
+      <van-empty
+        v-else-if="result?.yearData?.length === 0"
+        description="暂无数据"
+      />
     </div>
 
     <!-- 分类选择器弹窗 -->

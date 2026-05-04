@@ -205,8 +205,13 @@ const groupedFlows = computed(() => {
 })
 
 // 获取流水列表
+// 失败标识：用于 van-empty 切换"加载失败"占位
+const loadFailed = ref(false)
+
 async function fetchFlows() {
   loading.value = true
+  loadFailed.value = false
+  showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
   try {
     const listPromise = flowApi.getMonthList(handleType.value, orderType.value, chooseMonth.value)
     // 趋势图始终需要全量数据；handleType=3 时复用列表请求避免重复
@@ -225,8 +230,14 @@ async function fetchFlows() {
     } else if (chartRes && chartRes.data.code === 0) {
       chartFlowData.value = chartRes.data.data
     }
+    // 成功才关 loading toast；失败让全局 onError 弹的 fail toast 自然显示
+    closeToast()
   } catch (err) {
     console.error('获取流水失败:', err)
+    // 网络错误：清空数据 + 标记失败，让列表显示"加载失败"占位
+    flowData.value = null
+    chartFlowData.value = null
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -540,7 +551,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <van-empty v-else-if="!loading" description="暂无账单" />
+      <van-empty
+        v-else-if="!loading"
+        :image="loadFailed ? 'network' : 'default'"
+        :description="loadFailed ? '加载失败，请切换月份或刷新重试' : '暂无账单'"
+      />
     </div>
 
     <!-- 浮动添加按钮 -->

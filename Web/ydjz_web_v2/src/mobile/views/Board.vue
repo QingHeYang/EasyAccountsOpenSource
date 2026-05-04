@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showToast, showLoadingToast, closeToast } from 'vant'
 import { homeApi, type HomeInfo } from '@shared/api/home'
 import { aiApi } from '@shared/api/ai'
 import { useNoticeStore } from '@shared/stores/notice'
@@ -234,15 +234,25 @@ function isMaxBalance(month: string) {
 }
 
 // 获取首页数据
+// 失败标识：用于让 van-empty 显示"加载失败"而不是"暂无数据"
+const loadFailed = ref(false)
+
 async function fetchHomeInfo() {
   loading.value = true
+  loadFailed.value = false
+  showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
   try {
     const res = await homeApi.getHomeInfoByYear(chooseYear.value)
     if (res.data.code === 0) {
       homeInfo.value = res.data.data
     }
+    // 成功才关 loading toast；失败时让全局 onError 弹的 showFailToast 自然显示
+    closeToast()
   } catch (err) {
     console.error('获取首页数据失败:', err)
+    // 网络错误：清空数据 + 标记失败，让月度概览显示"加载失败"占位
+    homeInfo.value = null
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -476,7 +486,11 @@ function toAI() {
           </div>
         </div>
 
-        <van-empty v-else description="暂无数据" />
+        <van-empty
+          v-else
+          :image="loadFailed ? 'network' : 'default'"
+          :description="loadFailed ? '加载失败，请切换年份重试' : '暂无数据'"
+        />
       </div>
 
     </div>

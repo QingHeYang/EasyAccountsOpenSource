@@ -130,6 +130,15 @@
 | **本次处理** | 一并修复，AI 端整体抗压能力显著提升 |
 | **dev-log** | [`ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md`](../../ai/KoalaqHub/docs/dev-log/dev-log-2026-04-29.md) Part 3 |
 
+### E3 · 公告系统抽离重构 + 移动端加载体验改进
+
+| 项 | 内容 |
+|---|---|
+| **公告系统重构** | ① 抽出 `useNotice.ts` 双端共享 composable（拉取 / 已读管理 / Markdown 渲染 / localStorage 持久化）<br>② 抽出 `NoticeCard.vue` 双端各自的卡片组件（含折叠/展开逻辑）<br>③ `NoticeDrawer.vue`（桌面）和 `NoticePopup.vue`（移动端）大幅瘦身（共 -300+ 行） |
+| **移动端加载体验** | Board / Analysis / Flow / AnalysisType 4 个核心页加载流程统一：<br>① 加载中 `showLoadingToast` 提示<br>② 失败时清空数据 + 标记 `loadFailed`，让空态显示"加载失败"占位（不再误导用户以为"没数据"） |
+| **用户感知** | 移动端打开页面有明确"加载中"反馈；网络异常时也能看出是失败而不是空账本 |
+| **dev-log** | ⏳ 待 Web Claude 补 |
+
 ---
 
 ### B7 · 外网无法访问 AI 助手（[Issue #23](https://github.com/QingHeYang/EasyAccounts/issues/23)）—— ✅ 文档级解决

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Sunny, Moon, Monitor } from '@element-plus/icons-vue'
+import { Sunny } from '@element-plus/icons-vue'
 import { useThemeStore } from '@shared/stores/theme'
 
 const themeStore = useThemeStore()
 
+// emoji 跟移动端 SystemSettings.vue 保持一致（带 ️ 变体选择符）
 const themeOptions = [
-  { value: 'light', label: '浅色', icon: Sunny },
-  { value: 'dark', label: '深色', icon: Moon },
-  { value: 'system', label: '跟随系统', icon: Monitor },
+  { value: 'light', label: '浅色', emoji: '☀️' },
+  { value: 'dark', label: '深色', emoji: '🌙' },
+  { value: 'system', label: '跟随系统', emoji: '⚙️' },
 ] as const
 
 const currentTheme = computed({
@@ -32,7 +33,7 @@ const currentTheme = computed({
           :class="{ active: currentTheme === opt.value }"
           @click="currentTheme = opt.value"
         >
-          <el-icon :size="20"><component :is="opt.icon" /></el-icon>
+          <span class="theme-emoji">{{ opt.emoji }}</span>
           <span>{{ opt.label }}</span>
         </div>
       </div>
@@ -62,6 +63,11 @@ const currentTheme = computed({
 
 .theme-option:hover {
   background: var(--color-bg-active);
+}
+
+.theme-emoji {
+  font-size: 28px;
+  line-height: 1;
 }
 
 .theme-option.active {
