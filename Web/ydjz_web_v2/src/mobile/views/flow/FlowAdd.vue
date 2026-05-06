@@ -75,7 +75,6 @@ const tags = ref<Tag[]>([])
 const templates = ref<Template[]>([])
 
 // ==================== 弹窗状态 ====================
-const showActionSheet = ref(false)
 const showAccountSheet = ref(false)
 const accountSheetType = ref<1 | 2>(1)
 const showTypeCascader = ref(false)
@@ -106,6 +105,33 @@ const maxDate = new Date()
 
 // ==================== 计算属性 ====================
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
+
+// 普通 / 不计入分组（chip 区主显示 normal，exempt 折叠）
+// chip 显示顺序：支出(1) → 收入(0) → 转账(2)
+const HANDLE_ORDER: Record<number, number> = { 1: 0, 0: 1, 2: 2 }
+const normalActions = computed(() => {
+  const list = actions.value.filter((a) => !a.exempt)
+  return [...list].sort(
+    (a, b) => (HANDLE_ORDER[a.handle] ?? 99) - (HANDLE_ORDER[b.handle] ?? 99)
+  )
+})
+const exemptActions = computed(() => actions.value.filter((a) => a.exempt))
+const exemptActionsExpanded = ref(false)
+
+// 当前选中收支类型的颜色（用于卡片渐变背景）
+const actionColor = computed(() => {
+  if (!selectedAction.value) return 'var(--color-transfer)'
+  switch (selectedAction.value.handle) {
+    case 0:
+      return 'var(--color-income)'
+    case 1:
+      return 'var(--color-expense)'
+    case 2:
+      return 'var(--color-transfer)'
+    default:
+      return 'var(--color-transfer)'
+  }
+})
 
 // ==================== 双向限制逻辑 ====================
 
@@ -229,6 +255,19 @@ async function fetchActions() {
     const res = await actionApi.getAll()
     actions.value = res.data.data || []
     requestLocks.value.action = true
+
+    // 新增模式 + 未从模板/store 恢复 + 当前未选时：默认选第一个支出
+    if (
+      !isEdit.value &&
+      !selectedAction.value &&
+      !flowAddStateStore.initialized
+    ) {
+      const firstExpense = actions.value.find(
+        (a) => a.handle === ActionHandle.OUT && !a.exempt
+      )
+      if (firstExpense) onSelectAction(firstExpense)
+    }
+
     checkAndLoadFlow()
   } catch (err) {
     console.error('获取收支列表失败', err)
@@ -354,15 +393,11 @@ async function loadFlowDetail() {
 
 // ==================== 表单交互 ====================
 function onSelectAction(action: Action) {
-  if (action.id === selectedAction.value?.id) {
-    showActionSheet.value = false
-    return
-  }
+  if (action.id === selectedAction.value?.id) return
   selectedAction.value = action
   selectedAccountTo.value = null
   selectedType.value = null
   cascaderValue.value = ''
-  showActionSheet.value = false
   fetchTypesByAction()
 }
 
@@ -847,43 +882,75 @@ watch(selectedTag, () => {
 
     <!-- 页面内容 -->
     <div class="page-body">
-      <!-- 金额输入区域 -->
-      <div class="money-card">
-        <div class="money-label">账单金额</div>
-        <div class="money-input-wrapper">
-          <span class="money-symbol">¥</span>
+      <!-- 金额 + 收支类型合体卡（背景跟随 selectedAction.handle 渐变） -->
+      <div class="amount-action-card" :style="{ '--action-color': actionColor }">
+        <div class="aa-money-wrapper">
+          <span class="aa-money-symbol">¥</span>
           <input
             :value="money"
             @input="onMoneyInput"
             @blur="onMoneyBlur"
             type="text"
             inputmode="decimal"
-            class="money-input"
+            class="aa-money-input"
             placeholder="0.00"
           />
         </div>
+
+        <!-- 主 chip 行：normal action + 右侧"不计入"折叠按钮 -->
+        <div class="aa-chip-row">
+          <div
+            v-for="action in normalActions"
+            :key="action.id"
+            class="aa-chip"
+            :class="{
+              active: selectedAction?.id === action.id,
+              [getActionClass(action.handle)]: true,
+              disabled: isActionDisabled(action),
+            }"
+            @click="!isActionDisabled(action) && onSelectAction(action)"
+          >
+            {{ action.hname }}
+          </div>
+          <!-- 不计入 折叠 toggle，紧贴右边 -->
+          <div
+            v-if="exemptActions.length > 0"
+            class="aa-exempt-toggle"
+            @click="exemptActionsExpanded = !exemptActionsExpanded"
+          >
+            <span>不计入</span>
+            <van-icon
+              :name="exemptActionsExpanded ? 'arrow-up' : 'arrow-down'"
+              size="11"
+            />
+          </div>
+        </div>
+
+        <!-- 不计入 action 折叠展开区 -->
+        <Transition name="aa-collapse">
+          <div
+            v-show="exemptActionsExpanded && exemptActions.length > 0"
+            class="aa-chip-row aa-chip-row-exempt"
+          >
+            <div
+              v-for="action in exemptActions"
+              :key="action.id"
+              class="aa-chip exempt"
+              :class="{
+                active: selectedAction?.id === action.id,
+                [getActionClass(action.handle)]: true,
+                disabled: isActionDisabled(action),
+              }"
+              @click="!isActionDisabled(action) && onSelectAction(action)"
+            >
+              {{ action.hname }}
+            </div>
+          </div>
+        </Transition>
       </div>
 
       <!-- 基本信息 -->
       <div class="form-card">
-        <!-- 选择收支 -->
-        <div class="form-item" @click="showActionSheet = true">
-          <div class="form-item-left">
-            <van-icon name="balance-list-o" size="20" class="form-icon" />
-            <span class="form-label">收支类型</span>
-          </div>
-          <div class="form-item-right">
-            <template v-if="selectedAction">
-              <span class="action-tag" :class="getActionClass(selectedAction.handle)">
-                {{ selectedAction.hname }}
-              </span>
-              <span v-if="selectedAction.exempt" class="exempt-badge">{{ getExemptText(selectedAction) }}</span>
-            </template>
-            <span v-else class="form-placeholder">请选择</span>
-            <van-icon name="arrow" size="16" class="arrow-icon" />
-          </div>
-        </div>
-
         <!-- 选择账户 -->
         <div class="form-item" @click="openAccountSheet(1)">
           <div class="form-item-left">
@@ -1053,37 +1120,6 @@ watch(selectedTag, () => {
         </button>
       </div>
     </div>
-
-    <!-- 收支选择器 -->
-    <van-action-sheet v-model:show="showActionSheet" title="选择收支类型" teleport="body">
-      <div class="sheet-list">
-        <div
-          v-for="action in actions"
-          :key="action.id"
-          class="sheet-item"
-          :class="{
-            active: selectedAction?.id === action.id,
-            [getActionClass(action.handle)]: selectedAction?.id === action.id,
-            disabled: isActionDisabled(action)
-          }"
-          @click="!isActionDisabled(action) && onSelectAction(action)"
-        >
-          <div class="sheet-item-info">
-            <span class="sheet-item-name">{{ action.hname }}</span>
-            <div class="sheet-item-tags">
-              <span class="action-tag small" :class="getActionClass(action.handle)">
-                {{ getActionHandleText(action.handle) }}
-              </span>
-              <span v-if="action.exempt" class="exempt-badge small">{{ getExemptText(action) }}</span>
-            </div>
-            <span v-if="isActionDisabled(action)" class="disabled-reason">
-              {{ getActionDisabledReason(action) }}
-            </span>
-          </div>
-          <van-icon v-if="selectedAction?.id === action.id" name="success" class="check-icon" />
-        </div>
-      </div>
-    </van-action-sheet>
 
     <!-- 账户选择器 -->
     <van-action-sheet v-model:show="showAccountSheet" :title="accountSheetType === 1 ? (isTransfer ? '选择转出账户' : '选择账户') : '选择转入账户'" teleport="body">
@@ -1343,45 +1379,142 @@ watch(selectedTag, () => {
   padding: 76px 16px 32px;
 }
 
-/* 金额卡片 - 简洁版 */
-.money-card {
-  background: var(--color-bg-card);
-  border-radius: 20px;
-  padding: 24px;
-  margin-bottom: 16px;
-}
-
-.money-label {
-  font-size: 14px;
-  color: var(--color-text-secondary);
+/* === 金额 + 收支类型 合体卡（紧凑版） === */
+.amount-action-card {
+  background: linear-gradient(
+    135deg,
+    var(--action-color) 0%,
+    color-mix(in srgb, var(--action-color) 70%, #000) 100%
+  );
+  border-radius: 18px;
+  padding: 14px 16px 12px;
   margin-bottom: 12px;
+  color: #fff;
+  transition: background 0.3s ease;
 }
 
-.money-input-wrapper {
+.aa-money-wrapper {
   display: flex;
   align-items: baseline;
+  margin-bottom: 0;
+  padding-bottom: 12px;
 }
 
-.money-symbol {
-  font-size: 24px;
+.aa-money-symbol {
+  font-size: 22px;
   font-weight: 600;
-  color: var(--color-text-primary);
   margin-right: 4px;
+  color: #fff;
 }
 
-.money-input {
+.aa-money-input {
   flex: 1;
-  font-size: 42px;
+  width: 100%;
+  font-size: 40px;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: #fff;
   background: transparent;
   border: none;
   outline: none;
   letter-spacing: -1px;
+  padding: 0;
+  line-height: 1.1;
 }
 
-.money-input::placeholder {
-  color: var(--color-text-placeholder);
+.aa-money-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* chip 行 */
+.aa-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.aa-chip {
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  transition: background 0.2s, color 0.2s, opacity 0.2s;
+  user-select: none;
+}
+
+.aa-chip:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* 选中：白底 + 主色文字（颜色按 handle 区分） */
+.aa-chip.active.income {
+  background: #fff;
+  color: var(--color-income);
+}
+
+.aa-chip.active.expense {
+  background: #fff;
+  color: var(--color-expense);
+}
+
+.aa-chip.active.transfer {
+  background: #fff;
+  color: var(--color-transfer);
+}
+
+.aa-chip.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* 不计入 chip 默认半透明（淡化层级） */
+.aa-chip.exempt {
+  opacity: 0.85;
+}
+
+.aa-chip.exempt.active {
+  opacity: 1;
+}
+
+/* "不计入"折叠按钮（在主 chip 行内，靠 margin-left:auto 推到右边） */
+.aa-exempt-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  user-select: none;
+}
+
+.aa-exempt-toggle:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.aa-chip-row-exempt {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.aa-collapse-enter-active,
+.aa-collapse-leave-active {
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.aa-collapse-enter-from,
+.aa-collapse-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
 }
 
 /* 表单卡片 */
