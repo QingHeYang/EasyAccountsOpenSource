@@ -11,6 +11,7 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.13.2",
+    "canvas-confetti": "^1.9.4",
     "crypto-js": "^4.2.0",
     "echarts": "^6.0.0",
     "element-plus": "^2.12.0",
@@ -25,6 +26,7 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/crypto-js": "^4.2.2",
     "@types/http-proxy": "^1.17.17",
     "@types/markdown-it": "^14.1.2",

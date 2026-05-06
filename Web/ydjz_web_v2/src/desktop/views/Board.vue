@@ -4,8 +4,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, ArrowRight, Grid, List, InfoFilled, View, Hide } from '@element-plus/icons-vue'
 import { homeApi, type HomeInfo } from '@shared/api/home'
+import { storage } from '@shared/utils/storage'
 import { init, type EChartsOption } from '@shared/utils/echarts'
 import type { ECharts } from 'echarts/core'
+import VersionAnimation from '@shared/components/VersionAnimation.vue'
 
 const router = useRouter()
 
@@ -352,8 +354,33 @@ function toFlow(month: string) {
   router.push({ path: '/flow', query: { month: monthStr } })
 }
 
+// ============= 版本号庆祝动画（基于 versionCode 比对，仅升级首次触发） =============
+const showVersionAnim = ref(false)
+const animVersion = ref('')
+const LAST_SEEN_VERSION_KEY = 'lastSeenVersionCode'
+
+async function checkVersionUpdate() {
+  try {
+    const res = await homeApi.getSystemConfig()
+    if (res.data.code !== 0) return
+    const { versionCode, release } = res.data.data.versions
+    if (!versionCode) return
+    const lastSeen = storage.getJSON<number>(LAST_SEEN_VERSION_KEY, 0)
+    if (versionCode > lastSeen) {
+      animVersion.value = release || ''
+      showVersionAnim.value = true
+      // 立即写入新版本码（避免动画期间用户离开导致未写入）
+      storage.setJSON(LAST_SEEN_VERSION_KEY, versionCode)
+    }
+  } catch (err) {
+    // 拉版本失败静默：不影响 Board 主流程
+    console.warn('检查版本更新失败', err)
+  }
+}
+
 onMounted(() => {
   fetchHomeInfo()
+  setTimeout(checkVersionUpdate, 300)
 })
 </script>
 
@@ -554,6 +581,9 @@ onMounted(() => {
         <el-button type="primary" @click="showLegendTip = false">知道了</el-button>
       </template>
     </el-dialog>
+
+    <!-- 版本号庆祝动画（仅首次见到新版本时触发） -->
+    <VersionAnimation v-model:show="showVersionAnim" :version="animVersion" />
   </div>
 </template>
 

@@ -3,10 +3,12 @@ import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } fro
 import { useRouter } from 'vue-router'
 import { showToast, showLoadingToast, closeToast } from 'vant'
 import { homeApi, type HomeInfo } from '@shared/api/home'
+import { storage } from '@shared/utils/storage'
 import { aiApi } from '@shared/api/ai'
 import { useNoticeStore } from '@shared/stores/notice'
 import logoUrl from '@shared/assets/logo.png'
 import ChartOverlay from '@mobile/components/ChartOverlay.vue'
+import VersionAnimation from '@shared/components/VersionAnimation.vue'
 
 const router = useRouter()
 const noticeStore = useNoticeStore()
@@ -89,10 +91,33 @@ async function checkAiService() {
   aiServiceAvailable.value = health !== null
 }
 
+// ============= 版本号庆祝动画（基于 versionCode 比对，仅升级首次触发） =============
+const showVersionAnim = ref(false)
+const animVersion = ref('')
+const LAST_SEEN_VERSION_KEY = 'lastSeenVersionCode'
+
+async function checkVersionUpdate() {
+  try {
+    const res = await homeApi.getSystemConfig()
+    if (res.data.code !== 0) return
+    const { versionCode, release } = res.data.data.versions
+    if (!versionCode) return
+    const lastSeen = storage.getJSON<number>(LAST_SEEN_VERSION_KEY, 0)
+    if (versionCode > lastSeen) {
+      animVersion.value = release || ''
+      showVersionAnim.value = true
+      storage.setJSON(LAST_SEEN_VERSION_KEY, versionCode)
+    }
+  } catch (err) {
+    console.warn('检查版本更新失败', err)
+  }
+}
+
 onMounted(() => {
   fetchHomeInfo()
   checkAiService()
   noticeStore.refresh()
+  setTimeout(checkVersionUpdate, 300)
 })
 
 onActivated(() => {
@@ -563,6 +588,9 @@ function toAI() {
         </div>
       </div>
     </van-dialog>
+
+    <!-- 版本号庆祝动画（仅首次见到新版本时触发） -->
+    <VersionAnimation v-model:show="showVersionAnim" :version="animVersion" />
   </div>
 </template>
 

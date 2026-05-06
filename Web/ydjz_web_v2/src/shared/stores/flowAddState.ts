@@ -16,7 +16,6 @@ export interface FlowAddState {
   selectedAccount: Account | null
   selectedAccountTo: Account | null
   selectedType: { id: number; tname: string } | null
-  cascaderValue: number | string
   // 图片列表（只保存已上传成功的）
   uploadedImages: Array<{
     url: string
@@ -34,7 +33,6 @@ export const useFlowAddStateStore = defineStore('flowAddState', () => {
   const selectedAccount = ref<Account | null>(null)
   const selectedAccountTo = ref<Account | null>(null)
   const selectedType = ref<{ id: number; tname: string } | null>(null)
-  const cascaderValue = ref<number | string>('')
   const uploadedImages = ref<Array<{ url: string; serverFileName: string }>>([])
 
   // 初始化标记
@@ -50,7 +48,6 @@ export const useFlowAddStateStore = defineStore('flowAddState', () => {
     selectedAccount.value = state.selectedAccount
     selectedAccountTo.value = state.selectedAccountTo
     selectedType.value = state.selectedType
-    cascaderValue.value = state.cascaderValue
     uploadedImages.value = state.uploadedImages
     initialized.value = true
   }
@@ -65,7 +62,6 @@ export const useFlowAddStateStore = defineStore('flowAddState', () => {
     selectedAccount.value = null
     selectedAccountTo.value = null
     selectedType.value = null
-    cascaderValue.value = ''
     uploadedImages.value = []
     initialized.value = false
   }
@@ -79,7 +75,6 @@ export const useFlowAddStateStore = defineStore('flowAddState', () => {
     selectedAccount,
     selectedAccountTo,
     selectedType,
-    cascaderValue,
     uploadedImages,
     initialized,
     save,

@@ -70,6 +70,24 @@
 | **用户感知** | 编辑流水时可贴更多图片（购物小票多张 / 出行多张），PC 端 3×3 网格展示 |
 | **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md) §2 |
 
+### N3 · 版本升级庆祝动画
+
+| 项 | 内容 |
+|---|---|
+| **用户感知** | 升级到新版本后**首次打开** Board 总览页，会有礼花/动画庆祝当前版本号；后续打开不再触发 |
+| **触发逻辑** | 基于 `versionCode` 比对，每个用户每次升级仅触发一次（localStorage 存 `lastSeenVersionCode`）|
+| **范围** | 双端（PC + 移动）Board 页面 |
+| **依赖** | 新增 `canvas-confetti` 礼花动画库 |
+| **dev-log** | ⏳ 待 Web Claude 补 |
+
+### N4 · 移动端 FlowAdd 收支选择器从弹窗改为 chip 分组
+
+| 项 | 内容 |
+|---|---|
+| **用户感知** | 移动端记账时选收支类型不再点弹窗，**直接在表单里 chip 选择** |
+| **细节** | ① 顺序：支出 → 收入 → 转账（按使用频次）<br>② "不计入"项目分组折叠，默认收起<br>③ 选中后卡片背景按收支类型渐变（绿/红/蓝） |
+| **dev-log** | ⏳ 待 Web Claude 补 |
+
 ---
 
 ## 🐛 Bug 修复（续登）
@@ -137,6 +155,15 @@
 | **公告系统重构** | ① 抽出 `useNotice.ts` 双端共享 composable（拉取 / 已读管理 / Markdown 渲染 / localStorage 持久化）<br>② 抽出 `NoticeCard.vue` 双端各自的卡片组件（含折叠/展开逻辑）<br>③ `NoticeDrawer.vue`（桌面）和 `NoticePopup.vue`（移动端）大幅瘦身（共 -300+ 行） |
 | **移动端加载体验** | Board / Analysis / Flow / AnalysisType 4 个核心页加载流程统一：<br>① 加载中 `showLoadingToast` 提示<br>② 失败时清空数据 + 标记 `loadFailed`，让空态显示"加载失败"占位（不再误导用户以为"没数据"） |
 | **用户感知** | 移动端打开页面有明确"加载中"反馈；网络异常时也能看出是失败而不是空账本 |
+| **dev-log** | ⏳ 待 Web Claude 补 |
+
+### E4 · 移动端分类选择器抽象重构
+
+| 项 | 内容 |
+|---|---|
+| **背景** | 移动端记账（FlowAdd / TemplateAdd）和统计（AnalysisType）原本各自实现一套分类选择 UI，逻辑重复且维护负担大 |
+| **重构** | ① 新增 `mobile/components/flow/TypePicker.vue` —— 记账场景的分类选择器<br>② 新增 `mobile/components/analysis/StatTypePicker.vue` —— 统计场景的分类选择器<br>③ FlowAdd / TemplateAdd 接入 TypePicker，移除原生 vant cascader 代码<br>④ AnalysisType 接入 StatTypePicker，删除 -288 行原地分类树管理逻辑<br>⑤ flowAddState 清理废弃的 `cascaderValue` 状态字段 |
+| **用户感知** | 移动端选择分类的体验在 3 处页面统一一致 |
 | **dev-log** | ⏳ 待 Web Claude 补 |
 
 ---

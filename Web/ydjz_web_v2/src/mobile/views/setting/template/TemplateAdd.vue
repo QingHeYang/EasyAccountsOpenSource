@@ -6,8 +6,8 @@ import { templateApi } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
 import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 import { accountApi, type Account, AccountType } from '@shared/api/account'
-import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import TypePicker from '@mobile/components/flow/TypePicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,16 +35,14 @@ const selectedTag = ref<Tag | null>(null)
 // 列表数据
 const actions = ref<Action[]>([])
 const accounts = ref<Account[]>([])
-const types = ref<TypeWithChildren[]>([])
 const tags = ref<Tag[]>([])
 
 // 弹窗状态
 const showActionSheet = ref(false)
 const showAccountSheet = ref(false)
 const accountSheetType = ref<1 | 2>(1) // 1: 源账户, 2: 目标账户
-const showTypeCascader = ref(false)
+const showTypePicker = ref(false)
 const showTagPanel = ref(false)
-const cascaderValue = ref<number | string>('')
 
 // 请求锁（编辑模式需要等待基础数据加载完成）
 const requestLocks = ref({
@@ -52,13 +50,6 @@ const requestLocks = ref({
   account: false,
   tag: false,
 })
-
-// 级联选择器配置
-const cascaderFieldNames = {
-  text: 'tname',
-  value: 'id',
-  children: 'childrenTypes',
-}
 
 // 获取收支样式类
 function getActionClass(handle: number | undefined): string {
@@ -167,17 +158,6 @@ async function fetchTags() {
   }
 }
 
-// 根据收支ID加载分类列表
-async function fetchTypesByAction() {
-  if (!selectedAction.value) return
-  try {
-    const res = await typeApi.getByActionId(selectedAction.value.id)
-    types.value = res.data.data || []
-  } catch (err) {
-    console.error('获取分类列表失败', err)
-  }
-}
-
 // 检查是否可以加载模板详情
 function checkAndLoadTemplate() {
   if (isEdit.value && requestLocks.value.action && requestLocks.value.account && requestLocks.value.tag) {
@@ -197,12 +177,9 @@ async function loadTemplate() {
     money.value = data.money || ''
     dateType.value = data.dateType !== undefined && data.dateType !== null ? String(data.dateType) : ''
 
-    // 匹配收支
+    // 匹配收支（types 由 TypePicker 内部按 actionId 自行拉取）
     if (data.actionId) {
       selectedAction.value = actions.value.find(a => a.id === data.actionId) || null
-      if (selectedAction.value) {
-        fetchTypesByAction()
-      }
     }
 
     // 匹配账户
@@ -218,7 +195,6 @@ async function loadTemplate() {
     // 匹配分类
     if (data.typeId && data.type) {
       selectedType.value = { id: data.typeId, tname: data.type.tname }
-      cascaderValue.value = data.typeId
     }
 
     // 匹配标签
@@ -240,9 +216,8 @@ function onSelectAction(action: Action) {
   selectedAction.value = action
   selectedAccountTo.value = null
   selectedType.value = null
-  cascaderValue.value = ''
   showActionSheet.value = false
-  fetchTypesByAction()
+  // types 由 TypePicker 内部按 actionId 自动重新拉取
 }
 
 // 打开账户选择
@@ -262,24 +237,12 @@ function onSelectAccount(account: Account) {
 }
 
 // 打开分类选择
-function openTypeCascader() {
+function openTypePicker() {
   if (!selectedAction.value) {
     showToast('请先选择收支')
     return
   }
-  showTypeCascader.value = true
-}
-
-// 选择分类
-function onTypeCascaderFinish({ selectedOptions }: { selectedOptions: Array<{ tname: string; id: number }> }) {
-  showTypeCascader.value = false
-  if (selectedOptions.length > 0) {
-    const lastOption = selectedOptions[selectedOptions.length - 1]
-    selectedType.value = {
-      id: lastOption.id,
-      tname: selectedOptions.map(o => o.tname).join('/'),
-    }
-  }
+  showTypePicker.value = true
 }
 
 // 选择标签
@@ -493,7 +456,7 @@ onMounted(() => {
         </div>
 
         <!-- 选择分类 -->
-        <div class="form-item" @click="openTypeCascader">
+        <div class="form-item" @click="openTypePicker">
           <label class="form-label">模板账单分类</label>
           <div class="form-select">
             <span :class="{ placeholder: !selectedType }">
@@ -643,17 +606,12 @@ onMounted(() => {
       </div>
     </van-action-sheet>
 
-    <!-- 分类级联选择器 -->
-    <van-popup v-model:show="showTypeCascader" round position="bottom" teleport="body">
-      <van-cascader
-        v-model="cascaderValue"
-        title="选择账单分类"
-        :options="types"
-        :field-names="cascaderFieldNames"
-        @close="showTypeCascader = false"
-        @finish="onTypeCascaderFinish"
-      />
-    </van-popup>
+    <!-- 分类选择器（一级 section + 二级 chip 网格 + 搜索） -->
+    <TypePicker
+      v-model="selectedType"
+      v-model:open="showTypePicker"
+      :action-id="selectedAction?.id ?? null"
+    />
   </div>
 </template>
 

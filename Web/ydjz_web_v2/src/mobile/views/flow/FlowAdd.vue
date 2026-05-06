@@ -11,7 +11,7 @@ import {
 import { flowApi, type FlowParams } from '@shared/api/flow'
 import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 import { accountApi, AccountType, type Account } from '@shared/api/account'
-import { typeApi, type TypeWithChildren } from '@shared/api/type'
+import TypePicker from '@mobile/components/flow/TypePicker.vue'
 import { templateApi, type Template } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
 import { imageApi } from '@shared/api/image'
@@ -70,18 +70,16 @@ const flowNotFound = ref(false)
 // ==================== 列表数据 ====================
 const actions = ref<Action[]>([])
 const accounts = ref<Account[]>([])
-const types = ref<TypeWithChildren[]>([])
 const tags = ref<Tag[]>([])
 const templates = ref<Template[]>([])
 
 // ==================== 弹窗状态 ====================
 const showAccountSheet = ref(false)
 const accountSheetType = ref<1 | 2>(1)
-const showTypeCascader = ref(false)
+const showTypePicker = ref(false)
 const showCalendar = ref(false)
 const showTemplatePopup = ref(false)
 const showTemplateDetail = ref(false)
-const cascaderValue = ref<number | string>('')
 
 // 模板相关
 const selectedTag = ref<Tag | null>(null)
@@ -94,12 +92,6 @@ const requestLocks = ref({
 })
 
 // ==================== 配置 ====================
-const cascaderFieldNames = {
-  text: 'tname',
-  value: 'id',
-  children: 'childrenTypes',
-}
-
 const minDate = new Date(2021, 0, 1)
 const maxDate = new Date()
 
@@ -285,16 +277,6 @@ async function fetchAccounts() {
   }
 }
 
-async function fetchTypesByAction() {
-  if (!selectedAction.value) return
-  try {
-    const res = await typeApi.getByActionId(selectedAction.value.id)
-    types.value = res.data.data || []
-  } catch (err) {
-    console.error('获取分类列表失败', err)
-  }
-}
-
 async function fetchTags() {
   try {
     const res = await tagApi.getAll()
@@ -346,12 +328,9 @@ async function loadFlowDetail() {
     chooseDate.value = data.fdate
     fromSource.value = data.from || null
 
-    // 匹配收支
+    // 匹配收支（types 由 TypePicker 内部按 actionId 自行拉取）
     if (data.action) {
       selectedAction.value = actions.value.find(a => a.id === data.action.id) || null
-      if (selectedAction.value) {
-        await fetchTypesByAction()
-      }
     }
 
     // 匹配账户
@@ -370,7 +349,6 @@ async function loadFlowDetail() {
         id: data.type.id,
         tname: data.type.tname.replace(/——/g, '/'),
       }
-      cascaderValue.value = data.type.id
     }
 
     // 处理图片
@@ -397,8 +375,7 @@ function onSelectAction(action: Action) {
   selectedAction.value = action
   selectedAccountTo.value = null
   selectedType.value = null
-  cascaderValue.value = ''
-  fetchTypesByAction()
+  // types 由 TypePicker 内部按 actionId 自动重新拉取
 }
 
 function openAccountSheet(type: 1 | 2) {
@@ -415,23 +392,12 @@ function onSelectAccount(account: Account) {
   showAccountSheet.value = false
 }
 
-function openTypeCascader() {
+function openTypePicker() {
   if (!selectedAction.value) {
     showToast('请先选择收支')
     return
   }
-  showTypeCascader.value = true
-}
-
-function onTypeCascaderFinish({ selectedOptions }: { selectedOptions: Array<{ tname: string; id: number }> }) {
-  showTypeCascader.value = false
-  if (selectedOptions.length > 0) {
-    const lastOption = selectedOptions[selectedOptions.length - 1]
-    selectedType.value = {
-      id: lastOption.id,
-      tname: selectedOptions.map(o => o.tname).join('/'),
-    }
-  }
+  showTypePicker.value = true
 }
 
 function onCalendarConfirm(date: Date) {
@@ -586,10 +552,8 @@ function onSelectTemplate(template: Template) {
   selectedAccount.value = null
   selectedAccountTo.value = null
   selectedType.value = null
-  cascaderValue.value = ''
   chooseDate.value = formatDate(new Date()) // 默认今天
   isCollect.value = false
-  types.value = [] // 清空分类列表
 
   // 再用模板数据填充
   if (template.money) {
@@ -597,9 +561,6 @@ function onSelectTemplate(template: Template) {
   }
   if (template.action?.hname) {
     selectedAction.value = actions.value.find(a => a.id === template.action!.id) || null
-    if (selectedAction.value) {
-      fetchTypesByAction()
-    }
   }
   if (template.account?.name) {
     selectedAccount.value = accounts.value.find(a => a.id === template.account!.id) || null
@@ -610,7 +571,6 @@ function onSelectTemplate(template: Template) {
   }
   if (template.type?.tname) {
     selectedType.value = { id: template.type.id, tname: template.type.tname }
-    cascaderValue.value = template.type.id
   }
   if (template.dateType !== undefined && template.dateType !== null) {
     if (template.dateType === 0) {
@@ -654,7 +614,6 @@ function saveFormState() {
     selectedAccount: selectedAccount.value,
     selectedAccountTo: selectedAccountTo.value,
     selectedType: selectedType.value,
-    cascaderValue: cascaderValue.value,
     uploadedImages,
   })
 }
@@ -669,7 +628,6 @@ function restoreFormState() {
   selectedAccount.value = flowAddStateStore.selectedAccount
   selectedAccountTo.value = flowAddStateStore.selectedAccountTo
   selectedType.value = flowAddStateStore.selectedType
-  cascaderValue.value = flowAddStateStore.cascaderValue
 
   // 恢复图片列表
   if (flowAddStateStore.uploadedImages.length > 0) {
@@ -978,7 +936,7 @@ watch(selectedTag, () => {
         </div>
 
         <!-- 选择分类 -->
-        <div class="form-item" @click="openTypeCascader">
+        <div class="form-item" @click="openTypePicker">
           <div class="form-item-left">
             <van-icon name="apps-o" size="20" class="form-icon" />
             <span class="form-label">账单分类</span>
@@ -1043,8 +1001,8 @@ watch(selectedTag, () => {
             :after-read="onAfterRead"
             :before-delete="onDeleteImage"
             @click-preview="onPreviewImage"
-            preview-size="70px"
             multiple
+            class="uploader-grid"
           />
         </div>
       </div>
@@ -1162,17 +1120,12 @@ watch(selectedTag, () => {
       </div>
     </van-action-sheet>
 
-    <!-- 分类级联选择器 -->
-    <van-popup v-model:show="showTypeCascader" round position="bottom" teleport="body">
-      <van-cascader
-        v-model="cascaderValue"
-        title="选择账单分类"
-        :options="types"
-        :field-names="cascaderFieldNames"
-        @close="showTypeCascader = false"
-        @finish="onTypeCascaderFinish"
-      />
-    </van-popup>
+    <!-- 分类选择器（一级 section + 二级 chip 网格 + 搜索） -->
+    <TypePicker
+      v-model="selectedType"
+      v-model:open="showTypePicker"
+      :action-id="selectedAction?.id ?? null"
+    />
 
     <!-- 日期选择器 - 50%高度 -->
     <van-popup v-model:show="showCalendar" position="bottom" round teleport="body" :style="{ height: '50%' }" class="flow-calendar-popup">
@@ -1565,6 +1518,13 @@ watch(selectedTag, () => {
 .form-value {
   font-size: 15px;
   color: var(--color-text-primary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 长分类路径"餐饮/外卖" 优先保留末尾段（用 direction: rtl + 显示左对齐） */
+  direction: rtl;
+  text-align: left;
 }
 
 .form-placeholder {
@@ -1657,6 +1617,52 @@ watch(selectedTag, () => {
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+}
+
+/* van-uploader 强制 3x3 网格：wrapper 用 grid，preview/upload 自适应正方形 */
+.uploader-grid {
+  width: 100%;
+}
+
+.uploader-grid :deep(.van-uploader__wrapper) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.uploader-grid :deep(.van-uploader__preview),
+.uploader-grid :deep(.van-uploader__upload) {
+  margin: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.uploader-grid :deep(.van-uploader__preview-image),
+.uploader-grid :deep(.van-uploader__file) {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 10px;
+}
+
+.uploader-grid :deep(.van-uploader__preview-image img) {
+  border-radius: 10px;
+}
+
+/* 删除按钮放大（默认 18×18，圆角后显小） */
+.uploader-grid :deep(.van-uploader__preview-delete) {
+  width: 24px;
+  height: 24px;
+  border-radius: 0 10px 0 12px;
+}
+
+.uploader-grid :deep(.van-uploader__preview-delete-icon) {
+  font-size: 14px;
+  top: 2px;
+  right: 2px;
 }
 
 /* 追加分账单 */
@@ -2285,11 +2291,7 @@ html.dark .flow-add-page .van-dialog__header {
   color: var(--color-text-primary);
 }
 
-/* Uploader样式修复 */
-.flow-add-page .van-uploader__preview {
-  margin: 0 8px 8px 0;
-}
-
+/* Uploader 样式：preview 间距由 .uploader-grid 的 grid gap 控制 */
 .flow-add-page .van-uploader__upload {
   background: var(--color-bg-page);
   border-radius: 8px;
