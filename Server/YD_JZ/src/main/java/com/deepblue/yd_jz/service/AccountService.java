@@ -31,6 +31,10 @@ public class AccountService {
     @Autowired
     private FlowRepository flowRepository;
 
+    // v2.7.0: 账户停用时顺带把引用它的定时记账规则置为失效
+    @Autowired
+    private ScheduledFlowRuleService scheduledFlowRuleService;
+
     @Transactional(rollbackFor = Exception.class)
     public void addAccount(AccountRequestDto postBean) {
         Account account = new Account();
@@ -178,6 +182,8 @@ public class AccountService {
             account.setDisable(true);  // 设置账户为禁用状态
             accountRepository.save(account);  // 保存更改
             flowTemplateService.clearAccount(id);  // 清除与该账户相关的流程模板
+            // v2.7.0: 同步把引用该账户的 RUNNING 定时规则置为失效
+            scheduledFlowRuleService.invalidateByAccount(id);
         });
     }
 

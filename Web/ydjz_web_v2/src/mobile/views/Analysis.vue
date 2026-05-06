@@ -11,6 +11,7 @@ const filterStore = useAnalysisFilterStore()
 
 // ==================== 状态 ====================
 const loading = ref(false)
+const loadFailed = ref(false)
 const tabIndex = ref(0) // 0收入 1支出
 const showFullAmount = ref(false) // 是否显示完整金额
 
@@ -164,6 +165,7 @@ function onFastChoose(value: number) {
 
 async function fetchData() {
   loading.value = true
+  loadFailed.value = false
   showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
 
   try {
@@ -182,10 +184,18 @@ async function fetchData() {
     allInTypeList.value = data.allInTypeList
     allOutTypeList.value = data.allOutTypeList
 
+    // 成功才关 loading toast；失败让全局 onError 弹的 fail toast 自然显示
     closeToast()
   } catch (err) {
-    closeToast()
     console.error('获取统计数据失败', err)
+    // 网络错误：清空 + 标记失败，列表显示"加载失败"占位
+    totalIn.value = '0.00'
+    totalOut.value = '0.00'
+    showInTypeList.value = []
+    showOutTypeList.value = []
+    allInTypeList.value = []
+    allOutTypeList.value = []
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -358,7 +368,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <van-empty v-if="currentTypeList.length === 0 && !loading" description="暂无数据" />
+      <van-empty
+        v-if="currentTypeList.length === 0 && !loading"
+        :image="loadFailed ? 'network' : 'default'"
+        :description="loadFailed ? '加载失败，请调整筛选或重试' : '暂无数据'"
+      />
     </div>
 
     <!-- 筛选弹窗 -->

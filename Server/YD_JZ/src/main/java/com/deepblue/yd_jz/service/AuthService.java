@@ -4,26 +4,18 @@ import com.deepblue.yd_jz.dto.AuthDto;
 import com.deepblue.yd_jz.entity.Auth;
 import com.deepblue.yd_jz.utils.AuthUtils;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-
+// v2.7.0 (config-ui): auth.expired / auth.single_login 已下沉到 app_config.auth.*，改读 AuthConfigService
 @Service
 @Slf4j
 public class AuthService {
     @Autowired
     private AuthUtils authUtils;
-    @Value("${auth.expired}")
-    private long expired;
-    @Value("${auth.single_login:true}")
-    private boolean singleLogin;
+
+    @Autowired
+    private AuthConfigService authConfigService;
 
     public boolean verfiyAuthFiles() {
         Auth auth = authUtils.getAuth();
@@ -40,6 +32,8 @@ public class AuthService {
         if (auth != null) {
             if (auth.getUsername().equals(username)&&auth.getPasswordMD5().equals(password)) {
                 long now = System.currentTimeMillis();
+                long expired = authConfigService.getTokenExpiredMinutes();
+                boolean singleLogin = authConfigService.isSingleLogin();
 
                 if (!singleLogin && auth.getExpireTime() > now) {
                     // 多端模式 + Token未过期：只刷新过期时间，不换Token
@@ -77,7 +71,7 @@ public class AuthService {
         auth = new Auth();
         auth.setUsername(username);
         auth.setPasswordMD5(password);
-        auth.refreshToken(expired);
+        auth.refreshToken(authConfigService.getTokenExpiredMinutes());
         token = auth.getToken();
         AuthDto authDto = new AuthDto();
         authDto.setToken(token);

@@ -22,6 +22,10 @@ public class TypeService {
     @Autowired
     FlowTemplateService flowTemplateService;
 
+    // v2.7.0: 分类停用/归档时顺带把引用它的定时记账规则置为失效
+    @Autowired
+    ScheduledFlowRuleService scheduledFlowRuleService;
+
     @Transactional(rollbackFor = Exception.class)
     public void addType(TypeSingleDto typeSingleDto) {
         Type type = new Type();
@@ -69,11 +73,14 @@ public class TypeService {
             type.setDisable(true);
             typeRepository.save(type);
             flowTemplateService.clearType(id);
+            // v2.7.0: 同步把引用该分类的 RUNNING 定时规则置为失效
+            scheduledFlowRuleService.invalidateByType(id);
             if (type.getParent() == -1) {
                 typeRepository.findByParent(id).forEach(childType -> {
                     childType.setDisable(true);
                     typeRepository.save(childType);
                     flowTemplateService.clearType(childType.getId());
+                    scheduledFlowRuleService.invalidateByType(childType.getId());
                 });
             }
         });
@@ -85,11 +92,18 @@ public class TypeService {
             type.setArchive(archive);
             typeRepository.save(type);
             flowTemplateService.clearType(id);
+            // v2.7.0: 仅归档（archive=true）时触发规则失效；取消归档不改变规则状态
+            if (archive) {
+                scheduledFlowRuleService.invalidateByType(id);
+            }
             if (type.getParent() == -1) {
                 typeRepository.findByParentNoLimit(id).forEach(childType -> {
                     childType.setArchive(archive);
                     typeRepository.save(childType);
                     flowTemplateService.clearType(childType.getId());
+                    if (archive) {
+                        scheduledFlowRuleService.invalidateByType(childType.getId());
+                    }
                 });
             }
         });

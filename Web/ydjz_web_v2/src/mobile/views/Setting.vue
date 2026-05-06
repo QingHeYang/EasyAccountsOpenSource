@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { useThemeStore } from '@shared/stores/theme'
+import { useNoticeStore } from '@shared/stores/notice'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig } from '@shared/api/home'
 import MarkdownIt from 'markdown-it'
 
@@ -12,25 +12,22 @@ import logoUrl from '@shared/assets/logo.png'
 import NoticePopup from '../components/NoticePopup.vue'
 
 const router = useRouter()
-const themeStore = useThemeStore()
+
+// 通知中心未读数（共享 store，跟 Board 顶栏铃铛同源）
+const noticeStore = useNoticeStore()
+const unreadNoticeCount = computed(() => noticeStore.unreadCount)
+const unreadNoticeDisplay = computed(() =>
+  unreadNoticeCount.value > 99 ? '99+' : String(unreadNoticeCount.value)
+)
+
+function openNotifications() {
+  router.push('/notifications')
+}
 
 // AI 服务状态
 const aiHealth = ref<AiHealthResponse | null>(null)
 const aiServiceAvailable = computed(() => aiHealth.value !== null)
 const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === true)
-
-// 主题相关
-const themeText = computed(() => {
-  const map = { light: '浅色', dark: '深色', system: '跟随系统' }
-  return map[themeStore.mode]
-})
-
-function onThemeChange() {
-  const modes = ['light', 'dark', 'system'] as const
-  const idx = modes.indexOf(themeStore.mode)
-  const next = modes[(idx + 1) % modes.length]
-  themeStore.set(next)
-}
 
 // 关于弹窗
 const showAbout = ref(false)
@@ -41,7 +38,6 @@ const versions = ref<VersionInfo>({
   backendBranch: '',
   mysqlBranch: '',
   agentBranch: '',
-  webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
 const updateInfo = ref<UpdateInfo | null>(null)
@@ -133,6 +129,13 @@ onMounted(() => {
   loadSystemConfig()
   // 检测 AI 服务
   checkAiService()
+  // 通知未读数（store 内部静默失败，不打扰 UI）
+  noticeStore.refresh()
+})
+
+onActivated(() => {
+  // 用户从通知中心 / 编辑页返回时刷新未读数
+  noticeStore.refresh()
 })
 </script>
 
@@ -170,6 +173,12 @@ onMounted(() => {
           is-link
           to="/setting/template"
         />
+        <van-cell
+          title="定时记账"
+          icon="clock-o"
+          is-link
+          to="/setting/scheduled-flow"
+        />
       </van-cell-group>
 
       <!-- 系统管理 -->
@@ -188,7 +197,7 @@ onMounted(() => {
           </template>
         </van-cell>
         <van-cell
-          title="系统信息"
+          title="系统设置"
           icon="setting-o"
           is-link
           to="/setting/system"
@@ -197,6 +206,33 @@ onMounted(() => {
 
       <!-- 其他 -->
       <van-cell-group inset title="其他">
+        <van-cell
+          is-link
+          class="notification-cell"
+          @click="openNotifications"
+        >
+          <template #icon>
+            <svg
+              class="cell-bell-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+          </template>
+          <template #title>
+            <span>消息通知</span>
+            <span v-if="unreadNoticeCount > 0" class="notification-badge">
+              {{ unreadNoticeDisplay }}
+            </span>
+          </template>
+        </van-cell>
         <van-cell
           title="关于"
           icon="info-o"
@@ -537,6 +573,37 @@ onMounted(() => {
   height: 8px;
   background: var(--color-expense);
   border-radius: 50%;
+}
+
+/* 消息通知 cell：未读数徽章 */
+.notification-cell :deep(.van-cell__title) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 镂空 SVG 铃铛，跟 vant 默认 icon 视觉对齐 */
+.cell-bell-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  background: var(--color-expense);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 更新提示横幅 */

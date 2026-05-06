@@ -190,11 +190,8 @@ public class FlowService {
         BeanUtils.copyProperties(flowAddRequestDto, flow);
         flowDao.updateFlow(flow);
 
-        // 更新图片关联（先删后加）
-        imageService.deleteFlowImages(id);
-        if (flowAddRequestDto.getImages() != null && !flowAddRequestDto.getImages().isEmpty()) {
-            imageService.saveFlowImages(id, flowAddRequestDto.getImages());
-        }
+        // v2.7.0: 更新图片关联，按 diff 清理被移除的磁盘文件（避免编辑时去掉的图片留孤儿）
+        imageService.replaceFlowImages(id, flowAddRequestDto.getImages());
 
         return id;
     }
@@ -307,6 +304,8 @@ public class FlowService {
         }
 
         accountService.updateOriginAccount(lastAccount);
+        // v2.7.0: 删流水时清理图片关联 + 磁盘文件，避免 flow_image 表与 uploads 目录孤儿
+        imageService.deleteFlowImagesAndFiles(id);
         flowDao.deleteFlowById(id);
     }
 

@@ -42,11 +42,6 @@ v2.6.0
 │       ├── Dockerfile
 │       └── koalaq_hub/         # Python 源码
 │
-├── WebHook/                    # WebHook 服务
-│   ├── Dockerfile
-│   ├── README.md
-│   └── webhook.py              # FastAPI 源码
-│
 └── version/                    # 版本文档
     └── README.md               # 分支合并记录
 ```
@@ -55,10 +50,11 @@ v2.6.0
 
 | 模块 | 技术栈 | 运行环境 |
 |------|--------|----------|
-| **Server** | Spring Boot 3.x, JPA + MyBatis, MySQL | JDK 17 |
+| **Server** | Spring Boot 3.x, JPA + MyBatis, MySQL；邮件发送内嵌 | JDK 17 |
 | **Web** | Vue 3 + TypeScript, Vant UI | Node.js 16+ |
 | **AI** | Python, FastAPI, MCP 架构 | Python 3.10+ |
-| **WebHook** | Python, FastAPI | Python 3.10+ |
+
+> ⚠️ **v2.7.0 起 WebHook 模块已移除**：邮件发送能力已内聚到 Server。原独立的 `WebHook/` 目录、`easyaccounts-webhook` 镜像、SMTP 环境变量均不再使用，邮件配置改为在前端「系统设置 → 邮件」中维护。
 
 ## 快速开始
 
@@ -119,18 +115,6 @@ python -m koalaq_hub  # http://localhost:8001
 
 **端口：** 本地 8001 / Docker 10672
 
-### WebHook
-
-```bash
-cd WebHook
-
-pip install -r requirements.txt
-# 配置 SMTP 环境变量
-uvicorn webhook:app --host 0.0.0.0 --port 8083
-```
-
-**端口：** 本地 8083 / Docker 10671
-
 ## Docker 端口映射
 
 | 模块 | 本地端口 | Docker 端口 |
@@ -138,7 +122,6 @@ uvicorn webhook:app --host 0.0.0.0 --port 8083
 | Server | 8085 | 10670 |
 | Web | 8081 | 10669 |
 | AI | 8001 | 10672 |
-| WebHook | 8083 | 10671 |
 | MySQL | 3306 | 10668 |
 
 ## 2.6.0 主要更新
@@ -151,7 +134,7 @@ uvicorn webhook:app --host 0.0.0.0 --port 8083
 ## 开发建议
 
 ### 轻度开发
-基于 WebHook 扩展，调用现有 API，Python 编码。
+基于现有 REST API 写脚本（任意语言均可）调用业务能力。
 
 ### 中度开发
 修改前端/后端源码，不变更数据库结构。

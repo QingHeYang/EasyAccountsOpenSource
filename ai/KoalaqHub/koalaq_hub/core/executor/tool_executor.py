@@ -7,7 +7,34 @@ from typing import Any, Dict, List
 
 from ...core.tool.mcp.mcp_tool_manager import ToolManager
 from ...core.tool.mcp.server_manager import ServerManager
+from ...tools.error_codes import (
+    E_BUSINESS_OTHER,
+    E_INTERNAL,
+    E_TIMEOUT,
+    E_TOOL_BUDGET_EXHAUSTED,
+    E_UNKNOWN_TOOL,
+    ToolError,
+    from_exception,
+    make_error,
+)
 from .base_executor import BaseExecutor, ExecutionResult
+
+
+def _llm_text(err: ToolError) -> str:
+    if err.hint:
+        return f"{err.message}（{err.hint}）"
+    return err.message
+
+
+def _err_entry(tool_call: Dict[str, Any], err: ToolError) -> Dict[str, Any]:
+    """构造批量执行的失败结果项，与内部工具 executor 输出形状对齐。"""
+    return {
+        "tool_call_id": tool_call.get("tool_call_id"),
+        "tool_name": tool_call.get("tool_name"),
+        "result": _llm_text(err),
+        "success": False,
+        "error_object": err.to_dict(),
+    }
 
 
 class ToolExecutor(BaseExecutor):
@@ -61,9 +88,9 @@ class ToolExecutor(BaseExecutor):
         """
         # 验证上下文
         if not await self.validate_context(context):
-            return [{"tool_call_id": tc.get("tool_call_id"), "result": "执行上下文无效", "success": False} 
-                    for tc in tool_calls]
-        
+            ctx_err = make_error(E_INTERNAL, message="执行上下文无效")
+            return [_err_entry(tc, ctx_err) for tc in tool_calls]
+
         # 检查递归深度（工具调用额度）
         recursion_depth = context.get("recursion_depth", 0)
         if recursion_depth <= 0:
@@ -71,13 +98,8 @@ class ToolExecutor(BaseExecutor):
                 "conversation_id": context.get("conversation_id"),
                 "tool_calls_count": len(tool_calls)
             })
-            # 为所有工具调用返回额度用尽的错误
-            return [{
-                "tool_call_id": tc.get("tool_call_id"),
-                "tool_name": tc.get("tool_name"),
-                "result": "工具调用额度已用完：本轮对话的工具调用次数已达上限。请根据已有信息完成任务，或告知用户需要分步执行。",
-                "success": False
-            } for tc in tool_calls]
+            budget_err = make_error(E_TOOL_BUDGET_EXHAUSTED)
+            return [_err_entry(tc, budget_err) for tc in tool_calls]
         
         # 创建并行任务
         tasks = []
@@ -95,18 +117,12 @@ class ToolExecutor(BaseExecutor):
             tool_call_id = tool_call.get("tool_call_id")
             
             if isinstance(result, Exception):
-                error_msg = f"执行错误: {str(result)}"
                 self.logger.error("工具批量执行中捕获异常", {
                     "tool_call_id": tool_call_id,
                     "tool_name": tool_call.get("tool_name"),
                     "error": str(result)
                 })
-                final_results.append({
-                    "tool_call_id": tool_call_id,
-                    "tool_name": tool_call.get("tool_name"),
-                    "result": error_msg,
-                    "success": False
-                })
+                final_results.append(_err_entry(tool_call, from_exception(result)))
             else:
                 final_results.append(result)
         
@@ -143,36 +159,44 @@ class ToolExecutor(BaseExecutor):
         # 检查黑名单
         if self.tool_manager and agent:
             if not self.tool_manager.is_tool_allowed(agent, tool_name):
-                error_msg = f"工具 '{tool_name}' 已被管理员禁用"
                 self.logger.info("工具在黑名单中", {"tool_name": tool_name})
-                return {
-                    "tool_call_id": tool_call_id,
-                    "result": error_msg,
-                    "success": False
-                }
-        
-        
+                return _err_entry(tool_call, make_error(
+                    E_BUSINESS_OTHER,
+                    message=f"工具 '{tool_name}' 已被管理员禁用",
+                    hint="请改用其他工具或提示用户该能力当前不可用。",
+                ))
+
+
         # 执行工具调用
         try:
             result = await self._execute_tool_with_preprocessing(tool_name, arguments, context)
-            
-            # 成功执行
-            
+
             return {
                 "tool_call_id": tool_call_id,
                 "tool_name": tool_name,
                 "result": str(result),
                 "success": True
             }
-            
+
+        except asyncio.TimeoutError as e:
+            self.logger.warning("工具执行超时", {"tool": tool_name, "tool_call_id": tool_call_id})
+            return _err_entry(tool_call, make_error(
+                E_TIMEOUT,
+                message=f"工具 '{tool_name}' 执行超时",
+            ))
+
+        except ValueError as e:
+            # _execute_tool_with_preprocessing 中 raise ValueError 表示工具/服务器找不到
+            self.logger.warning("MCP 工具不可用", {"tool": tool_name, "error": str(e)})
+            return _err_entry(tool_call, make_error(
+                E_UNKNOWN_TOOL,
+                message=str(e) or f"未知工具: {tool_name}",
+            ))
+
         except Exception as e:
-            # 工具执行失败 - 改进错误信息处理
             error_str = str(e)
             if not error_str:
-                # 如果异常转换为空字符串，尝试获取更多信息
                 error_str = f"{type(e).__name__}: {repr(e)}"
-            
-            error_msg = f"工具执行失败: {error_str}"
             self.logger.warning(
                 "工具执行失败",
                 {
@@ -182,14 +206,7 @@ class ToolExecutor(BaseExecutor):
                     "tool_call_id": tool_call_id
                 }
             )
-            
-            
-            return {
-                "tool_call_id": tool_call_id,
-                "tool_name": tool_name,
-                "result": error_msg,
-                "success": False
-            }
+            return _err_entry(tool_call, from_exception(e))
     
     
     async def _execute_tool_with_preprocessing(self, tool_name: str, arguments: Dict[str, Any], context: Dict[str, Any]) -> Any:
@@ -232,7 +249,8 @@ class ToolExecutor(BaseExecutor):
                 "timeout": tool_timeout,
                 "arguments": processed_arguments
             })
-            raise Exception(f"工具 '{tool_name}' 执行超时（{tool_timeout}秒）")
+            # 保持 TimeoutError 类型，让上层 _execute_single_tool 能精确识别
+            raise
         
         # 检查结果
         if hasattr(result, "isError") and result.isError:

@@ -1,18 +1,56 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { House, List, TrendCharts, Setting } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { House, List, TrendCharts, Setting, Bell } from '@element-plus/icons-vue'
 import logoUrl from '@shared/assets/logo.png'
 import { AIDrawer, AITriggerButton } from '@desktop/components/ai-plus'
+import NotificationCenter from '@desktop/components/NotificationCenter.vue'
 import { aiApi } from '@shared/api/ai'
+import { noticeApi } from '@shared/api/notice'
+import { isHandledError } from '@shared/api/request'
 
 const route = useRoute()
+const router = useRouter()
 
 // AI 抽屉状态
 const aiDrawerOpen = ref(false)
 
 // AI 服务可用状态
 const aiServiceAvailable = ref(false)
+
+// 通知中心
+const notificationOpen = ref(false)
+const unreadCount = ref(0)
+const unreadDisplay = computed(() => (unreadCount.value > 99 ? '99+' : String(unreadCount.value)))
+
+/** 通知点击跳转对应规则：关抽屉，跳到设置页并触发打开规则编辑
+ *  - 在别的路由：sessionStorage 埋值 + 跳 /setting，settings 页 onMounted 读
+ *  - 已在 /setting：dispatch 全局自定义事件，settings 页运行时监听
+ */
+function onNotificationNavigate(payload: { ruleId: number }) {
+  notificationOpen.value = false
+  const ruleIdStr = String(payload.ruleId)
+  if (route.path.startsWith('/setting')) {
+    window.dispatchEvent(
+      new CustomEvent('open-scheduled-rule', { detail: { ruleId: payload.ruleId } })
+    )
+  } else {
+    sessionStorage.setItem('pendingOpenScheduledRule', ruleIdStr)
+    router.push('/setting')
+  }
+}
+
+async function loadUnreadCount() {
+  try {
+    const res = await noticeApi.list({ isRead: false })
+    unreadCount.value = (res.data.data ?? []).length
+  } catch (err) {
+    if (!isHandledError(err)) {
+      // 静默：顶栏徽章不打扰用户
+      unreadCount.value = 0
+    }
+  }
+}
 
 // 滚动状态
 const isScrolled = ref(false)
@@ -32,6 +70,7 @@ onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
   handleScroll()
   checkAiService()
+  loadUnreadCount()
 })
 
 onUnmounted(() => {
@@ -103,6 +142,18 @@ const sliderStyle = computed(() => ({
           </div>
         </nav>
 
+        <!-- 右侧：通知铃铛 -->
+        <div class="header-right">
+          <button
+            class="bell-btn"
+            type="button"
+            title="消息通知"
+            @click="notificationOpen = true"
+          >
+            <el-icon :size="20"><Bell /></el-icon>
+            <span v-if="unreadCount > 0" class="bell-badge">{{ unreadDisplay }}</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -123,6 +174,13 @@ const sliderStyle = computed(() => ({
 
     <!-- AI 触发按钮 (仅在 AI 服务可用时显示) -->
     <AITriggerButton v-if="aiServiceAvailable" :visible="!aiDrawerOpen" @click="aiDrawerOpen = true" />
+
+    <!-- 通知中心 -->
+    <NotificationCenter
+      v-model:visible="notificationOpen"
+      @changed="loadUnreadCount"
+      @navigate="onNotificationNavigate"
+    />
   </div>
 </template>
 
@@ -224,6 +282,7 @@ const sliderStyle = computed(() => ({
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 180px; /* 与右侧对称，保持胶囊居中 */
 }
 
 .logo-img {
@@ -242,6 +301,61 @@ const sliderStyle = computed(() => ({
   flex: 1;
   display: flex;
   justify-content: center;
+}
+
+/* 右侧：通知铃铛 */
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 180px; /* 与左侧 logo+app-name 视觉平衡，保持胶囊居中 */
+}
+
+.bell-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.bell-btn:hover {
+  color: var(--color-transfer);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.bell-btn:active {
+  transform: translateY(0);
+}
+
+.bell-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--color-expense);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--color-bg-card, #fff);
+  font-variant-numeric: tabular-nums;
 }
 
 .floating-nav {
@@ -355,5 +469,19 @@ html.dark .nav-item.active {
 html.dark .card-shape,
 html.dark .line {
   opacity: 0.06;
+}
+
+html.dark .bell-btn {
+  background: rgba(40, 40, 40, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .bell-btn:hover {
+  background: rgba(50, 50, 50, 0.8);
+}
+
+html.dark .bell-badge {
+  box-shadow: 0 0 0 2px #1a1a1a;
 }
 </style>

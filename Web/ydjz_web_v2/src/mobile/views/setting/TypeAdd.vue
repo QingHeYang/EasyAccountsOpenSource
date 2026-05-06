@@ -8,7 +8,7 @@ import { useSmartBack } from '@shared/composables/useSmartBack'
 
 const route = useRoute()
 const router = useRouter()
-const { smartBack } = useSmartBack()
+const { smartBack, replaceAfterSubmit } = useSmartBack()
 
 // 编辑模式
 const typeId = computed(() => {
@@ -241,7 +241,7 @@ async function onSubmit() {
 
     closeToast()
     showToast(isEdit.value ? '保存成功' : '添加成功')
-    router.push('/setting/type')
+    replaceAfterSubmit('/setting/type')
   } catch (err) {
     closeToast()
     showToast('操作失败')
@@ -263,7 +263,7 @@ async function onArchive() {
 
     await typeApi.archive(typeId.value!, true)
     showToast('已归档')
-    router.push('/setting/type')
+    replaceAfterSubmit('/setting/type')
   } catch {
     // 取消
   }
@@ -283,7 +283,7 @@ async function onDelete() {
 
     await typeApi.delete(typeId.value!)
     showToast('已停用')
-    router.push('/setting/type')
+    replaceAfterSubmit('/setting/type')
   } catch {
     // 取消
   }

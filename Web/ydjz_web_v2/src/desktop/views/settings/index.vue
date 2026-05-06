@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -14,7 +14,8 @@ import {
   MagicStick,
   Setting,
   FolderOpened,
-  Bell
+  Bell,
+  AlarmClock
 } from '@element-plus/icons-vue'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
@@ -30,9 +31,10 @@ import AccountManager from './AccountManager.vue'
 import TypeManager from './TypeManager.vue'
 import TemplateManager from './TemplateManager.vue'
 import AiSettings from './AiSettings.vue'
-import SystemInfo from './SystemInfo.vue'
+import SystemSettings from './SystemSettings.vue'
 import BackupManager from './BackupManager.vue'
 import NoticeDrawer from './NoticeDrawer.vue'
+import ScheduledFlowManager from './ScheduledFlowManager.vue'
 
 const router = useRouter()
 
@@ -50,7 +52,6 @@ const versions = ref<VersionInfo>({
   backendBranch: '',
   mysqlBranch: '',
   agentBranch: '',
-  webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
 const backupConfig = ref<BackupConfig | null>(null)
@@ -68,8 +69,8 @@ const changelogHtml = computed(() => {
   return md.render(updateInfo.value.changelog)
 })
 
-// 系统信息抽屉
-const showSystemInfo = ref(false)
+// 系统设置抽屉
+const showSystemSettings = ref(false)
 
 // 公告抽屉
 const showNoticeDrawer = ref(false)
@@ -122,13 +123,14 @@ const dataItems = [
   { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: CreditCard },
   { key: 'account', title: '账户管理', desc: '管理银行卡、现金等账户', icon: Wallet },
   { key: 'type', title: '分类管理', desc: '管理收支分类', icon: PriceTag },
-  { key: 'template', title: '快记模板', desc: '快速记账模板', icon: DocumentCopy },
+  { key: 'template', title: '快记模板', desc: '快速记账预填模板', icon: DocumentCopy },
+  { key: 'scheduledFlow', title: '定时记账', desc: '周期性自动生成真实流水', icon: AlarmClock },
 ]
 
 // 系统管理项
 const systemItems = [
   { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick },
-  { key: 'systemInfo', title: '系统信息', desc: '版本、认证与备份信息', icon: Setting },
+  { key: 'systemSettings', title: '系统设置', desc: '鉴权 / 邮件 / 提醒 / 备份 / 版本', icon: Setting },
 ]
 
 // 检测 AI 服务
@@ -141,6 +143,7 @@ const showActionDrawer = ref(false)
 const showAccountDrawer = ref(false)
 const showTypeDrawer = ref(false)
 const showTemplateDrawer = ref(false)
+const showScheduledFlowDrawer = ref(false)
 const showAiDrawer = ref(false)
 const showBackupDrawer = ref(false)
 
@@ -153,6 +156,8 @@ function openDrawer(key: string) {
     showTypeDrawer.value = true
   } else if (key === 'template') {
     showTemplateDrawer.value = true
+  } else if (key === 'scheduledFlow') {
+    showScheduledFlowDrawer.value = true
   } else if (key === 'ai') {
     // AI 配置未完成时显示提示
     if (!aiConfigured.value) {
@@ -202,16 +207,43 @@ function openDrawer(key: string) {
       return
     }
     showAiDrawer.value = true
-  } else if (key === 'systemInfo') {
-    showSystemInfo.value = true
+  } else if (key === 'systemSettings') {
+    showSystemSettings.value = true
   } else if (key === 'backup') {
     showBackupDrawer.value = true
   }
 }
 
+// ScheduledFlowManager ref，用于从通知中心跳转时打开指定规则
+const scheduledFlowRef = ref<InstanceType<typeof ScheduledFlowManager> | null>(null)
+
+async function openScheduledRuleById(ruleId: number) {
+  showScheduledFlowDrawer.value = true
+  await nextTick()
+  scheduledFlowRef.value?.openRuleById(ruleId)
+}
+
+function handleOpenScheduledRuleEvent(e: Event) {
+  const ruleId = (e as CustomEvent).detail?.ruleId
+  if (ruleId) openScheduledRuleById(Number(ruleId))
+}
+
 onMounted(() => {
   loadSystemConfig()
   checkAiService()
+
+  // 通知跳转：首次进入设置页时读 sessionStorage
+  const stored = sessionStorage.getItem('pendingOpenScheduledRule')
+  if (stored) {
+    sessionStorage.removeItem('pendingOpenScheduledRule')
+    openScheduledRuleById(Number(stored))
+  }
+  // 已在设置页内时用全局事件触发
+  window.addEventListener('open-scheduled-rule', handleOpenScheduledRuleEvent)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('open-scheduled-rule', handleOpenScheduledRuleEvent)
 })
 </script>
 
@@ -265,14 +297,14 @@ onMounted(() => {
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
-          <!-- 系统信息卡片 -->
-          <div class="data-card" @click="openDrawer('systemInfo')">
+          <!-- 系统设置卡片 -->
+          <div class="data-card" @click="openDrawer('systemSettings')">
             <div class="card-icon system-icon">
               <el-icon :size="24"><Setting /></el-icon>
             </div>
             <div class="card-info">
-              <div class="card-title">系统信息</div>
-              <div class="card-desc">版本、认证与备份信息</div>
+              <div class="card-title">系统设置</div>
+              <div class="card-desc">鉴权 / 邮件 / 提醒 / 备份 / 版本</div>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
@@ -418,12 +450,11 @@ onMounted(() => {
     <AccountManager v-model:visible="showAccountDrawer" />
     <TypeManager v-model:visible="showTypeDrawer" />
     <TemplateManager v-model:visible="showTemplateDrawer" />
+    <ScheduledFlowManager ref="scheduledFlowRef" v-model:visible="showScheduledFlowDrawer" />
     <AiSettings v-model:visible="showAiDrawer" />
-    <SystemInfo
-      v-model:visible="showSystemInfo"
+    <SystemSettings
+      v-model:visible="showSystemSettings"
       :versions="versions"
-      :auth-config="authConfig"
-      :backup-config="backupConfig"
     />
     <BackupManager v-model:visible="showBackupDrawer" />
     <NoticeDrawer ref="noticeDrawerRef" v-model:visible="showNoticeDrawer" />

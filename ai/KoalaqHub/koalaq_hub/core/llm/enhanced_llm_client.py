@@ -118,12 +118,21 @@ class EnhancedLLMClient:
         """
         tool_calls = []
         for tool_call_dict in tool_calls_list:
-            if tool_call_dict:  # 过滤空字典
-                tool_calls.append(ToolCall(
-                    id=tool_call_dict.get("id", ""),
-                    type=tool_call_dict.get("type", "function"),
-                    function=tool_call_dict.get("function", {})
-                ))
+            if not tool_call_dict:  # 过滤空字典
+                continue
+            function = tool_call_dict.get("function") or {}
+            # 没函数名的 tool_call 无法执行，丢弃
+            if not function.get("name"):
+                continue
+            # 部分 LLM 在无参调用时不发 arguments delta（OpenAI 协议要求必给空对象 "{}"），
+            # 这里兜底，避免下游 tc["function"]["arguments"] KeyError
+            if "arguments" not in function or function["arguments"] is None:
+                function["arguments"] = "{}"
+            tool_calls.append(ToolCall(
+                id=tool_call_dict.get("id", ""),
+                type=tool_call_dict.get("type", "function"),
+                function=function
+            ))
         return tool_calls
 
     def __init__(self, llm: Optional[LLM] = None, agent: Optional[Agent] = None):

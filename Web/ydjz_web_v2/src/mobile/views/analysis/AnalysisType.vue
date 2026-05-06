@@ -3,13 +3,13 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showLoadingToast, closeToast, showToast } from 'vant'
 import { analysisApi, type AnalysisTypeMonthResult, type MonthData } from '@shared/api/analysis'
-import { typeApi, type TypeWithChildren } from '@shared/api/type'
 import { screenApi, type ScreenFlowParams } from '@shared/api/screen'
 import type { Flow } from '@shared/api/flow'
 import { useSmartBack } from '@shared/composables/useSmartBack'
 import { useAnalysisTypeFilterStore } from '@mobile/stores/analysisTypeFilter'
 import FlowItem from '@mobile/components/FlowItem.vue'
 import YearLineChartOverlay from '@mobile/components/YearLineChartOverlay.vue'
+import StatTypePicker from '@mobile/components/analysis/StatTypePicker.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -18,13 +18,30 @@ const filterStore = useAnalysisTypeFilterStore()
 
 // ==================== 状态 ====================
 const loading = ref(false)
+const loadFailed = ref(false)
 const selectedTypeId = ref<number | null>(null)
 const selectedTypeName = ref('')
-const allTypes = ref<TypeWithChildren[]>([])
 
 // 分类选择弹窗
 const showTypePicker = ref(false)
-const expandedTypeId = ref<number | null>(null)
+
+// 适配 StatTypePicker 的 v-model（id+tname 对象）
+const selectedType = computed({
+  get: () =>
+    selectedTypeId.value !== null
+      ? { id: selectedTypeId.value, tname: selectedTypeName.value }
+      : null,
+  set: (val) => {
+    if (val) {
+      selectedTypeId.value = val.id
+      selectedTypeName.value = val.tname
+      fetchData()
+    } else {
+      selectedTypeId.value = null
+      selectedTypeName.value = ''
+    }
+  },
+})
 
 // 快捷选项：1近一年 2今年 3上年 4自定义
 const fastChoose = ref('1')
@@ -188,19 +205,11 @@ function formatDateDisplay(date: string): string {
   return `${year}年${month}月`
 }
 
-async function fetchTypes() {
-  try {
-    const res = await typeApi.getAll()
-    allTypes.value = res.data.data || []
-  } catch (err) {
-    console.error('获取分类列表失败', err)
-  }
-}
-
 async function fetchData() {
   if (!selectedTypeId.value) return
 
   loading.value = true
+  loadFailed.value = false
   showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
 
   try {
@@ -215,10 +224,13 @@ async function fetchData() {
     if (res.data.data?.typeName) {
       selectedTypeName.value = res.data.data.typeName.replace(/——/g, '/')
     }
+    // 成功才关 loading toast；失败让全局 onError 弹的 fail toast 自然显示
     closeToast()
   } catch (err) {
-    closeToast()
     console.error('获取分类统计失败', err)
+    // 网络错误：清空 + 标记失败
+    result.value = null
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -247,23 +259,6 @@ function onDateCancel() {
   showDatePicker.value = false
 }
 
-// ==================== 分类选择 ====================
-function toggleTypeExpand(typeId: number) {
-  if (expandedTypeId.value === typeId) {
-    expandedTypeId.value = null
-  } else {
-    expandedTypeId.value = typeId
-  }
-}
-
-function selectType(type: TypeWithChildren, isChild: boolean = false) {
-  selectedTypeId.value = type.id
-  selectedTypeName.value = type.tname
-  showTypePicker.value = false
-  expandedTypeId.value = null
-  fetchData()
-}
-
 // ==================== 月份数据 ====================
 function isHighest(yearData: { year: number; monthData: MonthData[] }, month: number): boolean {
   const stats = getYearStats(yearData)
@@ -280,19 +275,26 @@ function getMonthTotal(month: MonthData): number {
 }
 
 // ==================== 流水列表 ====================
-// 点击月份格子，自动判断显示收入还是支出
+// 点击月份格子，自动判断显示收入/支出/全部
+// 父级聚合时，一级分类下可能既有收入子类也有支出子类，要显示全部
 function onMonthItemClick(year: number, month: MonthData) {
   const hasIncome = parseFloat(month.income) > 0
   const hasExpense = parseFloat(month.outcome) > 0
 
   if (!hasIncome && !hasExpense) return
 
-  // 优先显示支出，如果只有收入则显示收入
-  const chooseHandle = hasExpense ? 1 : 0
+  let chooseHandle: number
+  if (hasIncome && hasExpense) {
+    chooseHandle = 3 // 同时有收入支出 → 全部
+  } else if (hasExpense) {
+    chooseHandle = 1
+  } else {
+    chooseHandle = 0
+  }
   onMonthClick(year, month.month, chooseHandle)
 }
 
-// chooseHandle: 0收入 1支出
+// chooseHandle: 0收入 1支出 3全部
 async function onMonthClick(year: number, month: number, chooseHandle: number) {
   const monthStr = `${year}-${String(month).padStart(2, '0')}`
   flowMonth.value = `${year}年${month}月`
@@ -333,11 +335,8 @@ function onFlowClick(flow: Flow) {
 
 // ==================== 生命周期 ====================
 onMounted(async () => {
-  await fetchTypes()
-
   // 判断来源：sessionStorage 标记表示从统计页面进入
   const isFromAnalysis = sessionStorage.getItem('analysisTypeFrom') === 'analysis'
-  // 立即清除标记
   sessionStorage.removeItem('analysisTypeFrom')
 
   if (isFromAnalysis) {
@@ -348,22 +347,7 @@ onMounted(async () => {
     const routeTypeId = route.query.typeId ? Number(route.query.typeId) : null
     if (routeTypeId) {
       selectedTypeId.value = routeTypeId
-
-      // 查找分类名称
-      for (const parent of allTypes.value) {
-        if (parent.id === routeTypeId) {
-          selectedTypeName.value = parent.tname
-          break
-        }
-        if (parent.childrenTypes) {
-          const child = parent.childrenTypes.find((c) => c.id === routeTypeId)
-          if (child) {
-            selectedTypeName.value = `${parent.tname}/${child.tname}`
-            break
-          }
-        }
-      }
-
+      // tname 由 fetchData 响应里的 typeName 自动填充（response 里有完整路径）
       fetchData()
     }
     return
@@ -520,74 +504,26 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <van-empty v-if="!result && !loading" description="请选择分类查看统计" />
-      <van-empty v-else-if="result?.yearData?.length === 0" description="暂无数据" />
+      <van-empty
+        v-if="!result && !loading && loadFailed"
+        image="network"
+        description="加载失败，请重试"
+      />
+      <van-empty
+        v-else-if="!result && !loading"
+        description="请选择分类查看统计"
+      />
+      <van-empty
+        v-else-if="result?.yearData?.length === 0"
+        description="暂无数据"
+      />
     </div>
 
-    <!-- 分类选择器弹窗 -->
-    <van-popup
-      v-model:show="showTypePicker"
-      position="bottom"
-      round
-      teleport="body"
-      :style="{ height: '70%' }"
-    >
-      <div class="type-picker">
-        <div class="picker-header">
-          <span class="picker-title">选择分类</span>
-          <van-icon name="cross" size="20" @click="showTypePicker = false" />
-        </div>
-        <div class="type-list">
-          <div v-for="type in allTypes" :key="type.id" class="type-group">
-            <!-- 一级分类 -->
-            <div
-              class="type-parent"
-              :class="{ expanded: expandedTypeId === type.id, selected: selectedTypeId === type.id }"
-              @click="type.childrenTypes?.length ? toggleTypeExpand(type.id) : selectType(type)"
-            >
-              <div class="type-parent-info">
-                <span class="type-name">{{ type.tname }}</span>
-                <van-tag
-                  v-if="type.action"
-                  :type="type.action.handle === 0 ? 'success' : type.action.handle === 2 ? 'primary' : 'danger'"
-                >{{ type.action.hname }}</van-tag>
-              </div>
-              <div class="type-parent-right">
-                <span
-                  v-if="!type.childrenTypes?.length"
-                  class="select-btn"
-                  @click.stop="selectType(type)"
-                >选择</span>
-                <van-icon
-                  v-else
-                  class="expand-icon"
-                  :class="{ rotated: expandedTypeId === type.id }"
-                  name="arrow-down"
-                  size="16"
-                />
-              </div>
-            </div>
-            <!-- 二级分类（标签形式）带动画 -->
-            <transition name="slide-fade">
-              <div v-if="expandedTypeId === type.id && type.childrenTypes?.length" class="type-children">
-                <div
-                  class="child-tag"
-                  :class="{ selected: selectedTypeId === type.id }"
-                  @click="selectType(type)"
-                >全部</div>
-                <div
-                  v-for="child in type.childrenTypes"
-                  :key="child.id"
-                  class="child-tag"
-                  :class="{ selected: selectedTypeId === child.id }"
-                  @click="selectType(child, true)"
-                >{{ child.tname }}</div>
-              </div>
-            </transition>
-          </div>
-        </div>
-      </div>
-    </van-popup>
+    <!-- 分类选择器（统计专用：显示全部分类 + action 标签 + 支持选父级聚合） -->
+    <StatTypePicker
+      v-model="selectedType"
+      v-model:open="showTypePicker"
+    />
 
     <!-- 日期选择器（双列） -->
     <van-popup v-model:show="showDatePicker" position="bottom" round teleport="body">
@@ -942,142 +878,6 @@ onBeforeUnmount(() => {
 
 .tag-lowest {
   background: #f97316; /* 橙色 */
-  color: #fff;
-}
-
-/* 分类选择器弹窗 */
-.type-picker {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-page);
-}
-
-.picker-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: var(--color-bg-card);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.picker-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.type-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-}
-
-.type-group {
-  margin-bottom: 2px;
-}
-
-.type-parent {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  background: var(--color-bg-card);
-  transition: background 0.2s;
-}
-
-.type-parent.expanded {
-  background: var(--color-bg-card);
-  border-left: 3px solid var(--color-transfer);
-}
-
-.type-parent.selected {
-  background: rgba(var(--color-transfer-rgb, 99, 102, 241), 0.08);
-}
-
-.type-parent-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.type-name {
-  font-size: 15px;
-  color: var(--color-text-primary);
-}
-
-.type-parent-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-text-tertiary);
-}
-
-.select-btn {
-  font-size: 13px;
-  color: var(--color-transfer);
-  padding: 4px 12px;
-  background: rgba(var(--color-transfer-rgb, 99, 102, 241), 0.1);
-  border-radius: 12px;
-}
-
-.expand-icon {
-  transition: transform 0.3s ease;
-}
-
-.expand-icon.rotated {
-  transform: rotate(180deg);
-}
-
-/* 展开折叠动画 */
-.slide-fade-enter-active {
-  transition: all 0.3s ease;
-}
-
-.slide-fade-leave-active {
-  transition: all 0.2s ease;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.slide-fade-enter-to,
-.slide-fade-leave-from {
-  opacity: 1;
-  max-height: 200px;
-}
-
-/* 二级分类标签区域 */
-.type-children {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--color-bg-card);
-  border-top: 1px solid var(--color-border);
-}
-
-.child-tag {
-  padding: 6px 14px;
-  background: var(--color-bg-page);
-  border-radius: 16px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  transition: all 0.2s;
-}
-
-.child-tag:active {
-  opacity: 0.7;
-}
-
-.child-tag.selected {
-  background: var(--color-transfer);
   color: #fff;
 }
 

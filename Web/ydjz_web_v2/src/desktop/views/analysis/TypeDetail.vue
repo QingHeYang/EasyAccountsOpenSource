@@ -307,19 +307,23 @@ function openYearChart(year: number, monthData: MonthData[]) {
 }
 
 // ==================== 月份点击 ====================
+// 父级聚合时一级分类下可能既有收入子类也有支出子类，要显示全部
 function onMonthItemClick(year: number, month: MonthData) {
   const total = getMonthTotal(month)
   if (total === 0) return
 
-  // 如果只有收入，显示收入流水；只有支出，显示支出流水；都有则默认显示支出
   const hasIncome = parseFloat(month.income) > 0
   const hasOutcome = parseFloat(month.outcome) > 0
 
-  if (hasIncome && !hasOutcome) {
-    onMonthClick(year, month.month, 0) // 收入
+  let handle: number
+  if (hasIncome && hasOutcome) {
+    handle = 3 // 同时有收入支出 → 全部
+  } else if (hasOutcome) {
+    handle = 1
   } else {
-    onMonthClick(year, month.month, 1) // 支出（默认）
+    handle = 0
   }
+  onMonthClick(year, month.month, handle)
 }
 
 // ==================== 流水列表 ====================

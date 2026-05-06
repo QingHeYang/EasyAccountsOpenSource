@@ -136,12 +136,67 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./views/setting/AiSettings.vue'),
     meta: { title: 'AI+ 设置' },
   },
-  // 系统信息
+  // 定时记账
+  {
+    path: '/setting/scheduled-flow',
+    name: 'SettingScheduledFlow',
+    component: () => import('./views/setting/ScheduledFlow.vue'),
+    meta: { title: '定时记账' },
+  },
+  {
+    path: '/setting/scheduled-flow/add',
+    name: 'SettingScheduledFlowAdd',
+    component: () => import('./views/setting/ScheduledFlowAdd.vue'),
+    meta: { title: '新建规则' },
+  },
+  {
+    path: '/setting/scheduled-flow/edit/:id',
+    name: 'SettingScheduledFlowEdit',
+    component: () => import('./views/setting/ScheduledFlowAdd.vue'),
+    meta: { title: '编辑规则' },
+  },
+  {
+    path: '/setting/scheduled-flow/logs',
+    name: 'SettingScheduledFlowLogs',
+    component: () => import('./views/setting/ScheduledFlowLogs.vue'),
+    meta: { title: '执行记录' },
+  },
+  // 系统设置（主页 + 5 个子域）
   {
     path: '/setting/system',
     name: 'SettingSystem',
-    component: () => import('./views/setting/SystemInfo.vue'),
-    meta: { title: '系统信息' },
+    component: () => import('./views/setting/SystemSettings.vue'),
+    meta: { title: '系统设置' },
+  },
+  {
+    path: '/setting/system/auth',
+    name: 'SettingSystemAuth',
+    component: () => import('./views/setting/system/AuthSettings.vue'),
+    meta: { title: '鉴权设置' },
+  },
+  {
+    path: '/setting/system/mail',
+    name: 'SettingSystemMail',
+    component: () => import('./views/setting/system/MailSettings.vue'),
+    meta: { title: '邮件设置' },
+  },
+  {
+    path: '/setting/system/reminder',
+    name: 'SettingSystemReminder',
+    component: () => import('./views/setting/system/ReminderSettings.vue'),
+    meta: { title: '提醒设置' },
+  },
+  {
+    path: '/setting/system/backup',
+    name: 'SettingSystemBackup',
+    component: () => import('./views/setting/system/BackupSettings.vue'),
+    meta: { title: '备份设置' },
+  },
+  {
+    path: '/setting/system/auto-excel',
+    name: 'SettingSystemAutoExcel',
+    component: () => import('./views/setting/system/AutoExcelSettings.vue'),
+    meta: { title: '月度报表' },
   },
   // 流水记账
   {
@@ -176,6 +231,13 @@ const routes: RouteRecordRaw[] = [
     name: 'AI',
     component: () => import('./views/AI.vue'),
     meta: { title: 'AI 助手' },
+  },
+  // 通知中心（顶层入口：Board 铃铛 + Setting 「消息通知」cell）
+  {
+    path: '/notifications',
+    name: 'Notifications',
+    component: () => import('./views/NotificationCenter.vue'),
+    meta: { title: '消息通知' },
   },
 ]
 

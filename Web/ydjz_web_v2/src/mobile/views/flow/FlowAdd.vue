@@ -11,7 +11,7 @@ import {
 import { flowApi, type FlowParams } from '@shared/api/flow'
 import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 import { accountApi, AccountType, type Account } from '@shared/api/account'
-import { typeApi, type TypeWithChildren } from '@shared/api/type'
+import TypePicker from '@mobile/components/flow/TypePicker.vue'
 import { templateApi, type Template } from '@shared/api/template'
 import { tagApi, type Tag } from '@shared/api/tag'
 import { imageApi } from '@shared/api/image'
@@ -70,19 +70,16 @@ const flowNotFound = ref(false)
 // ==================== 列表数据 ====================
 const actions = ref<Action[]>([])
 const accounts = ref<Account[]>([])
-const types = ref<TypeWithChildren[]>([])
 const tags = ref<Tag[]>([])
 const templates = ref<Template[]>([])
 
 // ==================== 弹窗状态 ====================
-const showActionSheet = ref(false)
 const showAccountSheet = ref(false)
 const accountSheetType = ref<1 | 2>(1)
-const showTypeCascader = ref(false)
+const showTypePicker = ref(false)
 const showCalendar = ref(false)
 const showTemplatePopup = ref(false)
 const showTemplateDetail = ref(false)
-const cascaderValue = ref<number | string>('')
 
 // 模板相关
 const selectedTag = ref<Tag | null>(null)
@@ -95,17 +92,38 @@ const requestLocks = ref({
 })
 
 // ==================== 配置 ====================
-const cascaderFieldNames = {
-  text: 'tname',
-  value: 'id',
-  children: 'childrenTypes',
-}
-
 const minDate = new Date(2021, 0, 1)
 const maxDate = new Date()
 
 // ==================== 计算属性 ====================
 const isTransfer = computed(() => selectedAction.value?.handle === 2)
+
+// 普通 / 不计入分组（chip 区主显示 normal，exempt 折叠）
+// chip 显示顺序：支出(1) → 收入(0) → 转账(2)
+const HANDLE_ORDER: Record<number, number> = { 1: 0, 0: 1, 2: 2 }
+const normalActions = computed(() => {
+  const list = actions.value.filter((a) => !a.exempt)
+  return [...list].sort(
+    (a, b) => (HANDLE_ORDER[a.handle] ?? 99) - (HANDLE_ORDER[b.handle] ?? 99)
+  )
+})
+const exemptActions = computed(() => actions.value.filter((a) => a.exempt))
+const exemptActionsExpanded = ref(false)
+
+// 当前选中收支类型的颜色（用于卡片渐变背景）
+const actionColor = computed(() => {
+  if (!selectedAction.value) return 'var(--color-transfer)'
+  switch (selectedAction.value.handle) {
+    case 0:
+      return 'var(--color-income)'
+    case 1:
+      return 'var(--color-expense)'
+    case 2:
+      return 'var(--color-transfer)'
+    default:
+      return 'var(--color-transfer)'
+  }
+})
 
 // ==================== 双向限制逻辑 ====================
 
@@ -229,6 +247,19 @@ async function fetchActions() {
     const res = await actionApi.getAll()
     actions.value = res.data.data || []
     requestLocks.value.action = true
+
+    // 新增模式 + 未从模板/store 恢复 + 当前未选时：默认选第一个支出
+    if (
+      !isEdit.value &&
+      !selectedAction.value &&
+      !flowAddStateStore.initialized
+    ) {
+      const firstExpense = actions.value.find(
+        (a) => a.handle === ActionHandle.OUT && !a.exempt
+      )
+      if (firstExpense) onSelectAction(firstExpense)
+    }
+
     checkAndLoadFlow()
   } catch (err) {
     console.error('获取收支列表失败', err)
@@ -243,16 +274,6 @@ async function fetchAccounts() {
     checkAndLoadFlow()
   } catch (err) {
     console.error('获取账户列表失败', err)
-  }
-}
-
-async function fetchTypesByAction() {
-  if (!selectedAction.value) return
-  try {
-    const res = await typeApi.getByActionId(selectedAction.value.id)
-    types.value = res.data.data || []
-  } catch (err) {
-    console.error('获取分类列表失败', err)
   }
 }
 
@@ -307,12 +328,9 @@ async function loadFlowDetail() {
     chooseDate.value = data.fdate
     fromSource.value = data.from || null
 
-    // 匹配收支
+    // 匹配收支（types 由 TypePicker 内部按 actionId 自行拉取）
     if (data.action) {
       selectedAction.value = actions.value.find(a => a.id === data.action.id) || null
-      if (selectedAction.value) {
-        await fetchTypesByAction()
-      }
     }
 
     // 匹配账户
@@ -331,7 +349,6 @@ async function loadFlowDetail() {
         id: data.type.id,
         tname: data.type.tname.replace(/——/g, '/'),
       }
-      cascaderValue.value = data.type.id
     }
 
     // 处理图片
@@ -354,16 +371,11 @@ async function loadFlowDetail() {
 
 // ==================== 表单交互 ====================
 function onSelectAction(action: Action) {
-  if (action.id === selectedAction.value?.id) {
-    showActionSheet.value = false
-    return
-  }
+  if (action.id === selectedAction.value?.id) return
   selectedAction.value = action
   selectedAccountTo.value = null
   selectedType.value = null
-  cascaderValue.value = ''
-  showActionSheet.value = false
-  fetchTypesByAction()
+  // types 由 TypePicker 内部按 actionId 自动重新拉取
 }
 
 function openAccountSheet(type: 1 | 2) {
@@ -380,23 +392,12 @@ function onSelectAccount(account: Account) {
   showAccountSheet.value = false
 }
 
-function openTypeCascader() {
+function openTypePicker() {
   if (!selectedAction.value) {
     showToast('请先选择收支')
     return
   }
-  showTypeCascader.value = true
-}
-
-function onTypeCascaderFinish({ selectedOptions }: { selectedOptions: Array<{ tname: string; id: number }> }) {
-  showTypeCascader.value = false
-  if (selectedOptions.length > 0) {
-    const lastOption = selectedOptions[selectedOptions.length - 1]
-    selectedType.value = {
-      id: lastOption.id,
-      tname: selectedOptions.map(o => o.tname).join('/'),
-    }
-  }
+  showTypePicker.value = true
 }
 
 function onCalendarConfirm(date: Date) {
@@ -551,10 +552,8 @@ function onSelectTemplate(template: Template) {
   selectedAccount.value = null
   selectedAccountTo.value = null
   selectedType.value = null
-  cascaderValue.value = ''
   chooseDate.value = formatDate(new Date()) // 默认今天
   isCollect.value = false
-  types.value = [] // 清空分类列表
 
   // 再用模板数据填充
   if (template.money) {
@@ -562,9 +561,6 @@ function onSelectTemplate(template: Template) {
   }
   if (template.action?.hname) {
     selectedAction.value = actions.value.find(a => a.id === template.action!.id) || null
-    if (selectedAction.value) {
-      fetchTypesByAction()
-    }
   }
   if (template.account?.name) {
     selectedAccount.value = accounts.value.find(a => a.id === template.account!.id) || null
@@ -575,7 +571,6 @@ function onSelectTemplate(template: Template) {
   }
   if (template.type?.tname) {
     selectedType.value = { id: template.type.id, tname: template.type.tname }
-    cascaderValue.value = template.type.id
   }
   if (template.dateType !== undefined && template.dateType !== null) {
     if (template.dateType === 0) {
@@ -619,7 +614,6 @@ function saveFormState() {
     selectedAccount: selectedAccount.value,
     selectedAccountTo: selectedAccountTo.value,
     selectedType: selectedType.value,
-    cascaderValue: cascaderValue.value,
     uploadedImages,
   })
 }
@@ -634,7 +628,6 @@ function restoreFormState() {
   selectedAccount.value = flowAddStateStore.selectedAccount
   selectedAccountTo.value = flowAddStateStore.selectedAccountTo
   selectedType.value = flowAddStateStore.selectedType
-  cascaderValue.value = flowAddStateStore.cascaderValue
 
   // 恢复图片列表
   if (flowAddStateStore.uploadedImages.length > 0) {
@@ -847,43 +840,75 @@ watch(selectedTag, () => {
 
     <!-- 页面内容 -->
     <div class="page-body">
-      <!-- 金额输入区域 -->
-      <div class="money-card">
-        <div class="money-label">账单金额</div>
-        <div class="money-input-wrapper">
-          <span class="money-symbol">¥</span>
+      <!-- 金额 + 收支类型合体卡（背景跟随 selectedAction.handle 渐变） -->
+      <div class="amount-action-card" :style="{ '--action-color': actionColor }">
+        <div class="aa-money-wrapper">
+          <span class="aa-money-symbol">¥</span>
           <input
             :value="money"
             @input="onMoneyInput"
             @blur="onMoneyBlur"
             type="text"
             inputmode="decimal"
-            class="money-input"
+            class="aa-money-input"
             placeholder="0.00"
           />
         </div>
+
+        <!-- 主 chip 行：normal action + 右侧"不计入"折叠按钮 -->
+        <div class="aa-chip-row">
+          <div
+            v-for="action in normalActions"
+            :key="action.id"
+            class="aa-chip"
+            :class="{
+              active: selectedAction?.id === action.id,
+              [getActionClass(action.handle)]: true,
+              disabled: isActionDisabled(action),
+            }"
+            @click="!isActionDisabled(action) && onSelectAction(action)"
+          >
+            {{ action.hname }}
+          </div>
+          <!-- 不计入 折叠 toggle，紧贴右边 -->
+          <div
+            v-if="exemptActions.length > 0"
+            class="aa-exempt-toggle"
+            @click="exemptActionsExpanded = !exemptActionsExpanded"
+          >
+            <span>不计入</span>
+            <van-icon
+              :name="exemptActionsExpanded ? 'arrow-up' : 'arrow-down'"
+              size="11"
+            />
+          </div>
+        </div>
+
+        <!-- 不计入 action 折叠展开区 -->
+        <Transition name="aa-collapse">
+          <div
+            v-show="exemptActionsExpanded && exemptActions.length > 0"
+            class="aa-chip-row aa-chip-row-exempt"
+          >
+            <div
+              v-for="action in exemptActions"
+              :key="action.id"
+              class="aa-chip exempt"
+              :class="{
+                active: selectedAction?.id === action.id,
+                [getActionClass(action.handle)]: true,
+                disabled: isActionDisabled(action),
+              }"
+              @click="!isActionDisabled(action) && onSelectAction(action)"
+            >
+              {{ action.hname }}
+            </div>
+          </div>
+        </Transition>
       </div>
 
       <!-- 基本信息 -->
       <div class="form-card">
-        <!-- 选择收支 -->
-        <div class="form-item" @click="showActionSheet = true">
-          <div class="form-item-left">
-            <van-icon name="balance-list-o" size="20" class="form-icon" />
-            <span class="form-label">收支类型</span>
-          </div>
-          <div class="form-item-right">
-            <template v-if="selectedAction">
-              <span class="action-tag" :class="getActionClass(selectedAction.handle)">
-                {{ selectedAction.hname }}
-              </span>
-              <span v-if="selectedAction.exempt" class="exempt-badge">{{ getExemptText(selectedAction) }}</span>
-            </template>
-            <span v-else class="form-placeholder">请选择</span>
-            <van-icon name="arrow" size="16" class="arrow-icon" />
-          </div>
-        </div>
-
         <!-- 选择账户 -->
         <div class="form-item" @click="openAccountSheet(1)">
           <div class="form-item-left">
@@ -911,7 +936,7 @@ watch(selectedTag, () => {
         </div>
 
         <!-- 选择分类 -->
-        <div class="form-item" @click="openTypeCascader">
+        <div class="form-item" @click="openTypePicker">
           <div class="form-item-left">
             <van-icon name="apps-o" size="20" class="form-icon" />
             <span class="form-label">账单分类</span>
@@ -971,13 +996,13 @@ watch(selectedTag, () => {
           </div>
           <van-uploader
             v-model="fileList"
-            :max-count="3"
+            :max-count="9"
             :max-size="20 * 1024 * 1024"
             :after-read="onAfterRead"
             :before-delete="onDeleteImage"
             @click-preview="onPreviewImage"
-            preview-size="70px"
             multiple
+            class="uploader-grid"
           />
         </div>
       </div>
@@ -1054,37 +1079,6 @@ watch(selectedTag, () => {
       </div>
     </div>
 
-    <!-- 收支选择器 -->
-    <van-action-sheet v-model:show="showActionSheet" title="选择收支类型" teleport="body">
-      <div class="sheet-list">
-        <div
-          v-for="action in actions"
-          :key="action.id"
-          class="sheet-item"
-          :class="{
-            active: selectedAction?.id === action.id,
-            [getActionClass(action.handle)]: selectedAction?.id === action.id,
-            disabled: isActionDisabled(action)
-          }"
-          @click="!isActionDisabled(action) && onSelectAction(action)"
-        >
-          <div class="sheet-item-info">
-            <span class="sheet-item-name">{{ action.hname }}</span>
-            <div class="sheet-item-tags">
-              <span class="action-tag small" :class="getActionClass(action.handle)">
-                {{ getActionHandleText(action.handle) }}
-              </span>
-              <span v-if="action.exempt" class="exempt-badge small">{{ getExemptText(action) }}</span>
-            </div>
-            <span v-if="isActionDisabled(action)" class="disabled-reason">
-              {{ getActionDisabledReason(action) }}
-            </span>
-          </div>
-          <van-icon v-if="selectedAction?.id === action.id" name="success" class="check-icon" />
-        </div>
-      </div>
-    </van-action-sheet>
-
     <!-- 账户选择器 -->
     <van-action-sheet v-model:show="showAccountSheet" :title="accountSheetType === 1 ? (isTransfer ? '选择转出账户' : '选择账户') : '选择转入账户'" teleport="body">
       <div class="sheet-list">
@@ -1126,17 +1120,12 @@ watch(selectedTag, () => {
       </div>
     </van-action-sheet>
 
-    <!-- 分类级联选择器 -->
-    <van-popup v-model:show="showTypeCascader" round position="bottom" teleport="body">
-      <van-cascader
-        v-model="cascaderValue"
-        title="选择账单分类"
-        :options="types"
-        :field-names="cascaderFieldNames"
-        @close="showTypeCascader = false"
-        @finish="onTypeCascaderFinish"
-      />
-    </van-popup>
+    <!-- 分类选择器（一级 section + 二级 chip 网格 + 搜索） -->
+    <TypePicker
+      v-model="selectedType"
+      v-model:open="showTypePicker"
+      :action-id="selectedAction?.id ?? null"
+    />
 
     <!-- 日期选择器 - 50%高度 -->
     <van-popup v-model:show="showCalendar" position="bottom" round teleport="body" :style="{ height: '50%' }" class="flow-calendar-popup">
@@ -1343,45 +1332,142 @@ watch(selectedTag, () => {
   padding: 76px 16px 32px;
 }
 
-/* 金额卡片 - 简洁版 */
-.money-card {
-  background: var(--color-bg-card);
-  border-radius: 20px;
-  padding: 24px;
-  margin-bottom: 16px;
-}
-
-.money-label {
-  font-size: 14px;
-  color: var(--color-text-secondary);
+/* === 金额 + 收支类型 合体卡（紧凑版） === */
+.amount-action-card {
+  background: linear-gradient(
+    135deg,
+    var(--action-color) 0%,
+    color-mix(in srgb, var(--action-color) 70%, #000) 100%
+  );
+  border-radius: 18px;
+  padding: 14px 16px 12px;
   margin-bottom: 12px;
+  color: #fff;
+  transition: background 0.3s ease;
 }
 
-.money-input-wrapper {
+.aa-money-wrapper {
   display: flex;
   align-items: baseline;
+  margin-bottom: 0;
+  padding-bottom: 12px;
 }
 
-.money-symbol {
-  font-size: 24px;
+.aa-money-symbol {
+  font-size: 22px;
   font-weight: 600;
-  color: var(--color-text-primary);
   margin-right: 4px;
+  color: #fff;
 }
 
-.money-input {
+.aa-money-input {
   flex: 1;
-  font-size: 42px;
+  width: 100%;
+  font-size: 40px;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: #fff;
   background: transparent;
   border: none;
   outline: none;
   letter-spacing: -1px;
+  padding: 0;
+  line-height: 1.1;
 }
 
-.money-input::placeholder {
-  color: var(--color-text-placeholder);
+.aa-money-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* chip 行 */
+.aa-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.aa-chip {
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  transition: background 0.2s, color 0.2s, opacity 0.2s;
+  user-select: none;
+}
+
+.aa-chip:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* 选中：白底 + 主色文字（颜色按 handle 区分） */
+.aa-chip.active.income {
+  background: #fff;
+  color: var(--color-income);
+}
+
+.aa-chip.active.expense {
+  background: #fff;
+  color: var(--color-expense);
+}
+
+.aa-chip.active.transfer {
+  background: #fff;
+  color: var(--color-transfer);
+}
+
+.aa-chip.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* 不计入 chip 默认半透明（淡化层级） */
+.aa-chip.exempt {
+  opacity: 0.85;
+}
+
+.aa-chip.exempt.active {
+  opacity: 1;
+}
+
+/* "不计入"折叠按钮（在主 chip 行内，靠 margin-left:auto 推到右边） */
+.aa-exempt-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  user-select: none;
+}
+
+.aa-exempt-toggle:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.aa-chip-row-exempt {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.aa-collapse-enter-active,
+.aa-collapse-leave-active {
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.aa-collapse-enter-from,
+.aa-collapse-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
 }
 
 /* 表单卡片 */
@@ -1432,6 +1518,13 @@ watch(selectedTag, () => {
 .form-value {
   font-size: 15px;
   color: var(--color-text-primary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 长分类路径"餐饮/外卖" 优先保留末尾段（用 direction: rtl + 显示左对齐） */
+  direction: rtl;
+  text-align: left;
 }
 
 .form-placeholder {
@@ -1524,6 +1617,52 @@ watch(selectedTag, () => {
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+}
+
+/* van-uploader 强制 3x3 网格：wrapper 用 grid，preview/upload 自适应正方形 */
+.uploader-grid {
+  width: 100%;
+}
+
+.uploader-grid :deep(.van-uploader__wrapper) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.uploader-grid :deep(.van-uploader__preview),
+.uploader-grid :deep(.van-uploader__upload) {
+  margin: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.uploader-grid :deep(.van-uploader__preview-image),
+.uploader-grid :deep(.van-uploader__file) {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 10px;
+}
+
+.uploader-grid :deep(.van-uploader__preview-image img) {
+  border-radius: 10px;
+}
+
+/* 删除按钮放大（默认 18×18，圆角后显小） */
+.uploader-grid :deep(.van-uploader__preview-delete) {
+  width: 24px;
+  height: 24px;
+  border-radius: 0 10px 0 12px;
+}
+
+.uploader-grid :deep(.van-uploader__preview-delete-icon) {
+  font-size: 14px;
+  top: 2px;
+  right: 2px;
 }
 
 /* 追加分账单 */
@@ -2152,11 +2291,7 @@ html.dark .flow-add-page .van-dialog__header {
   color: var(--color-text-primary);
 }
 
-/* Uploader样式修复 */
-.flow-add-page .van-uploader__preview {
-  margin: 0 8px 8px 0;
-}
-
+/* Uploader 样式：preview 间距由 .uploader-grid 的 grid gap 控制 */
 .flow-add-page .van-uploader__upload {
   background: var(--color-bg-page);
   border-radius: 8px;

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showDialog, showLoadingToast, closeToast } from 'vant'
+import { showDialog, showLoadingToast, closeToast, showToast } from 'vant'
 import MD5 from 'crypto-js/md5'
 import { authApi } from '@shared/api/auth'
+import { ApiCode } from '@shared/types'
 import { useThemeStore } from '@shared/stores/theme'
 import logoUrl from '@shared/assets/logo.png'
 
@@ -22,6 +23,9 @@ const buttonText = computed(() => isLogin.value ? '登录' : '注册')
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
+
+// password autocomplete：登录用 current-password，注册用 new-password
+const passwordAutocomplete = computed(() => isLogin.value ? 'current-password' : 'new-password')
 
 // 表单验证
 function validate(): string | null {
@@ -76,6 +80,17 @@ async function onSubmit() {
     const redirect = (route.query.redirect as string) || '/board'
     router.replace(redirect)
   } catch (err: any) {
+    // 418：登录时用户不存在 → 引导切换到注册模式
+    if (err?.code === ApiCode.NOT_REGISTERED && isLogin.value) {
+      closeToast()
+      showToast(err.message || '用户尚未注册，已切换到注册模式')
+      router.replace({
+        path: '/auth',
+        query: { ...route.query, mode: '0' },
+      })
+      password.value = ''
+      return
+    }
     showDialog({
       title: '请求失败',
       message: err.message || '网络错误',
@@ -132,6 +147,7 @@ function onForgotPassword() {
             <van-field
               v-model="username"
               name="username"
+              autocomplete="username"
               label="用户名"
               placeholder="请输入用户名"
               :rules="[{ required: true, message: '请填写用户名' }]"
@@ -140,6 +156,7 @@ function onForgotPassword() {
             <van-field
               v-model="password"
               name="password"
+              :autocomplete="passwordAutocomplete"
               label="密码"
               type="password"
               placeholder="请输入密码"

@@ -8,16 +8,66 @@ import {
   Filter,
   Download,
   Plus,
+  DCaret,
 } from '@element-plus/icons-vue'
+import { Sortable } from 'sortablejs-vue3'
 import { flowApi, type Flow, type FlowListResult } from '@shared/api/flow'
+import { storage } from '@shared/utils/storage'
 import FlowItem from '@desktop/components/FlowItem.vue'
 import FlowEditor from '@desktop/components/flow/FlowEditor.vue'
+import DayTrendSparkline, { type DayTrendPoint } from '@desktop/components/flow/DayTrendSparkline.vue'
+import DayTrendDialog from '@desktop/components/flow/DayTrendDialog.vue'
 
 const route = useRoute()
 
 // 数据
 const loading = ref(false)
 const flowData = ref<FlowListResult | null>(null)
+// 趋势图独立数据源（始终是当月全量流水，不受 handleType 筛选影响）
+const chartFlowData = ref<FlowListResult | null>(null)
+
+// 趋势图状态：outcome=支出 / income=收入 / both=同时
+const chartType = ref<'outcome' | 'income' | 'both'>('outcome')
+const showTrendDialog = ref(false)
+
+// ============= 右侧卡片可拖排序 =============
+// 月份卡是核心交互（切月联动整页），固定在顶部，不参与拖动
+const ALL_CARDS = ['stats', 'trend', 'calendar', 'filter'] as const
+type CardId = (typeof ALL_CARDS)[number]
+const CARD_ORDER_KEY = 'flowList.cardOrder'
+
+function loadCardOrder(): CardId[] {
+  const stored = storage.getJSON<string[]>(CARD_ORDER_KEY, [])
+  // 校验：只保留合法 cardId，缺失的卡片自动追加到末尾（向前兼容旧顺序）
+  const valid: CardId[] = stored.filter((id): id is CardId =>
+    (ALL_CARDS as readonly string[]).includes(id)
+  )
+  for (const card of ALL_CARDS) {
+    if (!valid.includes(card)) valid.push(card)
+  }
+  return valid
+}
+
+const cardOrder = ref<CardId[]>(loadCardOrder())
+
+const sortableOptions = {
+  handle: '.drag-handle',
+  animation: 200,
+  ghostClass: 'sortable-ghost',
+  chosenClass: 'sortable-chosen',
+  forceFallback: true, // 用 sortable 自带 ghost，避免浏览器原生 drag 的丑陋样式
+  fallbackClass: 'sortable-fallback',
+}
+
+function onSortEnd(evt: { oldIndex?: number; newIndex?: number }) {
+  const { oldIndex, newIndex } = evt
+  if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return
+  const next = [...cardOrder.value]
+  const [moved] = next.splice(oldIndex, 1)
+  next.splice(newIndex, 0, moved)
+  cardOrder.value = next
+  storage.setJSON(CARD_ORDER_KEY, next)
+}
 
 // 编辑器状态
 const showEditor = ref(false)
@@ -135,15 +185,75 @@ function onCalendarDateClick(date: Date) {
 async function fetchFlows() {
   loading.value = true
   try {
-    const res = await flowApi.getMonthList(handleType.value, orderType.value, chooseMonth.value)
-    if (res.data.code === 0) {
-      flowData.value = res.data.data
+    // 列表请求（按当前 handleType 过滤）
+    const listPromise = flowApi.getMonthList(handleType.value, orderType.value, chooseMonth.value)
+
+    // 趋势图始终用全量数据；handleType=3 时复用列表请求避免重复
+    const chartPromise =
+      handleType.value === 3
+        ? null
+        : flowApi.getMonthList(3, 0, chooseMonth.value)
+
+    const [listRes, chartRes] = await Promise.all([listPromise, chartPromise])
+
+    if (listRes.data.code === 0) {
+      flowData.value = listRes.data.data
+    }
+    if (handleType.value === 3) {
+      chartFlowData.value = flowData.value
+    } else if (chartRes && chartRes.data.code === 0) {
+      chartFlowData.value = chartRes.data.data
     }
   } catch (err) {
     console.error('获取流水失败:', err)
   } finally {
     loading.value = false
   }
+}
+
+// 当月日级数据（喂给趋势图组件）
+const dayData = computed<DayTrendPoint[]>(() => {
+  const flows = chartFlowData.value?.flows || []
+  // 按 fdate 聚合（剔除 exempt 与转账，与后端 totalIn/totalOut 对齐）
+  const map = new Map<string, { income: number; outcome: number }>()
+  for (const flow of flows) {
+    if (flow.exempt) continue
+    if (flow.handle === 2) continue
+    const acc = map.get(flow.fdate) || { income: 0, outcome: 0 }
+    const money = parseFloat(flow.money) || 0
+    if (flow.handle === 0) acc.income += money
+    else if (flow.handle === 1) acc.outcome += money
+    map.set(flow.fdate, acc)
+  }
+
+  const [yStr, mStr] = chooseMonth.value.split('-')
+  const year = parseInt(yStr)
+  const month = parseInt(mStr)
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const now = new Date()
+  const isCurrent = year === now.getFullYear() && month === now.getMonth() + 1
+  const lastDay = isCurrent ? now.getDate() : daysInMonth
+
+  const result: DayTrendPoint[] = []
+  for (let day = 1; day <= lastDay; day++) {
+    const dateStr = `${chooseMonth.value}-${String(day).padStart(2, '0')}`
+    const data = map.get(dateStr)
+    result.push({
+      day,
+      date: dateStr,
+      income: data ? data.income : null,
+      outcome: data ? data.outcome : null,
+    })
+  }
+  return result
+})
+
+// 弹窗内切月份 → 联动整页
+function onTrendMonthChange(newMonth: string) {
+  if (newMonth === chooseMonth.value) return
+  chooseMonth.value = newMonth
+  pickerMonth.value = newMonth
+  fetchFlows()
 }
 
 // 月份切换
@@ -332,7 +442,7 @@ onMounted(() => {
           </div>
         </button>
 
-        <!-- 月份选择 -->
+        <!-- 月份卡（固定，不参与拖动） -->
         <div class="month-card">
           <div class="month-selector">
             <el-button :icon="ArrowLeft" circle size="small" @click="onMonthPrev" />
@@ -350,69 +460,95 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 月度统计 -->
-        <div class="stats-card">
-          <div class="stat-row">
-            <span class="stat-label">收入</span>
-            <span class="stat-value income">+{{ flowData?.totalIn || '0.00' }}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">支出</span>
-            <span class="stat-value expense">-{{ flowData?.totalOut || '0.00' }}</span>
-          </div>
-          <el-divider />
-          <div class="stat-row">
-            <span class="stat-label">结余</span>
-            <span class="stat-value balance">{{ totalBalance }}</span>
-          </div>
-        </div>
+        <!-- 可拖排序的卡片区 -->
+        <Sortable
+          :list="cardOrder"
+          item-key="."
+          tag="div"
+          class="sortable-cards"
+          :options="sortableOptions"
+          @end="onSortEnd"
+        >
+          <template #item="{ element }">
+            <div class="sortable-item" :key="element">
+              <span class="drag-handle" :title="'拖动调整顺序'">
+                <el-icon><DCaret /></el-icon>
+              </span>
 
-        <!-- 日历卡片 -->
-        <div class="calendar-card">
-          <el-calendar v-model="calendarDate">
-            <template #date-cell="{ data }">
-              <div
-                class="calendar-cell"
-                :class="{
-                  'has-record': hasRecord(data.date),
-                  'other-month': !isCurrentMonth(data.date)
-                }"
-                @click="onCalendarDateClick(data.date)"
-              >
-                <span class="day-num">{{ data.date.getDate() }}</span>
-                <span v-if="hasRecord(data.date)" class="record-dot"></span>
+              <!-- 月度统计卡 -->
+              <div v-if="element === 'stats'" class="stats-card">
+                <div class="stat-row">
+                  <span class="stat-label">收入</span>
+                  <span class="stat-value income">+{{ flowData?.totalIn || '0.00' }}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">支出</span>
+                  <span class="stat-value expense">-{{ flowData?.totalOut || '0.00' }}</span>
+                </div>
+                <el-divider />
+                <div class="stat-row">
+                  <span class="stat-label">结余</span>
+                  <span class="stat-value balance">{{ totalBalance }}</span>
+                </div>
               </div>
-            </template>
-          </el-calendar>
-        </div>
 
-        <!-- 筛选条件 -->
-        <div class="filter-card">
-          <h3 class="filter-title">
-            <el-icon><Filter /></el-icon>
-            <span>筛选</span>
-          </h3>
-          <div class="filter-group">
-            <label class="filter-label">类型</label>
-            <el-radio-group v-model="handleType" size="small" @change="onFilterChange">
-              <el-radio-button
-                v-for="opt in handleOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >{{ opt.label }}</el-radio-button>
-            </el-radio-group>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">排序</label>
-            <el-radio-group v-model="orderType" size="small" @change="onFilterChange">
-              <el-radio-button
-                v-for="opt in orderOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >{{ opt.label }}</el-radio-button>
-            </el-radio-group>
-          </div>
-        </div>
+              <!-- 日趋势 sparkline -->
+              <DayTrendSparkline
+                v-else-if="element === 'trend'"
+                :day-data="dayData"
+                :chart-type="chartType"
+                @click="showTrendDialog = true"
+              />
+
+              <!-- 日历卡 -->
+              <div v-else-if="element === 'calendar'" class="calendar-card">
+                <el-calendar v-model="calendarDate">
+                  <template #date-cell="{ data }">
+                    <div
+                      class="calendar-cell"
+                      :class="{
+                        'has-record': hasRecord(data.date),
+                        'other-month': !isCurrentMonth(data.date)
+                      }"
+                      @click="onCalendarDateClick(data.date)"
+                    >
+                      <span class="day-num">{{ data.date.getDate() }}</span>
+                      <span v-if="hasRecord(data.date)" class="record-dot"></span>
+                    </div>
+                  </template>
+                </el-calendar>
+              </div>
+
+              <!-- 筛选卡 -->
+              <div v-else-if="element === 'filter'" class="filter-card">
+                <h3 class="filter-title">
+                  <el-icon><Filter /></el-icon>
+                  <span>筛选</span>
+                </h3>
+                <div class="filter-group">
+                  <label class="filter-label">类型</label>
+                  <el-radio-group v-model="handleType" size="small" @change="onFilterChange">
+                    <el-radio-button
+                      v-for="opt in handleOptions"
+                      :key="opt.value"
+                      :value="opt.value"
+                    >{{ opt.label }}</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label">排序</label>
+                  <el-radio-group v-model="orderType" size="small" @change="onFilterChange">
+                    <el-radio-button
+                      v-for="opt in orderOptions"
+                      :key="opt.value"
+                      :value="opt.value"
+                    >{{ opt.label }}</el-radio-button>
+                  </el-radio-group>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Sortable>
 
         <!-- 操作按钮 -->
         <div class="action-buttons">
@@ -426,6 +562,15 @@ onMounted(() => {
       v-model:visible="showEditor"
       :flow-id="editFlowId"
       @success="onEditorSuccess"
+    />
+
+    <!-- 日趋势大图弹窗 -->
+    <DayTrendDialog
+      v-model:visible="showTrendDialog"
+      v-model:chart-type="chartType"
+      :month="chooseMonth"
+      :day-data="dayData"
+      @update:month="onTrendMonthChange"
     />
   </div>
 </template>
@@ -457,6 +602,63 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* 可拖卡片容器 */
+.sortable-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sortable-item {
+  position: relative;
+}
+
+/* 拖拽手柄 */
+.drag-handle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text-tertiary);
+  cursor: grab;
+  font-size: 13px;
+  opacity: 0.55;
+  transition: opacity 0.2s, background 0.2s, color 0.2s;
+}
+
+.sortable-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text-primary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* 拖动占位（原位置淡化） */
+.sortable-ghost {
+  opacity: 0.35;
+}
+
+/* 跟随鼠标的拖拽元素 */
+.sortable-fallback {
+  opacity: 0.92 !important;
+  transform: rotate(1deg);
+  cursor: grabbing !important;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* 月份卡片 */
@@ -860,6 +1062,17 @@ html.dark .flow-list-page .group-items {
 
 html.dark .flow-list-page .calendar-cell:hover {
   background: rgba(50, 50, 50, 0.6);
+}
+
+/* 暗黑：拖拽手柄 */
+html.dark .flow-list-page .drag-handle {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-tertiary);
+}
+
+html.dark .flow-list-page .drag-handle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-text-primary);
 }
 
 /* 月份选择器暗色模式 */

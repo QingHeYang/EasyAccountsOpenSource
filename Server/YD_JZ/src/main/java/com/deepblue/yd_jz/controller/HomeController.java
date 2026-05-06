@@ -32,9 +32,6 @@ public class HomeController {
     @Autowired
     NoticeService noticeService;
 
-    @Value("${webhook_url}")
-    private String webhookUrl;
-
     @Operation(summary = "获取首页信息")
     @GetMapping("/getHomeInfo")
     public BaseDto<HomeDto> getHomeInfo() {
