@@ -11,7 +11,7 @@
 
 | # | 标题 | 模块 | 优先级 | 状态 | 备注 |
 |---|------|------|--------|------|------|
-| [#23](https://github.com/QingHeYang/EasyAccounts/issues/23) | 外网无法访问 AI 助手 | 文档 | 🔴 高 | ✅ **文档级解决** | 经核查项目代码 + 内置 nginx 全部正确，根因是用户自家反代缺 WebSocket Upgrade 三件套；新增 `docs/deployment-reverse-proxy.md` |
+| [#23](https://github.com/QingHeYang/EasyAccounts/issues/23) | 外网无法访问 AI 助手 | 文档 | 🔴 高 | ✅ **GitHub 评论解决** | 经核查项目代码 + 内置 nginx 全部正确，根因是用户自家反代缺 WebSocket Upgrade 三件套；issue 评论里给完整模板 |
 | [#27](https://github.com/QingHeYang/EasyAccounts/issues/27) | 手机端分类多次添加后返回需点击多次 | Web（移动端） | 🟡 中 | ✅ **已修** | useSmartBack.replaceAfterSubmit 共享 API + 5 个 *Add 页面接入（v2.7.0-config-ui） |
 | [#28](https://github.com/QingHeYang/EasyAccounts/issues/28) | 内部转账：总金额不计入，分账单明细疑似也不计入 | Server | 🟡 中 | 待确认 | 需先确认是预期行为还是 bug |
 | [#29](https://github.com/QingHeYang/EasyAccounts/issues/29) | AI 报错不展示错误信息 | Web / AI | 🔴 高 | ✅ **已修** | AI 工具失败结构化错误 + 借机修了 5 个连锁稳定性问题（流式/历史/DS-R1/httpx/.env） |

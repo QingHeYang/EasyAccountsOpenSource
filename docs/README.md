@@ -19,12 +19,6 @@
 |---|---|
 | [`roadmap-v2.6-v2.7.md`](./roadmap-v2.6-v2.7.md) | v2.6.x / v2.7.0 路线图（issue + 需求 + 状态总览） |
 
-### 部署 / 运维指南
-
-| 文件 | 用途 |
-|---|---|
-| [`deployment-reverse-proxy.md`](./deployment-reverse-proxy.md) | 反向代理部署指南（nginx / Caddy / Apache 模板 + 5 类常见坑 + 排查 checklist） |
-
 ### 版本归档
 
 每个版本目录下只保留**长期价值的过程文档**与**发版结果**。

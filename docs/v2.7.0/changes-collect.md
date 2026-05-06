@@ -178,7 +178,7 @@
 | **现象** | 用户在自家 nginx 反代后访问 EasyAccounts，AI 助手"连接失败" |
 | **根因（彻底定位）** | **不是 user_id header / 下划线问题**，而是用户自己的反代 nginx 没配 WebSocket Upgrade 三件套（`proxy_http_version 1.1` + `Upgrade` + `Connection`），WebSocket 握手永远失败 |
 | **诊断曲折记录** | 之前主管两次给出错误诊断（怀疑过 nginx 下划线、AI 中间件挡 WebSocket），最终核查代码确认：项目代码 + 内置 nginx 配置全部正确，问题 100% 在用户的反代配置上 |
-| **解决方案** | **不改代码**，新增 [`docs/deployment-reverse-proxy.md`](./deployment-reverse-proxy.md) 完整反向代理部署指南：含 nginx HTTP/HTTPS 模板、Caddy / Apache 模板、5 类常见坑、自查 checklist、排查步骤 |
+| **解决方案** | **不改代码**，在 issue #23 评论区直接给用户完整 nginx 反代配置模板（重点：WebSocket Upgrade 三件套 `proxy_http_version 1.1` + `Upgrade` + `Connection`）|
 | **关联动作** | 在 issue #23 重新回复用户，撤回旧诊断，给完整模板 |
 | **dev-log** | 不涉及代码，无 dev-log |
 
