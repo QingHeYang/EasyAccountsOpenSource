@@ -19,25 +19,23 @@
 |---|---|
 | [`roadmap-v2.6-v2.7.md`](./roadmap-v2.6-v2.7.md) | v2.6.x / v2.7.0 路线图（issue + 需求 + 状态总览） |
 
-### 版本规划
+### 部署 / 运维指南
 
-每个未来版本一个目录，目录下放该版本的产品需求 plan / 任务拆分 / 变更收集等。
+| 文件 | 用途 |
+|---|---|
+| [`deployment-reverse-proxy.md`](./deployment-reverse-proxy.md) | 反向代理部署指南（nginx / Caddy / Apache 模板 + 5 类常见坑 + 排查 checklist） |
 
-#### v2.7.0（已实质完成，发版前收尾）
+### 版本归档
+
+每个版本目录下只保留**长期价值的过程文档**与**发版结果**。
+
+> 产品 plan / 任务拆分 / 讨论草稿等**讨论过程产物不进 docs/**，全程在对话和 commit message 里完成。
+
+#### v2.7.0（发版前收尾）
 
 | 文件 | 类型 | 说明 |
 |---|---|---|
-| [`v2.7.0/plan-scheduled-flow.md`](./v2.7.0/plan-scheduled-flow.md) | 产品 plan | 定时记账主功能（含 5 态规则、不补漏、信息记录、信息提醒等完整产品规则）|
-| [`v2.7.0/plan-config-ui.md`](./v2.7.0/plan-config-ui.md) | 产品 plan | 配置 UI 化（邮件 SMTP + 备份 cron 从 env 下沉到 UI）|
-| [`v2.7.0/tasks-web.md`](./v2.7.0/tasks-web.md) | 任务拆分 | 前端任务包 W1-W8，发版按里程碑 M1-M5 推进 |
 | [`v2.7.0/changes-collect.md`](./v2.7.0/changes-collect.md) | 变更收集 | plan 之外的零碎修复 / 优化 / 新功能登记，发版前整理为 release notes |
-
-#### v2.8.0（已立项，待开工）
-
-| 文件 | 类型 | 说明 |
-|---|---|---|
-| [`v2.8.0/plan-multi-book.md`](./v2.8.0/plan-multi-book.md) | 产品 plan | 多账本（钱迹模式：账户共享、其他隔离），12 个待拍板产品问题 |
-| [`v2.8.0/plan-saved-filter.md`](./v2.8.0/plan-saved-filter.md) | 产品 plan | 自定义查询条件 / 快速筛选保存 |
 
 ---
 

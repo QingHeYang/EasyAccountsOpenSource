@@ -199,15 +199,18 @@
 
 ---
 
-## 📚 与现有 plan 文档的关系
+## 📚 与主功能的关系
 
-本文档**仅收集 plan 之外的零碎事项**。已有 plan 的主功能不在此重复登记：
+本文档登记**v2.7.0 全部用户可感知的变更**，包括主功能与零碎修复。
+plan 类讨论过程产物不在 docs/ 中，发版前主管将本文档整理成对外 release notes。
 
-- 定时记账主功能 → `docs/v2.7.0/plan-scheduled-flow.md`
-- 配置 UI 化（邮件 + 备份 cron） → `docs/v2.7.0/plan-config-ui.md`
-- 前端任务包 → `docs/v2.7.0/tasks-web.md`
+主功能（已落地）：
+- **定时记账**（v2.7.0 主线）—— 5 态规则、不补漏、信息记录、信息提醒
+- **配置 UI 化**（邮件 SMTP + 备份 cron + 鉴权 + 自动 Excel）
+- **WebHook 容器废弃**（邮件能力内聚到 Server）
+- **自动月度 Excel 生成**
 
-发版前主管整理 release notes 时，把本文档 + 三份 plan 的"已完成"内容合并成对外公告。
+主功能 + 本文档全部条目汇成 release notes。
 
 ---
 
