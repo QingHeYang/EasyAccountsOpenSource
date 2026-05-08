@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import { useSmartBack } from '@shared/composables/useSmartBack'
+import { ClipboardClock } from 'lucide-vue-next'
 import {
   scheduledFlowApi,
   CycleType,
@@ -150,7 +151,7 @@ onMounted(loadRules)
       <div class="header-title">定时记账</div>
       <div class="header-right-group">
         <div class="header-icon-btn" title="执行记录" @click="onOpenLogs">
-          <van-icon name="notes-o" size="20" />
+          <ClipboardClock :size="20" :stroke-width="1.75" />
         </div>
         <div class="header-icon-btn" title="新建规则" @click="onAddRule">
           <van-icon name="plus" size="20" />

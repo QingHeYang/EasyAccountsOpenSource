@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Lock, Timer, User } from '@element-plus/icons-vue'
+import { Timer, User } from '@element-plus/icons-vue'
+import { Lock } from 'lucide-vue-next'
 import { systemConfigApi, type AuthOverview } from '@shared/api/systemConfig'
 import { isHandledError } from '@shared/api/request'
 
@@ -107,7 +108,7 @@ const sessionTimeText = computed(() => {
 <template>
   <div class="sys-section">
     <div class="sys-section-header">
-      <el-icon :size="18"><Lock /></el-icon>
+      <Lock :size="18" :stroke-width="1.75" />
       <span>鉴权设置</span>
     </div>
     <div class="sys-section-body">

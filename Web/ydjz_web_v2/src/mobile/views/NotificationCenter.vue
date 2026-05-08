@@ -6,6 +6,7 @@ import { useSmartBack } from '@shared/composables/useSmartBack'
 import { useNoticeStore } from '@shared/stores/notice'
 import { noticeApi, NoticeType, type UserNotice } from '@shared/api/notice'
 import { isHandledError } from '@shared/api/request'
+import { BellOff } from 'lucide-vue-next'
 
 const router = useRouter()
 const { smartBack } = useSmartBack()
@@ -302,7 +303,7 @@ onMounted(() => {
       <!-- 空状态 -->
       <div v-else-if="!loading" class="empty-state">
         <div class="empty-icon">
-          <van-icon name="volume-o" size="40" />
+          <BellOff :size="40" :stroke-width="1.5" />
         </div>
         <div class="empty-title">
           {{ filterUnread ? '没有未读通知' : '暂无通知' }}

@@ -11,7 +11,6 @@ import {
   Clock,
   Bell,
   InfoFilled,
-  Tickets,
   CircleCheckFilled,
   CircleCloseFilled,
   Delete,
@@ -19,6 +18,7 @@ import {
   VideoPause,
   View,
 } from '@element-plus/icons-vue'
+import { ClipboardClock } from 'lucide-vue-next'
 import FlowEditor from '@desktop/components/flow/FlowEditor.vue'
 import {
   scheduledFlowApi,
@@ -286,6 +286,14 @@ function isBeforeToday(date: Date) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return date.getTime() < today.getTime()
+}
+
+// 禁用今天及之前的日期（开始日期最早是明天）
+function isBeforeTomorrow(date: Date) {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(0, 0, 0, 0)
+  return date.getTime() < tomorrow.getTime()
 }
 
 function isBeforeStart(date: Date) {
@@ -711,10 +719,11 @@ function validate(): string | null {
   if (!f.runTime) return '请选择执行时间'
   if (!f.startDate) return '请选择开始日期'
   const startTs = new Date(f.startDate).getTime()
-  // TODO(测试期放开)：原规则要求 >= 今天+1，暂时放开到今天
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (startTs < today.getTime()) return '开始日期不能早于今天'
+  // 开始日期最早是明天（避免新建时已经过了今天 runTime 导致首日不触发的歧义）
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(0, 0, 0, 0)
+  if (startTs < tomorrow.getTime()) return '开始日期最早是明天'
   if (f.endDate && new Date(f.endDate).getTime() <= startTs) return '结束日期必须晚于开始日期'
   return null
 }
@@ -957,12 +966,13 @@ function onDrawerVisibleChange(v: boolean) {
         </div>
         <div class="drawer-header-right">
           <el-button
-            :icon="Tickets"
             circle
             class="header-icon-btn"
             title="执行记录"
             @click="openLogDialog"
-          />
+          >
+            <ClipboardClock :size="16" :stroke-width="1.75" />
+          </el-button>
         </div>
       </div>
     </template>
@@ -1313,9 +1323,9 @@ function onDrawerVisibleChange(v: boolean) {
               type="date"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              placeholder="最早今天（测试期临时放开）"
+              placeholder="最早明天"
               size="large"
-              :disabled-date="isBeforeToday"
+              :disabled-date="isBeforeTomorrow"
               style="width: 100%"
             />
           </div>
@@ -1669,7 +1679,7 @@ function onDrawerVisibleChange(v: boolean) {
         <!-- 空状态：占满容器居中 -->
         <div v-else-if="!logLoading" class="log-empty">
           <div class="log-empty-icon">
-            <el-icon :size="28"><Tickets /></el-icon>
+            <ClipboardClock :size="28" :stroke-width="1.5" />
           </div>
           <div class="log-empty-title">暂无执行记录</div>
           <div class="log-empty-desc">规则执行后会在这里留下记录</div>

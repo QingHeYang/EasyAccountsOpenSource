@@ -2,13 +2,13 @@
 import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Document,
   EditPen,
   Check,
   InfoFilled,
   CircleCheckFilled,
   CircleCloseFilled,
 } from '@element-plus/icons-vue'
+import { Calendars } from 'lucide-vue-next'
 import {
   systemConfigApi,
   type AutoExcelOverview,
@@ -108,7 +108,7 @@ function targetLabel(t: AutoExcelTarget | undefined): string {
 <template>
   <div class="sys-section">
     <div class="sys-section-header">
-      <el-icon :size="18"><Document /></el-icon>
+      <Calendars :size="18" :stroke-width="1.75" />
       <span>月度报表生成设置</span>
 
       <!-- 功能解释 popover -->

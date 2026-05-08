@@ -13,6 +13,7 @@ import {
   CircleCloseFilled,
   Minus,
 } from '@element-plus/icons-vue'
+import { BellOff } from 'lucide-vue-next'
 import { noticeApi, NoticeType, type UserNotice } from '@shared/api/notice'
 import { isHandledError } from '@shared/api/request'
 
@@ -298,7 +299,7 @@ defineExpose({
         <!-- 空状态 -->
         <div v-if="!loading && !filteredNotices.length" class="empty-state">
           <div class="empty-icon">
-            <el-icon :size="32"><Bell /></el-icon>
+            <BellOff :size="32" :stroke-width="1.5" />
           </div>
           <div class="empty-title">
             {{ filterUnread ? '没有未读通知' : '暂无通知' }}

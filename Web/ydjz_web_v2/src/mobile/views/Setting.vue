@@ -10,6 +10,19 @@ import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import { showConfirmDialog } from 'vant'
 import logoUrl from '@shared/assets/logo.png'
 import NoticePopup from '../components/NoticePopup.vue'
+import {
+  ArrowLeftRight,
+  Wallet,
+  Tags,
+  Layers2,
+  AlarmClock,
+  Sparkles,
+  Settings,
+  Bell,
+  Info,
+  Newspaper,
+  LogOut,
+} from 'lucide-vue-next'
 
 const router = useRouter()
 
@@ -149,36 +162,31 @@ onActivated(() => {
     <div class="page-body">
       <!-- 数据管理 -->
       <van-cell-group inset title="数据管理">
-        <van-cell
-          title="收支"
-          icon="exchange"
-          is-link
-          to="/setting/action"
-        />
-        <van-cell
-          title="账户"
-          icon="paid"
-          is-link
-          to="/setting/account"
-        />
-        <van-cell
-          title="分类"
-          icon="balance-list-o"
-          is-link
-          to="/setting/type"
-        />
-        <van-cell
-          title="快记模板"
-          icon="cluster-o"
-          is-link
-          to="/setting/template"
-        />
-        <van-cell
-          title="定时记账"
-          icon="clock-o"
-          is-link
-          to="/setting/scheduled-flow"
-        />
+        <van-cell title="收支" is-link to="/setting/action">
+          <template #icon>
+            <ArrowLeftRight :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="账户" is-link to="/setting/account">
+          <template #icon>
+            <Wallet :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="分类" is-link to="/setting/type">
+          <template #icon>
+            <Tags :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="快记模板" is-link to="/setting/template">
+          <template #icon>
+            <Layers2 :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="定时记账" is-link to="/setting/scheduled-flow">
+          <template #icon>
+            <AlarmClock :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
       </van-cell-group>
 
       <!-- 系统管理 -->
@@ -187,21 +195,22 @@ onActivated(() => {
         <van-cell
           v-if="aiServiceAvailable"
           title="AI+ 设置"
-          icon="fire-o"
           is-link
           :class="{ 'ai-unconfigured': !aiConfigured }"
           @click="onAiClick"
         >
+          <template #icon>
+            <Sparkles :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
           <template #value>
             <van-tag v-if="!aiConfigured" type="warning">未配置</van-tag>
           </template>
         </van-cell>
-        <van-cell
-          title="系统设置"
-          icon="setting-o"
-          is-link
-          to="/setting/system"
-        />
+        <van-cell title="系统设置" is-link to="/setting/system">
+          <template #icon>
+            <Settings :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
       </van-cell-group>
 
       <!-- 其他 -->
@@ -212,19 +221,7 @@ onActivated(() => {
           @click="openNotifications"
         >
           <template #icon>
-            <svg
-              class="cell-bell-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-            </svg>
+            <Bell :size="18" :stroke-width="1.75" class="cell-icon" />
           </template>
           <template #title>
             <span>消息通知</span>
@@ -234,24 +231,26 @@ onActivated(() => {
           </template>
         </van-cell>
         <van-cell
-          title="关于"
-          icon="info-o"
           is-link
           class="about-cell"
           @click="openAbout"
         >
+          <template #icon>
+            <Info :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
           <template #title>
             <span>关于</span>
             <span v-if="hasUpdate" class="update-dot"></span>
           </template>
         </van-cell>
         <van-cell
-          title="公告"
-          icon="volume-o"
           is-link
           class="notice-cell"
           @click="showNoticePopup = true"
         >
+          <template #icon>
+            <Newspaper :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
           <template #title>
             <span>公告</span>
             <span v-if="hasUnreadNotice" class="notice-dot"></span>
@@ -260,10 +259,13 @@ onActivated(() => {
         <van-cell
           v-if="showLogout"
           title="退出登录"
-          icon="revoke"
           is-link
           @click="onLogout"
-        />
+        >
+          <template #icon>
+            <LogOut :size="18" :stroke-width="1.75" class="cell-icon cell-icon-danger" />
+          </template>
+        </van-cell>
       </van-cell-group>
     </div>
 
@@ -583,12 +585,22 @@ onActivated(() => {
 }
 
 /* 镂空 SVG 铃铛，跟 vant 默认 icon 视觉对齐 */
-.cell-bell-icon {
-  width: 18px;
-  height: 18px;
-  margin-right: 4px;
+/* 设置页 cell 内的 Lucide 图标统一样式 */
+.cell-icon {
+  display: block; /* 关键：去除 svg 默认 inline baseline 偏移，让 flex 居中生效 */
+  margin-right: 8px;
   color: var(--color-text-secondary);
   flex-shrink: 0;
+  align-self: center; /* 双保险：跟标题严格垂直居中 */
+}
+
+/* 危险操作（退出登录等）淡红色 */
+.cell-icon-danger {
+  color: #ff7875;
+}
+
+html.dark .cell-icon-danger {
+  color: #ff9999;
 }
 
 .notification-badge {

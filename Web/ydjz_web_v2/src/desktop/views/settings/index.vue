@@ -2,21 +2,20 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight, Close } from '@element-plus/icons-vue'
 import {
-  SwitchButton,
-  CreditCard,
+  ArrowLeftRight,
   Wallet,
-  PriceTag,
-  DocumentCopy,
-  InfoFilled,
-  ArrowRight,
-  Close,
-  MagicStick,
-  Setting,
-  FolderOpened,
-  Bell,
-  AlarmClock
-} from '@element-plus/icons-vue'
+  Tags,
+  Layers2,
+  AlarmClock,
+  Sparkles,
+  Settings,
+  FolderOpen,
+  Info,
+  Newspaper,
+  LogOut,
+} from 'lucide-vue-next'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import logoUrl from '@shared/assets/logo.png'
@@ -120,17 +119,17 @@ function onLogout() {
 
 // 数据管理项
 const dataItems = [
-  { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: CreditCard },
+  { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: ArrowLeftRight },
   { key: 'account', title: '账户管理', desc: '管理银行卡、现金等账户', icon: Wallet },
-  { key: 'type', title: '分类管理', desc: '管理收支分类', icon: PriceTag },
-  { key: 'template', title: '快记模板', desc: '快速记账预填模板', icon: DocumentCopy },
+  { key: 'type', title: '分类管理', desc: '管理收支分类', icon: Tags },
+  { key: 'template', title: '快记模板', desc: '快速记账预填模板', icon: Layers2 },
   { key: 'scheduledFlow', title: '定时记账', desc: '周期性自动生成真实流水', icon: AlarmClock },
 ]
 
 // 系统管理项
 const systemItems = [
-  { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick },
-  { key: 'systemSettings', title: '系统设置', desc: '鉴权 / 邮件 / 提醒 / 备份 / 版本', icon: Setting },
+  { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: Sparkles },
+  { key: 'systemSettings', title: '系统设置', desc: '鉴权 / 邮件 / 提醒 / 备份 / 版本', icon: Settings },
 ]
 
 // 检测 AI 服务
@@ -263,7 +262,7 @@ onUnmounted(() => {
             @click="openDrawer(item.key)"
           >
             <div class="card-icon">
-              <el-icon :size="24"><component :is="item.icon" /></el-icon>
+              <component :is="item.icon" :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">{{ item.title }}</div>
@@ -286,7 +285,7 @@ onUnmounted(() => {
             @click="openDrawer('ai')"
           >
             <div class="card-icon ai-icon">
-              <el-icon :size="24"><MagicStick /></el-icon>
+              <Sparkles :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">
@@ -300,7 +299,7 @@ onUnmounted(() => {
           <!-- 系统设置卡片 -->
           <div class="data-card" @click="openDrawer('systemSettings')">
             <div class="card-icon system-icon">
-              <el-icon :size="24"><Setting /></el-icon>
+              <Settings :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">系统设置</div>
@@ -311,7 +310,7 @@ onUnmounted(() => {
           <!-- 数据备份卡片 -->
           <div class="data-card" @click="openDrawer('backup')">
             <div class="card-icon backup-icon">
-              <el-icon :size="24"><FolderOpened /></el-icon>
+              <FolderOpen :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">数据备份</div>
@@ -327,17 +326,17 @@ onUnmounted(() => {
         <h2 class="section-title">其他</h2>
         <div class="other-actions">
           <el-button size="large" class="about-btn" @click="openAbout">
-            <el-icon><InfoFilled /></el-icon>
+            <Info :size="16" :stroke-width="1.75" class="btn-icon" />
             <span>关于</span>
             <span v-if="hasUpdate" class="update-dot"></span>
           </el-button>
           <el-button size="large" class="notice-btn" @click="showNoticeDrawer = true">
-            <el-icon><Bell /></el-icon>
+            <Newspaper :size="16" :stroke-width="1.75" class="btn-icon" />
             <span>公告</span>
             <span v-if="hasUnreadNotice" class="notice-dot"></span>
           </el-button>
           <el-button v-if="showLogout" size="large" type="danger" plain @click="onLogout">
-            <el-icon><SwitchButton /></el-icon>
+            <LogOut :size="16" :stroke-width="1.75" class="btn-icon" />
             <span>退出登录</span>
           </el-button>
         </div>
@@ -430,7 +429,7 @@ onUnmounted(() => {
           target="_blank"
           class="update-tip"
         >
-          <el-icon><InfoFilled /></el-icon>
+          <Info :size="14" :stroke-width="1.75" />
           <span>查看更新指南</span>
           <el-icon class="tip-arrow"><ArrowRight /></el-icon>
         </a>
@@ -951,6 +950,12 @@ html.dark .card-icon {
 
 html.dark .data-card.ai-unconfigured .card-icon.ai-icon {
   background: var(--color-text-quaternary);
+}
+
+/* el-button 内 Lucide 图标的间距（Lucide 不是 el-icon，不会自动应用 EP 间距规则） */
+.el-button .btn-icon {
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 /* AI 配置对话框样式 */

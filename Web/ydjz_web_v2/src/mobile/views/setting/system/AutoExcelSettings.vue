@@ -9,6 +9,7 @@ import {
   type AutoExcelTarget,
 } from '@shared/api/systemConfig'
 import { isHandledError } from '@shared/api/request'
+import { CircleHelp } from 'lucide-vue-next'
 
 import './page-styles.css'
 
@@ -114,8 +115,10 @@ async function onSave() {
     showToast({ message: '已保存', type: 'success' })
     smartBack('/setting/system')
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('保存失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('保存失败')
+    }
   } finally {
     saving.value = false
   }
@@ -144,8 +147,10 @@ async function runNow() {
     showToast({ message: '已生成', type: 'success' })
     loadData()
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('生成失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('生成失败')
+    }
   } finally {
     running.value = false
   }
@@ -181,7 +186,7 @@ onMounted(() => {
       </div>
       <div class="sys-mob-header-title">月度报表生成</div>
       <div class="sys-mob-header-right is-info" @click="showInfoDialog">
-        <van-icon name="question-o" size="20" />
+        <CircleHelp :size="20" :stroke-width="1.75" />
       </div>
     </div>
 

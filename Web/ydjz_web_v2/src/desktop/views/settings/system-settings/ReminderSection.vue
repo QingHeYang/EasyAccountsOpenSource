@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Bell, AlarmClock, Document } from '@element-plus/icons-vue'
+import { AlarmClock, Document } from '@element-plus/icons-vue'
+import { Bell } from 'lucide-vue-next'
 import {
   systemConfigApi,
   type AutoExcelOverview,
@@ -120,7 +121,7 @@ async function onAutoExcelRemindEmailChange(val: boolean) {
 <template>
   <div class="sys-section">
     <div class="sys-section-header">
-      <el-icon :size="18"><Bell /></el-icon>
+      <Bell :size="18" :stroke-width="1.75" />
       <span>提醒设置</span>
     </div>
     <div class="sys-section-body">

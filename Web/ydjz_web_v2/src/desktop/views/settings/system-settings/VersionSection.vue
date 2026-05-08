@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Monitor as VersionIcon } from '@element-plus/icons-vue'
+import { Info } from 'lucide-vue-next'
 import type { VersionInfo } from '@shared/api/home'
 
 const props = defineProps<{
@@ -18,7 +18,7 @@ const versionItems = computed(() => [
 <template>
   <div class="sys-section">
     <div class="sys-section-header">
-      <el-icon :size="18"><VersionIcon /></el-icon>
+      <Info :size="18" :stroke-width="1.75" />
       <span>版本信息</span>
     </div>
     <div class="sys-section-body">

@@ -9,6 +9,7 @@ import {
 } from '@shared/api/systemConfig'
 import { homeApi, type VersionInfo } from '@shared/api/home'
 import { isHandledError } from '@shared/api/request'
+import { Lock, Mail, Bell, FolderOpen, Calendars, Sun, Moon, Monitor } from 'lucide-vue-next'
 
 const { smartBack } = useSmartBack()
 const themeStore = useThemeStore()
@@ -24,9 +25,9 @@ const versions = ref<VersionInfo>({
 })
 
 const themeOptions = [
-  { value: 'light', label: '浅色', emoji: '☀️' },
-  { value: 'dark', label: '深色', emoji: '🌙' },
-  { value: 'system', label: '跟随系统', emoji: '⚙️' },
+  { value: 'light', label: '浅色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'system', label: '跟随系统', icon: Monitor },
 ] as const
 
 async function loadOverview() {
@@ -137,7 +138,7 @@ onActivated(() => {
             :class="{ active: themeStore.mode === opt.value }"
             @click="onSetTheme(opt.value)"
           >
-            <span class="theme-emoji">{{ opt.emoji }}</span>
+            <component :is="opt.icon" :size="22" :stroke-width="1.75" class="theme-icon" />
             <span class="theme-label">{{ opt.label }}</span>
             <van-icon
               v-if="themeStore.mode === opt.value"
@@ -158,8 +159,8 @@ onActivated(() => {
           class="m-link-cell"
         >
           <template #icon>
-            <div class="m-cell-icon m-cell-icon-purple">
-              <van-icon name="lock" size="16" />
+            <div class="m-cell-icon">
+              <Lock :size="18" :stroke-width="1.75" />
             </div>
           </template>
           <template #title>
@@ -177,8 +178,8 @@ onActivated(() => {
           class="m-link-cell"
         >
           <template #icon>
-            <div class="m-cell-icon m-cell-icon-blue">
-              <van-icon name="envelop-o" size="16" />
+            <div class="m-cell-icon">
+              <Mail :size="18" :stroke-width="1.75" />
             </div>
           </template>
           <template #title>
@@ -196,8 +197,8 @@ onActivated(() => {
           class="m-link-cell"
         >
           <template #icon>
-            <div class="m-cell-icon m-cell-icon-orange">
-              <van-icon name="bell" size="16" />
+            <div class="m-cell-icon">
+              <Bell :size="18" :stroke-width="1.75" />
             </div>
           </template>
           <template #title>
@@ -215,8 +216,8 @@ onActivated(() => {
           class="m-link-cell"
         >
           <template #icon>
-            <div class="m-cell-icon m-cell-icon-green">
-              <van-icon name="cluster-o" size="16" />
+            <div class="m-cell-icon">
+              <FolderOpen :size="18" :stroke-width="1.75" />
             </div>
           </template>
           <template #title>
@@ -234,8 +235,8 @@ onActivated(() => {
           class="m-link-cell"
         >
           <template #icon>
-            <div class="m-cell-icon m-cell-icon-cyan">
-              <van-icon name="orders-o" size="16" />
+            <div class="m-cell-icon">
+              <Calendars :size="18" :stroke-width="1.75" />
             </div>
           </template>
           <template #title>
@@ -344,9 +345,13 @@ onActivated(() => {
   transform: scale(0.96);
 }
 
-.theme-emoji {
-  font-size: 28px;
-  line-height: 1;
+.theme-icon {
+  display: block;
+  color: var(--color-text-secondary);
+}
+
+.theme-option.active .theme-icon {
+  color: var(--color-transfer);
 }
 
 .theme-label {
@@ -387,26 +392,9 @@ html.dark .theme-option.active {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  margin-right: 12px;
+  margin-right: 8px;
   flex-shrink: 0;
-  color: #fff;
-}
-
-.m-cell-icon-purple {
-  background: linear-gradient(135deg, #9254DE 0%, #722ED1 100%);
-}
-.m-cell-icon-blue {
-  background: linear-gradient(135deg, #40A9FF 0%, #1890FF 100%);
-}
-.m-cell-icon-orange {
-  background: linear-gradient(135deg, #FFA940 0%, #FA8C16 100%);
-}
-.m-cell-icon-green {
-  background: linear-gradient(135deg, #73D13D 0%, #52C41A 100%);
-}
-.m-cell-icon-cyan {
-  background: linear-gradient(135deg, #36CFC9 0%, #13C2C2 100%);
+  color: var(--color-text-secondary);
 }
 
 .m-cell-title {

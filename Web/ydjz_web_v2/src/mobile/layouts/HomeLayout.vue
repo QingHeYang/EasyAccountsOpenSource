@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useThemeStore } from '@shared/stores/theme'
+import { Home, List, BarChart3, Settings } from 'lucide-vue-next'
 
 const route = useRoute()
 const themeStore = useThemeStore()
@@ -9,12 +10,12 @@ const themeStore = useThemeStore()
 // Vant 主题：'light' | 'dark'
 const vantTheme = computed(() => themeStore.effectiveTheme)
 
-// Tab 配置
+// Tab 配置（icon 用 Lucide 双端统一）
 const tabs = [
-  { path: '/board', icon: 'balance-pay', label: '总览' },
-  { path: '/flow', icon: 'records-o', label: '明细' },
-  { path: '/analysis', icon: 'chart-trending-o', label: '统计' },
-  { path: '/setting', icon: 'setting-o', label: '设置' },
+  { path: '/board', icon: Home, label: '总览' },
+  { path: '/flow', icon: List, label: '明细' },
+  { path: '/analysis', icon: BarChart3, label: '统计' },
+  { path: '/setting', icon: Settings, label: '设置' },
 ]
 
 // 当前激活的 tab 索引
@@ -67,7 +68,7 @@ const sliderStyle = computed(() => ({
             class="tab-item"
             :class="{ active: activeIndex === index }"
           >
-            <van-icon :name="tab.icon" size="22" />
+            <component :is="tab.icon" :size="20" :stroke-width="1.75" class="tab-icon" />
             <span class="tab-label">{{ tab.label }}</span>
           </router-link>
         </div>

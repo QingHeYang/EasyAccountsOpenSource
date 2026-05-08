@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { FolderOpened } from '@element-plus/icons-vue'
+import { FolderOpen } from 'lucide-vue-next'
 import {
   systemConfigApi,
   type BackupOverview,
@@ -126,7 +126,7 @@ function onDayOfMonthChange(val: number | undefined) {
 <template>
   <div class="sys-section">
     <div class="sys-section-header">
-      <el-icon :size="18"><FolderOpened /></el-icon>
+      <FolderOpen :size="18" :stroke-width="1.75" />
       <span>备份设置</span>
     </div>
     <div class="sys-section-body">
