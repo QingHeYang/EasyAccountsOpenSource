@@ -5,6 +5,7 @@ import { showToast, showLoadingToast, closeToast } from 'vant'
 import { homeApi, type HomeInfo } from '@shared/api/home'
 import { storage } from '@shared/utils/storage'
 import { aiApi } from '@shared/api/ai'
+import { Bell } from 'lucide-vue-next'
 import { useNoticeStore } from '@shared/stores/notice'
 import logoUrl from '@shared/assets/logo.png'
 import ChartOverlay from '@mobile/components/ChartOverlay.vue'
@@ -344,19 +345,7 @@ function toAI() {
         title="消息通知"
         @click="openNotifications"
       >
-        <svg
-          class="bell-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-        </svg>
+        <Bell class="bell-icon" :size="22" :stroke-width="1.75" />
         <span v-if="unreadCount > 0" class="bell-badge">{{ unreadDisplay }}</span>
       </button>
     </div>

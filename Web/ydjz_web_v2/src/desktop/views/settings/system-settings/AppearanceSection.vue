@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Sunny } from '@element-plus/icons-vue'
+import { Sun, Moon, Monitor } from 'lucide-vue-next'
 import { useThemeStore } from '@shared/stores/theme'
 
 const themeStore = useThemeStore()
 
-// emoji 跟移动端 SystemSettings.vue 保持一致（带 ️ 变体选择符）
+// 跟移动端 SystemSettings.vue 保持一致（Lucide Sun/Moon/Monitor）
 const themeOptions = [
-  { value: 'light', label: '浅色', emoji: '☀️' },
-  { value: 'dark', label: '深色', emoji: '🌙' },
-  { value: 'system', label: '跟随系统', emoji: '⚙️' },
+  { value: 'light', label: '浅色', icon: Sun },
+  { value: 'dark', label: '深色', icon: Moon },
+  { value: 'system', label: '跟随系统', icon: Monitor },
 ] as const
 
 const currentTheme = computed({
@@ -21,7 +21,7 @@ const currentTheme = computed({
 <template>
   <div class="sys-section">
     <div class="sys-section-header">
-      <el-icon :size="18"><Sunny /></el-icon>
+      <Sun :size="18" :stroke-width="1.75" />
       <span>外观设置</span>
     </div>
     <div class="sys-section-body">
@@ -33,7 +33,7 @@ const currentTheme = computed({
           :class="{ active: currentTheme === opt.value }"
           @click="currentTheme = opt.value"
         >
-          <span class="theme-emoji">{{ opt.emoji }}</span>
+          <component :is="opt.icon" :size="22" :stroke-width="1.75" class="theme-icon" />
           <span>{{ opt.label }}</span>
         </div>
       </div>
@@ -65,14 +65,18 @@ const currentTheme = computed({
   background: var(--color-bg-active);
 }
 
-.theme-emoji {
-  font-size: 28px;
-  line-height: 1;
+.theme-icon {
+  display: block;
+  color: var(--color-text-secondary);
 }
 
 .theme-option.active {
   border-color: var(--color-transfer);
   background: rgba(24, 144, 255, 0.08);
+}
+
+.theme-option.active .theme-icon {
+  color: var(--color-transfer);
 }
 
 .theme-option span {

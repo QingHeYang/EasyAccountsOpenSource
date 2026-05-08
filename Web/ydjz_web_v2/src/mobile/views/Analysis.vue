@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { showLoadingToast, closeToast } from 'vant'
+import { showLoadingToast, closeToast, showToast } from 'vant'
 import { analysisApi, type AnalysisTypeItem } from '@shared/api/analysis'
 import { useAnalysisFilterStore } from '@mobile/stores/analysisFilter'
 import AnalysisChartOverlay from '@mobile/components/AnalysisChartOverlay.vue'
@@ -36,8 +36,9 @@ const allOutTypeList = ref<AnalysisTypeItem[]>([])
 const disabledTypeIds = ref<Set<number>>(new Set())
 
 // 弹窗状态
-const showFilterPopup = ref(false)
-const showDatePicker = ref(false) // 日期选择器弹窗
+const filterExpanded = ref(false)
+const showStartPicker = ref(false)
+const showEndPicker = ref(false)
 const showChartOverlay = ref(false) // 图表弹窗
 
 // 日期选择器
@@ -46,24 +47,14 @@ const chooseEndTime = ref<string[]>([])
 const minDate = new Date(2021, 0, 1)
 const maxDate = new Date()
 
-// 结束日期的最小值（不能早于开始日期）
-const endMinDate = computed(() => {
-  if (chooseStartTime.value.length === 2) {
-    const year = parseInt(chooseStartTime.value[0])
-    const month = parseInt(chooseStartTime.value[1]) - 1
-    return new Date(year, month, 1)
-  }
-  return minDate
-})
-
 // ==================== 计算属性 ====================
 const fastOptions = [
-  { label: '当月', value: 0 },
+  { label: '本月', value: 0 },
   { label: '上月', value: 1 },
   { label: '近3月', value: 2 },
   { label: '近6月', value: 3 },
   { label: '近1年', value: 4 },
-  { label: '当年', value: 5 },
+  { label: '本年', value: 5 },
   { label: '上年', value: 6 },
 ]
 
@@ -234,36 +225,55 @@ function toggleTypeDisabled(typeId: number) {
   disabledTypeIds.value = newSet
 }
 
-function openDatePicker() {
-  // 初始化日期选择器的值
+function openStartPicker() {
   if (startDate.value) {
     chooseStartTime.value = startDate.value.split('-')
   } else {
     const now = new Date()
     chooseStartTime.value = [String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0')]
   }
+  showStartPicker.value = true
+}
+
+function openEndPicker() {
   if (endDate.value) {
     chooseEndTime.value = endDate.value.split('-')
   } else {
     const now = new Date()
     chooseEndTime.value = [String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0')]
   }
-  showDatePicker.value = true
+  showEndPicker.value = true
 }
 
-function onDatePickerConfirm() {
-  // 应用自定义时间
-  startDate.value = `${chooseStartTime.value[0]}-${chooseStartTime.value[1].padStart(2, '0')}`
-  endDate.value = `${chooseEndTime.value[0]}-${chooseEndTime.value[1].padStart(2, '0')}`
-  fastChoose.value = -1 // 标记为自定义
-  showDatePicker.value = false
-  fetchData() // 直接刷新数据
-}
-
-function applyFilter() {
-  showFilterPopup.value = false
+function onStartConfirm() {
+  const newStart = `${chooseStartTime.value[0]}-${chooseStartTime.value[1].padStart(2, '0')}`
+  // 校验：开始不能晚于结束
+  if (endDate.value && newStart > endDate.value) {
+    showToast('开始月份不能晚于结束月份')
+    return
+  }
+  startDate.value = newStart
+  fastChoose.value = -1
+  showStartPicker.value = false
   fetchData()
 }
+
+function onEndConfirm() {
+  const newEnd = `${chooseEndTime.value[0]}-${chooseEndTime.value[1].padStart(2, '0')}`
+  if (startDate.value && newEnd < startDate.value) {
+    showToast('结束月份不能早于开始月份')
+    return
+  }
+  endDate.value = newEnd
+  fastChoose.value = -1
+  showEndPicker.value = false
+  fetchData()
+}
+
+// 是否有非默认筛选值（用于头部按钮 dot 提示）
+const hasCustomFilter = computed(
+  () => combineSubType.value || !showDisableAnalysisType.value || fastChoose.value === -1
+)
 
 function openChart() {
   showChartOverlay.value = true
@@ -306,11 +316,55 @@ onBeforeUnmount(() => {
     <div class="page-header">
       <div class="header-title">统计</div>
       <div class="header-actions">
-        <div class="header-btn" @click="showFilterPopup = true">
-          <van-icon name="setting-o" size="20" />
+        <div class="header-btn" @click="filterExpanded = !filterExpanded">
+          <van-icon name="filter-o" size="20" />
+          <span v-if="hasCustomFilter" class="filter-dot"></span>
         </div>
         <div class="header-btn" @click="openChart">
           <van-icon name="chart-trending-o" size="20" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 折叠筛选面板 -->
+    <div class="filter-bar" :class="{ expanded: filterExpanded }">
+      <!-- 快捷时间 chip -->
+      <div class="quick-filter">
+        <div
+          v-for="opt in fastOptions"
+          :key="opt.value"
+          class="quick-item"
+          :class="{ active: fastChoose === opt.value }"
+          @click="onFastChoose(opt.value)"
+        >
+          {{ opt.label }}
+        </div>
+      </div>
+
+      <div class="option-pair">
+        <div class="filter-row option-row">
+          <span class="option-label">合并子分类</span>
+          <van-switch v-model="combineSubType" size="18" @change="fetchData" />
+        </div>
+        <div class="filter-row option-row">
+          <span class="option-label">显示全部</span>
+          <van-switch v-model="showDisableAnalysisType" size="18" @change="fetchData" />
+        </div>
+      </div>
+      <div class="option-pair">
+        <div class="filter-row date-row" @click="openStartPicker">
+          <span class="option-label">开始</span>
+          <div class="date-display">
+            <span class="date-value">{{ startDate || '请选择' }}</span>
+            <van-icon name="arrow" size="12" class="date-arrow" />
+          </div>
+        </div>
+        <div class="filter-row date-row" @click="openEndPicker">
+          <span class="option-label">结束</span>
+          <div class="date-display">
+            <span class="date-value">{{ endDate || '请选择' }}</span>
+            <van-icon name="arrow" size="12" class="date-arrow" />
+          </div>
         </div>
       </div>
     </div>
@@ -332,19 +386,6 @@ onBeforeUnmount(() => {
       >
         <span class="tab-label">支出</span>
         <span class="tab-value expense">¥{{ showFullAmount ? totalOut : formatLargeAmount(totalOut) }}</span>
-      </div>
-    </div>
-
-    <!-- 快速筛选 -->
-    <div class="quick-filter">
-      <div
-        v-for="opt in fastOptions"
-        :key="opt.value"
-        class="quick-item"
-        :class="{ active: fastChoose === opt.value }"
-        @click="onFastChoose(opt.value)"
-      >
-        {{ opt.label }}
       </div>
     </div>
 
@@ -375,73 +416,31 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <!-- 筛选弹窗 -->
-    <van-popup
-      v-model:show="showFilterPopup"
-      position="bottom"
-      round
-      teleport="body"
-    >
-      <div class="filter-popup">
-        <div class="filter-header">
-          <span class="filter-title">统计条件</span>
-        </div>
 
-        <div class="filter-content">
-          <!-- 选项 -->
-          <div class="filter-section">
-            <div class="section-title">显示选项</div>
-            <div class="option-row">
-              <span>合并子分类</span>
-              <van-switch v-model="combineSubType" size="20" />
-            </div>
-            <div class="option-row">
-              <span>显示全部分类</span>
-              <van-switch v-model="showDisableAnalysisType" size="20" />
-            </div>
-          </div>
-
-          <!-- 自定义时间 -->
-          <div class="filter-section">
-            <div class="section-title">自定义时间</div>
-            <div class="date-row" @click="openDatePicker">
-              <div class="date-display">
-                <span class="date-value">{{ startDate || '开始' }}</span>
-                <span class="date-sep">至</span>
-                <span class="date-value">{{ endDate || '结束' }}</span>
-              </div>
-              <van-icon name="arrow" color="var(--color-text-tertiary)" />
-            </div>
-          </div>
-        </div>
-
-        <div class="filter-footer">
-          <button class="apply-btn" @click="applyFilter">应用筛选</button>
-        </div>
-      </div>
+    <!-- 开始月份选择器 -->
+    <van-popup v-model:show="showStartPicker" position="bottom" round teleport="body">
+      <van-date-picker
+        v-model="chooseStartTime"
+        title="选择开始月份"
+        :min-date="minDate"
+        :max-date="maxDate"
+        :columns-type="['year', 'month']"
+        @confirm="onStartConfirm"
+        @cancel="showStartPicker = false"
+      />
     </van-popup>
 
-    <!-- 日期范围选择器（独立弹窗） -->
-    <van-popup v-model:show="showDatePicker" position="bottom" round teleport="body">
-      <van-picker-group
-        title="选择时间范围"
-        :tabs="['开始月份', '结束月份']"
-        @confirm="onDatePickerConfirm"
-        @cancel="showDatePicker = false"
-      >
-        <van-date-picker
-          v-model="chooseStartTime"
-          :min-date="minDate"
-          :max-date="maxDate"
-          :columns-type="['year', 'month']"
-        />
-        <van-date-picker
-          v-model="chooseEndTime"
-          :min-date="endMinDate"
-          :max-date="maxDate"
-          :columns-type="['year', 'month']"
-        />
-      </van-picker-group>
+    <!-- 结束月份选择器 -->
+    <van-popup v-model:show="showEndPicker" position="bottom" round teleport="body">
+      <van-date-picker
+        v-model="chooseEndTime"
+        title="选择结束月份"
+        :min-date="minDate"
+        :max-date="maxDate"
+        :columns-type="['year', 'month']"
+        @confirm="onEndConfirm"
+        @cancel="showEndPicker = false"
+      />
     </van-popup>
 
     <!-- 图表弹窗 -->
@@ -544,12 +543,17 @@ onBeforeUnmount(() => {
   color: var(--color-expense);
 }
 
-/* 快速筛选 */
+/* 快速筛选（在 filter-bar 内）*/
 .quick-filter {
   display: flex;
   gap: 8px;
-  padding: 0 16px 12px;
+  padding: 4px 0 8px;
+  margin-bottom: 6px;
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scrollbar-width: none;
 }
 
 .quick-filter::-webkit-scrollbar {
@@ -637,103 +641,112 @@ onBeforeUnmount(() => {
   color: var(--color-expense);
 }
 
-/* 筛选弹窗 */
-.filter-popup {
-  height: 100%;
+/* === 折叠筛选面板（流式布局，展开时下层内容跟着下推，不浮在上方） === */
+.filter-bar {
+  padding: 0 16px;
+  max-height: 0;
+  overflow-x: visible;
+  overflow-y: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+  margin-top: 0;
+}
+
+.filter-bar.expanded {
+  max-height: 260px;
+  padding: 8px 16px 4px;
+}
+
+.filter-row {
   display: flex;
-  flex-direction: column;
-  background: var(--color-bg-page);
-}
-
-.filter-header {
-  padding: 20px;
-  background: var(--color-bg-card);
-  text-align: center;
-}
-
-.filter-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.filter-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.filter-section {
-  margin-top: 12px;
-  background: var(--color-bg-card);
-  padding: 16px;
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  margin-bottom: 12px;
-}
-
-.option-row {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: var(--color-bg-card);
+  border-radius: 10px;
+}
+
+.filter-row:last-child {
+  margin-bottom: 0;
+}
+
+/* 两个 switch 选项一行 */
+.option-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.option-pair .filter-row {
+  margin-bottom: 0;
+  padding: 6px 10px;
+}
+
+.option-pair .option-label {
+  font-size: 13px;
+}
+
+.option-label {
   font-size: 14px;
   color: var(--color-text-primary);
 }
 
 .date-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  background: var(--color-bg-page);
-  border-radius: 10px;
   cursor: pointer;
+}
+
+.date-row:active {
+  opacity: 0.7;
 }
 
 .date-display {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  color: var(--color-text-secondary);
 }
 
 .date-value {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .date-sep {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
 }
 
-.filter-footer {
-  padding: 16px 20px;
-  background: var(--color-bg-card);
+.date-arrow {
+  color: var(--color-text-tertiary);
 }
 
-.apply-btn {
-  width: 100%;
-  padding: 14px;
+/* 头部按钮上的红点（有非默认筛选时显示） */
+.filter-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   background: var(--color-transfer);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 500;
+}
+
+.header-btn {
+  position: relative;
 }
 </style>
 
 <!-- 暗色模式 -->
 <style>
-.analysis-page .page-header {
+.analysis-page .page-header,
+.analysis-page .filter-bar {
   background: rgba(245, 245, 245, 0.8);
 }
 
-html.dark .analysis-page .page-header {
+html.dark .analysis-page .page-header,
+html.dark .analysis-page .filter-bar {
   background: rgba(10, 10, 10, 0.8);
 }
 </style>

@@ -8,6 +8,7 @@ import {
   type MailConfigUpdate,
 } from '@shared/api/systemConfig'
 import { isHandledError } from '@shared/api/request'
+import { CircleHelp } from 'lucide-vue-next'
 
 import './page-styles.css'
 
@@ -123,8 +124,10 @@ async function onSave() {
     showToast({ message: '已保存', type: 'success' })
     smartBack('/setting/system')
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('保存失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('保存失败')
+    }
   } finally {
     saving.value = false
   }
@@ -151,8 +154,10 @@ async function testMail() {
       })
     }
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('测试发送失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('测试发送失败')
+    }
   } finally {
     testing.value = false
   }
@@ -198,7 +203,7 @@ onMounted(() => {
       </div>
       <div class="sys-mob-header-title">邮件设置</div>
       <div class="sys-mob-header-right is-info" @click="showInfoDialog">
-        <van-icon name="question-o" size="20" />
+        <CircleHelp :size="20" :stroke-width="1.75" />
       </div>
     </div>
 

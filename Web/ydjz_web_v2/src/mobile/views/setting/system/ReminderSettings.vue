@@ -9,6 +9,7 @@ import {
 } from '@shared/api/systemConfig'
 import type { ReminderConfig } from '@shared/api/scheduledFlow'
 import { isHandledError } from '@shared/api/request'
+import { TriangleAlert } from 'lucide-vue-next'
 
 import './page-styles.css'
 
@@ -142,8 +143,11 @@ async function onSave() {
     showToast({ message: '已保存', type: 'success' })
     smartBack('/setting/system')
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('保存失败')
+    // handled error：全局 onError 已弹 fail toast，让它自然显示，不要主动 close
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('保存失败')
+    }
   } finally {
     saving.value = false
   }
@@ -253,7 +257,7 @@ onMounted(() => {
       </van-cell-group>
 
       <div v-if="originalAutoExcel && !autoExcelForm.enabled" class="sys-mob-hint is-warn">
-        <van-icon name="warning-o" size="14" class="hint-icon" />
+        <TriangleAlert :size="14" :stroke-width="1.75" class="hint-icon" />
         <div class="hint-content">
           <div class="hint-title">月度报表生成已关闭</div>
           <div class="hint-text">

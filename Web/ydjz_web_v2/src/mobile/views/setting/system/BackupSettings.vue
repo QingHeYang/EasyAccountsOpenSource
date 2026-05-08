@@ -124,8 +124,10 @@ async function onSave() {
     showToast({ message: '已保存', type: 'success' })
     smartBack('/setting/system')
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('保存失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('保存失败')
+    }
   } finally {
     saving.value = false
   }

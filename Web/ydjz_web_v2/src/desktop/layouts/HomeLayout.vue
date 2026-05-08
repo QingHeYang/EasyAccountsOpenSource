@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { House, List, TrendCharts, Setting, Bell } from '@element-plus/icons-vue'
+import { Home, List, BarChart3, Settings, Bell } from 'lucide-vue-next'
 import logoUrl from '@shared/assets/logo.png'
 import { AIDrawer, AITriggerButton } from '@desktop/components/ai-plus'
 import NotificationCenter from '@desktop/components/NotificationCenter.vue'
@@ -79,10 +79,10 @@ onUnmounted(() => {
 
 // Tab 配置
 const tabs = [
-  { path: '/board', icon: House, label: '总览' },
+  { path: '/board', icon: Home, label: '总览' },
   { path: '/flow', icon: List, label: '明细' },
-  { path: '/analysis', icon: TrendCharts, label: '统计' },
-  { path: '/setting', icon: Setting, label: '设置' },
+  { path: '/analysis', icon: BarChart3, label: '统计' },
+  { path: '/setting', icon: Settings, label: '设置' },
 ]
 
 // 当前激活的 tab 索引
@@ -134,9 +134,7 @@ const sliderStyle = computed(() => ({
               class="nav-item"
               :class="{ active: activeIndex === index }"
             >
-              <el-icon :size="18">
-                <component :is="tab.icon" />
-              </el-icon>
+              <component :is="tab.icon" :size="18" class="nav-icon" />
               <span class="nav-label">{{ tab.label }}</span>
             </router-link>
           </div>
@@ -150,7 +148,7 @@ const sliderStyle = computed(() => ({
             title="消息通知"
             @click="notificationOpen = true"
           >
-            <el-icon :size="20"><Bell /></el-icon>
+            <Bell :size="20" :stroke-width="1.75" />
             <span v-if="unreadCount > 0" class="bell-badge">{{ unreadDisplay }}</span>
           </button>
         </div>

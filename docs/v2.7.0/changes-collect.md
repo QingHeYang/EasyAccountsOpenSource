@@ -88,6 +88,23 @@
 | **细节** | ① 顺序：支出 → 收入 → 转账（按使用频次）<br>② "不计入"项目分组折叠，默认收起<br>③ 选中后卡片背景按收支类型渐变（绿/红/蓝）<br>④ 默认选第一个支出<br>⑤ 大字号金额 + 横线分隔 |
 | **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-05.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-05.md) §4 |
 
+### N5 · 移动端 Analysis 筛选面板重构
+
+| 项 | 内容 |
+|---|---|
+| **用户感知** | 移动端"统计"页筛选从底部弹层改为**顶部 fixed 折叠面板**，所有时间相关筛选集中：快捷选项 / 自定义起止 / 选项开关 |
+| **细节** | ① 开始/结束日期拆成两个独立 picker<br>② 快捷选项支持横向滑动<br>③ 头部按钮有非默认筛选时显示红点提示 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §3 |
+
+### N6 · 定时记账开始日期最早明天（双端业务校验补齐）
+
+| 项 | 内容 |
+|---|---|
+| **背景** | 用户新建定时记账时如果选今天但已经过了 runTime（执行时分），首日就不触发，歧义大 |
+| **修复** | 双端 datepicker + 校验：开始日期最早只能选**明天**<br>移动端 `ScheduledFlowAdd` + PC 端 `ScheduledFlowManager` 一起改 |
+| **附带** | ScheduledFlowAdd 接入 TypePicker，**移动端 4 个分类选择入口全部统一**（接续 E4）|
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §5, §6 |
+
 ---
 
 ## 🐛 Bug 修复（续登）
@@ -125,6 +142,15 @@
 | **影响** | PC 端"系统设置 → 邮件 → 编辑"对话框暗黑模式下，input 内框超出外框 + 左右不充满 |
 | **本次处理** | input 高度策略改用 Element Plus 标准变量，避免手撕样式与暗黑模式冲突 |
 | **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-04-28-part3.md) §1 |
+
+### B8 · toast 全局体验优化 + 修 9 处全局 fail toast 被秒关 bug
+
+| 项 | 内容 |
+|---|---|
+| **现象** | 业务调用失败后看不到错误 toast：5 个系统设置子页 + ScheduledFlowAdd 4 处 catch 块写了 `closeToast()`，把全局 fail toast 也一起关了 |
+| **修复** | 9 处 catch 内不再 `closeToast`，让全局 onError 弹的 fail toast 自然显示 |
+| **附带优化** | 长文本（>20 字）走横长条 toast，宽度 88%，duration 按字数线性；短文本走 fail 方形 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §4 |
 
 ---
 
@@ -164,10 +190,20 @@
 | 项 | 内容 |
 |---|---|
 | **背景** | 移动端记账（FlowAdd / TemplateAdd）和统计（AnalysisType）原本各自实现一套分类选择 UI，逻辑重复且维护负担大 |
-| **重构** | ① 新增 `mobile/components/flow/TypePicker.vue` —— 记账场景，**全展开网格视图替代 cascader**，self-contained（按 actionId 自拉、loading/empty/error 状态、竞态守卫）<br>② 新增 `mobile/components/analysis/StatTypePicker.vue` —— 统计场景，**全部分类（不按 action 过滤）+ 一级标题旁 action 标签 + 父级聚合"全部" chip**<br>③ FlowAdd / TemplateAdd 接入 TypePicker，移除原生 vant cascader 代码<br>④ AnalysisType 接入 StatTypePicker，删除 -288 行原地分类树管理逻辑<br>⑤ flowAddState 清理废弃的 `cascaderValue` 状态字段 |
+| **重构** | ① 新增 `mobile/components/flow/TypePicker.vue` —— 记账场景，**全展开网格视图替代 cascader**，self-contained（按 actionId 自拉、loading/empty/error 状态、竞态守卫）<br>② 新增 `mobile/components/analysis/StatTypePicker.vue` —— 统计场景，**全部分类（不按 action 过滤）+ 一级标题旁 action 标签 + 父级聚合"全部" chip**<br>③ FlowAdd / TemplateAdd / **ScheduledFlowAdd**（v2.7.0 末期补）接入 TypePicker，移除原生 vant cascader 代码<br>④ AnalysisType 接入 StatTypePicker，删除 -288 行原地分类树管理逻辑<br>⑤ flowAddState 清理废弃的 `cascaderValue` 状态字段 |
 | **附带修复** | 父级聚合下同月既有收入又有支出时传 `3`（全部）而不是只看支出。**双端同时修**：移动端 `AnalysisType.chooseHandle` + PC 端 `TypeDetail.onMonthItemClick` |
-| **用户感知** | 移动端选择分类的体验在 3 处页面统一一致；网格视图比 cascader 更直观 |
-| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-05.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-05.md) §6, §7, §8 |
+| **用户感知** | 移动端选择分类的体验在 4 处页面统一一致；网格视图比 cascader 更直观 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-05.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-05.md) §6, §7, §8<br>[`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §6 |
+
+### E5 · 图标库统一切到 Lucide
+
+| 项 | 内容 |
+|---|---|
+| **背景** | 双端图标来自 Element Plus / Vant / 手写 SVG / emoji 多个来源，风格 / stroke 重量 / 颜色机制不一致 |
+| **本次重构** | 装 `lucide-vue-next`，把所有"语义化业务图标"切到 Lucide：<br>① 双端导航 / 通知 / 设置主页 / 系统设置子页 / 系统设置抽屉 Section header / 主题选项 / 定时记账执行记录 全部替换<br>② Element Plus 仅保留状态符号（CircleCheckFilled 等填充态）+ 导航箭头<br>③ Vant 仅保留小型导航类图标 |
+| **配套规范** | 新增 `Web/ydjz_web_v2/docs/dev-guide/icon_图标使用规范.md`：<br>① 图标库选型 / 统一参数 / 命名约定<br>② 双端通用语义对照表<br>③ 新增页面接入清单<br>④ 特殊场景注意（el-button 不支持 :icon=Lucide / van-cell 同理 / 垂直对齐 display:block / `:has()` 浏览器要求） |
+| **用户感知** | 双端图标观感统一，尤其暗黑模式下不再有"有的图标偏黑、有的偏灰"的零碎感 |
+| **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §1, §2 |
 
 ---
 

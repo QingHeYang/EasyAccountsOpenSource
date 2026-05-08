@@ -8,6 +8,7 @@ import {
   type AuthConfigUpdate,
 } from '@shared/api/systemConfig'
 import { isHandledError } from '@shared/api/request'
+import { Info } from 'lucide-vue-next'
 
 import './page-styles.css'
 
@@ -89,8 +90,10 @@ async function onSave() {
     showToast({ message: '已保存', type: 'success' })
     smartBack('/setting/system')
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('保存失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('保存失败')
+    }
   } finally {
     saving.value = false
   }
@@ -171,7 +174,7 @@ onMounted(() => {
       </van-cell-group>
 
       <div class="sys-mob-hint">
-        <van-icon name="info-o" size="14" class="hint-icon" />
+        <Info :size="14" :stroke-width="1.75" class="hint-icon" />
         <div class="hint-content">
           <div class="hint-title">关于登录模式</div>
           <div class="hint-text">

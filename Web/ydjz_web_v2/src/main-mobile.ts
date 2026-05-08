@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import Vant, { showFailToast } from 'vant'
+import Vant, { showFailToast, showToast } from 'vant'
 import 'vant/lib/index.css'
 import '@shared/styles/theme.css'
 import './mobile/styles/base.css'
@@ -26,7 +26,22 @@ setupRequest({
     router.replace({ path: '/auth', query: { redirect, mode: '1' } })
   },
   onError: (_code, msg) => {
-    showFailToast(msg)
+    // bottom：跟操作位置更近，不挡顶部信息
+    // 长文案（> 20 字）走 text 横条 toast，max-width 70% 能容纳；
+    // 短文案走 fail 方形 toast，视觉强调失败语义
+    const text = msg ?? ''
+    if (text.length > 20) {
+      showToast({
+        message: text,
+        type: 'fail',
+        position: 'bottom',
+        // 长文本时长按字数线性增加：每 10 字 +500ms，最多 5 秒
+        duration: Math.min(2000 + Math.floor(text.length / 10) * 500, 5000),
+        className: 'app-long-toast',
+      })
+    } else {
+      showFailToast({ message: text, position: 'bottom' })
+    }
   },
 })
 

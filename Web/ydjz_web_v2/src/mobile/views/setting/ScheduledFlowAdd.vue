@@ -18,7 +18,7 @@ import {
 import { isHandledError } from '@shared/api/request'
 import { actionApi, type Action, ActionHandle, ExemptMode } from '@shared/api/action'
 import { accountApi, type Account, AccountType } from '@shared/api/account'
-import { typeApi, type TypeWithChildren } from '@shared/api/type'
+import TypePicker from '@mobile/components/flow/TypePicker.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -96,7 +96,6 @@ const submitting = ref(false)
 
 const actions = ref<Action[]>([])
 const accounts = ref<Account[]>([])
-const types = ref<TypeWithChildren[]>([])
 
 async function fetchActions() {
   try {
@@ -112,23 +111,12 @@ async function fetchAccounts() {
   } catch {}
 }
 
-async function fetchTypesByAction(actionId: number) {
-  try {
-    const res = await typeApi.getByActionId(actionId)
-    types.value = res.data.data || []
-  } catch {
-    types.value = []
-  }
-}
-
 /* ---------------- 选择器 state ---------------- */
 
 const showActionSheet = ref(false)
 const showAccountSheet = ref(false)
 const accountSheetType = ref<1 | 2>(1)
-const showTypeCascader = ref(false)
-const cascaderValue = ref<number | string>('')
-const cascaderFieldNames = { text: 'tname', value: 'id', children: 'childrenTypes' }
+const showTypePicker = ref(false)
 
 const showStartCalendar = ref(false)
 const showEndCalendar = ref(false)
@@ -200,8 +188,9 @@ function getAccountDisabledReason(account: Account, panelType: 1 | 2): string {
 /* ---------------- 日历 min/max ---------------- */
 
 const startCalendarMinDate = computed(() => {
-  // TODO(测试期放开)：产品规则要求明天起，当前放开到今天
+  // 定时记账最早从"明天"开始，当天不可选（避免新建时已经过了今天 runTime 导致首日不触发的歧义）
   const d = new Date()
+  d.setDate(d.getDate() + 1)
   d.setHours(0, 0, 0, 0)
   return d
 })
@@ -252,9 +241,8 @@ function onSelectAction(action: Action) {
   form.value.selectedAction = action
   form.value.selectedAccountTo = null
   form.value.selectedType = null
-  cascaderValue.value = ''
   showActionSheet.value = false
-  fetchTypesByAction(action.id)
+  // types 由 TypePicker 内部按 actionId 自动重新拉取
 }
 
 // 账户
@@ -278,27 +266,12 @@ function onSelectAccount(account: Account) {
 }
 
 // 分类
-function openTypeCascader() {
+function openTypePicker() {
   if (!form.value.selectedAction) {
     showToast('请先选择收支类型')
     return
   }
-  showTypeCascader.value = true
-}
-
-function onTypeCascaderFinish({
-  selectedOptions,
-}: {
-  selectedOptions: Array<{ tname: string; id: number }>
-}) {
-  showTypeCascader.value = false
-  if (selectedOptions.length > 0) {
-    const lastOption = selectedOptions[selectedOptions.length - 1]
-    form.value.selectedType = {
-      id: lastOption.id,
-      tname: selectedOptions.map((o) => o.tname).join('/'),
-    }
-  }
+  showTypePicker.value = true
 }
 
 // 周期
@@ -564,8 +537,10 @@ async function onSubmit() {
           closeToast()
           showToast('已保存并启动')
         } catch (err) {
-          closeToast()
-          if (!isHandledError(err)) showToast('已保存，启动失败，请回列表手动启动')
+          if (!isHandledError(err)) {
+            closeToast()
+            showToast('已保存，启动失败，请回列表手动启动')
+          }
         }
       } else {
         closeToast()
@@ -578,8 +553,8 @@ async function onSubmit() {
     }
     replaceAfterSubmit('/setting/scheduled-flow')
   } catch (err) {
-    closeToast()
     if (!isHandledError(err)) {
+      closeToast()
       showToast(isEditing.value ? '保存失败' : '创建失败')
     }
   } finally {
@@ -601,11 +576,10 @@ async function loadEditingRule(id: number) {
       return
     }
 
-    // 并行拉依赖（actions / accounts / 该 action 下的 types）
+    // 并行拉依赖（actions / accounts；types 由 TypePicker 自己按 actionId 拉）
     await Promise.all([
       fetchActions(),
       fetchAccounts(),
-      rule.actionId ? fetchTypesByAction(rule.actionId) : Promise.resolve(),
     ])
     closeToast()
 
@@ -640,8 +614,10 @@ async function loadEditingRule(id: number) {
       emailEnabled: rule.emailEnabled,
     }
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('加载规则失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('加载规则失败')
+    }
   }
 }
 
@@ -668,8 +644,10 @@ async function onDelete() {
     showToast('已删除')
     replaceAfterSubmit('/setting/scheduled-flow')
   } catch (err) {
-    closeToast()
-    if (!isHandledError(err)) showToast('删除失败')
+    if (!isHandledError(err)) {
+      closeToast()
+      showToast('删除失败')
+    }
   }
 }
 
@@ -793,7 +771,7 @@ onMounted(() => {
         </van-cell>
 
         <!-- 分类 -->
-        <van-cell is-link class="picker-cell" @click="openTypeCascader">
+        <van-cell is-link class="picker-cell" @click="openTypePicker">
           <template #title>
             <span class="cell-title-required">分类</span>
           </template>
@@ -1106,17 +1084,12 @@ onMounted(() => {
       </div>
     </van-action-sheet>
 
-    <!-- 分类级联 -->
-    <van-popup v-model:show="showTypeCascader" round position="bottom" teleport="body">
-      <van-cascader
-        v-model="cascaderValue"
-        title="选择分类"
-        :options="types"
-        :field-names="cascaderFieldNames"
-        @close="showTypeCascader = false"
-        @finish="onTypeCascaderFinish"
-      />
-    </van-popup>
+    <!-- 分类选择器（一级 section + 二级 chip 网格 + 搜索） -->
+    <TypePicker
+      v-model="form.selectedType"
+      v-model:open="showTypePicker"
+      :action-id="form.selectedAction?.id ?? null"
+    />
 
     <!-- 开始日期（用自定义 popup 限高，避免 van-calendar 默认铺满屏幕） -->
     <van-popup
