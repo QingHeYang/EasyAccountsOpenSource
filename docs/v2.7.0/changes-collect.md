@@ -105,6 +105,15 @@
 | **附带** | ScheduledFlowAdd 接入 TypePicker，**移动端 4 个分类选择入口全部统一**（接续 E4）|
 | **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §5, §6 |
 
+### N7 · 统计页时间筛选支持精确到天（双端）
+
+| 项 | 内容 |
+|---|---|
+| **产品决策** | "横切看日、纵切看月"：统计**主页**（按分类横切某段时间）支持精确到天；分类**详情页**（一个分类的长期趋势）仍按月 |
+| **范围** | 后端接口 `/getAnalysisType` 的 `start` / `end` 同时兼容 `yyyy-MM-dd` 与 `yyyy-MM`<br>PC 端 AnalysisMain 快捷选项 + FilterPanel date-picker 改为天级<br>移动端 Analysis 时间 picker columns 加 day 列<br>PC TypeDetail / 移动端 AnalysisType 收到 query 时截到月份保持原行为 |
+| **用户感知** | 想查"上周餐饮"、"5 月 1-5 日总览"等精确日期范围的人，统计主页可以直接选了 |
+| **dev-log** | [`Server/docs/dev-log/dev-log-2026-05-14.md`](../../Server/docs/dev-log/dev-log-2026-05-14.md) §2<br>[`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-14.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-14.md) §3-§6 |
+
 ---
 
 ## 🐛 Bug 修复（续登）
@@ -151,6 +160,14 @@
 | **修复** | 9 处 catch 内不再 `closeToast`，让全局 onError 弹的 fail toast 自然显示 |
 | **附带优化** | 长文本（>20 字）走横长条 toast，宽度 88%，duration 按字数线性；短文本走 fail 方形 |
 | **dev-log** | [`Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md`](../../Web/ydjz_web_v2/docs/dev-log/dev-log-2026-05-08.md) §4 |
+
+### B9 · 合并子分类视图下一级分类自有流水时金额计算错误
+
+| 项 | 内容 |
+|---|---|
+| **影响** | 统计页"合并子分类"视图下，若**一级分类自己有流水 + 子分类也有流水**，金额会被 HashMap 顺序覆盖导致计算错 |
+| **修复** | `AnalysisV2Service.combineTypeBean` 累加逻辑修正，不再因 key 顺序丢失父级流水 |
+| **dev-log** | [`Server/docs/dev-log/dev-log-2026-05-14.md`](../../Server/docs/dev-log/dev-log-2026-05-14.md) §1 |
 
 ---
 

@@ -37,60 +37,50 @@ const allOutTypeList = ref<AnalysisTypeItem[]>([])
 const disabledTypeIds = ref<Set<number>>(new Set())
 
 // ==================== 工具函数 ====================
-function formatYearMonth(date: Date): string {
+function formatYMD(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
-// 根据快捷选项计算日期范围
+/** 某年某月 1 号 */
+function firstDayOf(year: number, month: number): Date {
+  return new Date(year, month, 1)
+}
+
+/** 某年某月最后一天 */
+function lastDayOf(year: number, month: number): Date {
+  return new Date(year, month + 1, 0)
+}
+
+// 根据快捷选项计算日期范围（统一输出 yyyy-MM-dd，覆盖完整自然月起止）
 function calcDateRange(value: number): { start: string; end: string } {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
+  const today = formatYMD(now)
 
   switch (value) {
-    case 0: // 当月
+    case 0: // 当月：1 号 ~ 今天
+      return { start: formatYMD(firstDayOf(year, month)), end: today }
+    case 1: // 上月：上月 1 号 ~ 上月最后一天
       return {
-        start: formatYearMonth(now),
-        end: formatYearMonth(now)
+        start: formatYMD(firstDayOf(year, month - 1)),
+        end: formatYMD(lastDayOf(year, month - 1)),
       }
-    case 1: // 上月
-      const lastMonth = new Date(year, month - 1, 1)
-      return {
-        start: formatYearMonth(lastMonth),
-        end: formatYearMonth(lastMonth)
-      }
-    case 2: // 近3月
-      return {
-        start: formatYearMonth(new Date(year, month - 2, 1)),
-        end: formatYearMonth(now)
-      }
-    case 3: // 近6月
-      return {
-        start: formatYearMonth(new Date(year, month - 5, 1)),
-        end: formatYearMonth(now)
-      }
-    case 4: // 近1年
-      return {
-        start: formatYearMonth(new Date(year - 1, month, 1)),
-        end: formatYearMonth(now)
-      }
-    case 5: // 当年
-      return {
-        start: `${year}-01`,
-        end: formatYearMonth(now)
-      }
-    case 6: // 上年
-      return {
-        start: `${year - 1}-01`,
-        end: `${year - 1}-12`
-      }
+    case 2: // 近 3 月：3 个月前的 1 号 ~ 今天
+      return { start: formatYMD(firstDayOf(year, month - 2)), end: today }
+    case 3: // 近 6 月
+      return { start: formatYMD(firstDayOf(year, month - 5)), end: today }
+    case 4: // 近 1 年
+      return { start: formatYMD(firstDayOf(year - 1, month)), end: today }
+    case 5: // 本年：1/1 ~ 今天
+      return { start: `${year}-01-01`, end: today }
+    case 6: // 上年：上年 1/1 ~ 12/31
+      return { start: `${year - 1}-01-01`, end: `${year - 1}-12-31` }
     default:
-      return {
-        start: formatYearMonth(now),
-        end: formatYearMonth(now)
-      }
+      return { start: formatYMD(firstDayOf(year, month)), end: today }
   }
 }
 

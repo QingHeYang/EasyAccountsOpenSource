@@ -156,16 +156,17 @@ function formatYearMonth(date: Date): string {
 function initDateRange() {
   // 优先使用外部传入的时间
   if (route.query.start && route.query.end) {
-    startDate.value = route.query.start as string
-    endDate.value = route.query.end as string
+    // 主页可能传 yyyy-MM-dd，详情页"看长期趋势"按月就够，截取前 7 位
+    startDate.value = (route.query.start as string).substring(0, 7)
+    endDate.value = (route.query.end as string).substring(0, 7)
     fastChoose.value = '4' // 自定义
   } else {
     // 默认近一年
     onFastDateChoose('1')
   }
-  // 初始化时间选择器的值
-  chooseStartTime.value = startDate.value.split('-')
-  chooseEndTime.value = endDate.value.split('-')
+  // 初始化时间选择器的值（仅取 [year, month] 两段）
+  chooseStartTime.value = startDate.value.split('-').slice(0, 2)
+  chooseEndTime.value = endDate.value.split('-').slice(0, 2)
 }
 
 function onFastDateChoose(value: string) {

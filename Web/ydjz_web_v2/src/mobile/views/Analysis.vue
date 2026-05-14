@@ -104,10 +104,11 @@ function formatLargeAmount(amount: string): string {
   return amount
 }
 
-function formatYearMonth(date: Date): string {
+function formatYMD(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function onFastChoose(value: number) {
@@ -115,39 +116,37 @@ function onFastChoose(value: number) {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
+  const today = formatYMD(now)
+  const lastDayOf = (y: number, mIndex: number) => new Date(y, mIndex + 1, 0)
 
   switch (value) {
-    case 0: // 当月
-      startDate.value = formatYearMonth(now)
-      endDate.value = formatYearMonth(now)
+    case 0: // 本月
+      startDate.value = formatYMD(new Date(year, month, 1))
+      endDate.value = today
       break
     case 1: // 上月
-      const lastMonth = new Date(year, month - 1, 1)
-      startDate.value = formatYearMonth(lastMonth)
-      endDate.value = formatYearMonth(lastMonth)
+      startDate.value = formatYMD(new Date(year, month - 1, 1))
+      endDate.value = formatYMD(lastDayOf(year, month - 1))
       break
     case 2: // 近3月
-      const threeMonthsAgo = new Date(year, month - 2, 1)
-      startDate.value = formatYearMonth(threeMonthsAgo)
-      endDate.value = formatYearMonth(now)
+      startDate.value = formatYMD(new Date(year, month - 2, 1))
+      endDate.value = today
       break
     case 3: // 近6月
-      const sixMonthsAgo = new Date(year, month - 5, 1)
-      startDate.value = formatYearMonth(sixMonthsAgo)
-      endDate.value = formatYearMonth(now)
+      startDate.value = formatYMD(new Date(year, month - 5, 1))
+      endDate.value = today
       break
     case 4: // 近1年
-      const oneYearAgo = new Date(year - 1, month, 1)
-      startDate.value = formatYearMonth(oneYearAgo)
-      endDate.value = formatYearMonth(now)
+      startDate.value = formatYMD(new Date(year - 1, month, 1))
+      endDate.value = today
       break
-    case 5: // 当年
-      startDate.value = `${year}-01`
-      endDate.value = formatYearMonth(now)
+    case 5: // 本年
+      startDate.value = `${year}-01-01`
+      endDate.value = today
       break
     case 6: // 上年
-      startDate.value = `${year - 1}-01`
-      endDate.value = `${year - 1}-12`
+      startDate.value = `${year - 1}-01-01`
+      endDate.value = `${year - 1}-12-31`
       break
   }
 
@@ -225,31 +224,34 @@ function toggleTypeDisabled(typeId: number) {
   disabledTypeIds.value = newSet
 }
 
+function initPickerArr(date: string): string[] {
+  // 期望 yyyy-MM-dd，向后兼容 yyyy-MM（旧 store 数据自动补 01）
+  const parts = date.split('-')
+  if (parts.length === 3) return parts
+  if (parts.length === 2) return [parts[0], parts[1], '01']
+  const now = new Date()
+  return [
+    String(now.getFullYear()),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ]
+}
+
 function openStartPicker() {
-  if (startDate.value) {
-    chooseStartTime.value = startDate.value.split('-')
-  } else {
-    const now = new Date()
-    chooseStartTime.value = [String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0')]
-  }
+  chooseStartTime.value = initPickerArr(startDate.value)
   showStartPicker.value = true
 }
 
 function openEndPicker() {
-  if (endDate.value) {
-    chooseEndTime.value = endDate.value.split('-')
-  } else {
-    const now = new Date()
-    chooseEndTime.value = [String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0')]
-  }
+  chooseEndTime.value = initPickerArr(endDate.value)
   showEndPicker.value = true
 }
 
 function onStartConfirm() {
-  const newStart = `${chooseStartTime.value[0]}-${chooseStartTime.value[1].padStart(2, '0')}`
-  // 校验：开始不能晚于结束
+  const [y, m, d] = chooseStartTime.value
+  const newStart = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   if (endDate.value && newStart > endDate.value) {
-    showToast('开始月份不能晚于结束月份')
+    showToast('开始日期不能晚于结束日期')
     return
   }
   startDate.value = newStart
@@ -259,9 +261,10 @@ function onStartConfirm() {
 }
 
 function onEndConfirm() {
-  const newEnd = `${chooseEndTime.value[0]}-${chooseEndTime.value[1].padStart(2, '0')}`
+  const [y, m, d] = chooseEndTime.value
+  const newEnd = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   if (startDate.value && newEnd < startDate.value) {
-    showToast('结束月份不能早于开始月份')
+    showToast('结束日期不能早于开始日期')
     return
   }
   endDate.value = newEnd
@@ -417,27 +420,27 @@ onBeforeUnmount(() => {
     </div>
 
 
-    <!-- 开始月份选择器 -->
+    <!-- 开始日期选择器 -->
     <van-popup v-model:show="showStartPicker" position="bottom" round teleport="body">
       <van-date-picker
         v-model="chooseStartTime"
-        title="选择开始月份"
+        title="选择开始日期"
         :min-date="minDate"
         :max-date="maxDate"
-        :columns-type="['year', 'month']"
+        :columns-type="['year', 'month', 'day']"
         @confirm="onStartConfirm"
         @cancel="showStartPicker = false"
       />
     </van-popup>
 
-    <!-- 结束月份选择器 -->
+    <!-- 结束日期选择器 -->
     <van-popup v-model:show="showEndPicker" position="bottom" round teleport="body">
       <van-date-picker
         v-model="chooseEndTime"
-        title="选择结束月份"
+        title="选择结束日期"
         :min-date="minDate"
         :max-date="maxDate"
-        :columns-type="['year', 'month']"
+        :columns-type="['year', 'month', 'day']"
         @confirm="onEndConfirm"
         @cancel="showEndPicker = false"
       />

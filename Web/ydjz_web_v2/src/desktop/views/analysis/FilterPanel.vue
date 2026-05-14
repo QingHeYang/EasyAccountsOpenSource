@@ -90,10 +90,10 @@ function onEndDateChange(val: string) {
           <span class="date-label">开始</span>
           <el-date-picker
             :model-value="localStartDate"
-            type="month"
-            placeholder="开始月份"
-            format="YYYY-MM"
-            value-format="YYYY-MM"
+            type="date"
+            placeholder="开始日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
             class="date-picker"
             @update:model-value="onStartDateChange"
           />
@@ -102,10 +102,10 @@ function onEndDateChange(val: string) {
           <span class="date-label">结束</span>
           <el-date-picker
             :model-value="localEndDate"
-            type="month"
-            placeholder="结束月份"
-            format="YYYY-MM"
-            value-format="YYYY-MM"
+            type="date"
+            placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
             class="date-picker"
             @update:model-value="onEndDateChange"
           />
