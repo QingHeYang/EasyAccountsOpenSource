@@ -94,8 +94,9 @@ onMounted(async () => {
   }
 
   if (props.initialStartDate && props.initialEndDate) {
-    localStartDate.value = props.initialStartDate
-    localEndDate.value = props.initialEndDate
+    // 详情页"看长期趋势"语义按月就够；主页可能传 yyyy-MM-dd，截取前 7 位转月份
+    localStartDate.value = props.initialStartDate.substring(0, 7)
+    localEndDate.value = props.initialEndDate.substring(0, 7)
     fastChoose.value = 4 // 自定义
   } else {
     // 默认近一年
