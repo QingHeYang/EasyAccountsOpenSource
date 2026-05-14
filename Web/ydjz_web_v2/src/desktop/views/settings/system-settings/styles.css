@@ -1,0 +1,849 @@
+/* ============================================================
+ * 系统设置共享样式
+ *
+ * 由各 Section 子组件共用，统一抽屉内每块的视觉节奏：
+ *   .info-section / .section-header / .section-body
+ *   .info-grid / .info-item
+ *   .summary-text / .summary-tags
+ *   .form-group / .form-label / .form-hint（对话框内表单）
+ *   .day-grid / .day-cell（备份/Excel 的日期网格）
+ *
+ * 所有样式不带 scoped，由 SystemSettings.vue 主容器一次性 import 即可。
+ * ============================================================ */
+
+/* === 信息区块（沿用 SystemInfo 风格） === */
+.sys-section {
+  background: var(--color-bg-page);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sys-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.sys-section-edit {
+  margin-left: auto !important;
+  padding: 4px 10px !important;
+  height: 28px !important;
+}
+
+.sys-section-body {
+  padding: 16px;
+}
+
+.sys-loading-text {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* === 信息网格（label + value） === */
+.sys-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sys-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg-card);
+  border-radius: 8px;
+}
+
+.sys-info-item.sys-disabled {
+  opacity: 0.55;
+}
+
+.sys-info-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.sys-info-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-left: 4px;
+}
+
+.sys-info-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.sys-value-suffix {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+/* === 子区块（用于聚合分组，如提醒设置） === */
+.sys-sub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sys-sub-section.sys-sub-disabled .sys-info-grid {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.sys-sub-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  padding: 0 4px;
+}
+
+.sys-sub-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  margin-left: 6px;
+}
+
+.sys-sub-hint.sys-warn {
+  color: #d48806;
+}
+
+/* === 摘要 === */
+.sys-summary-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.sys-summary-sub {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.sys-summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sys-summary-cron {
+  margin-top: 6px;
+}
+
+.sys-summary-cron code {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--color-bg-page);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* === iOS 风格圆角 switch（覆盖抽屉内 + sys-dialog 对话框内） ===
+ * 默认 el-switch 视觉偏扁，这里加大轨道高度、加大按钮、加阴影，
+ * 形成更显眼的胶囊形态，符合 macOS / iOS 系统设置的视觉感。
+ * 注意：dialog 用 append-to-body 脱离了抽屉 DOM，所以选择器要并列包含 .sys-dialog
+ */
+.system-settings-drawer .el-switch__core,
+.sys-dialog .el-switch__core {
+  height: 26px;
+  min-width: 46px;
+  border-radius: 13px;
+  border: 0;
+  background-color: #d9d9d9;
+  transition: background-color 0.25s;
+}
+
+.system-settings-drawer .el-switch.is-checked .el-switch__core,
+.sys-dialog .el-switch.is-checked .el-switch__core {
+  background-color: var(--color-transfer);
+}
+
+.system-settings-drawer .el-switch__core .el-switch__action,
+.sys-dialog .el-switch__core .el-switch__action {
+  width: 22px;
+  height: 22px;
+  top: 2px;
+  left: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: left 0.25s;
+}
+
+.system-settings-drawer .el-switch.is-checked .el-switch__core .el-switch__action,
+.sys-dialog .el-switch.is-checked .el-switch__core .el-switch__action {
+  left: calc(100% - 24px);
+}
+
+.system-settings-drawer .el-switch.is-disabled,
+.sys-dialog .el-switch.is-disabled {
+  opacity: 0.5;
+}
+
+.system-settings-drawer .el-switch__inner,
+.sys-dialog .el-switch__inner {
+  display: none; /* 移除内嵌的 on/off 文字图标 */
+}
+
+/* === iOS 胶囊 + 主题蓝 segmented（覆盖抽屉内 + sys-dialog 对话框内） ===
+ * 容器：浅灰胶囊；
+ * 选中态：浅蓝底 + 主题蓝字 + 蓝色细边 + 柔和蓝阴影；
+ * 强制统一尺寸（覆盖 size=small/default 差异），避免不同地方大小不一致。
+ * 应用在：单点/多端、提前 N 天、频率每日/每周/每月、星期几、上月/本月 等
+ */
+.system-settings-drawer .el-segmented,
+.sys-dialog .el-segmented {
+  --el-segmented-bg-color: transparent;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 4px;
+  border-radius: 12px;
+  border: 0;
+}
+
+.system-settings-drawer .el-segmented__group,
+.sys-dialog .el-segmented__group {
+  gap: 0;
+}
+
+.system-settings-drawer .el-segmented__item,
+.sys-dialog .el-segmented__item {
+  border-radius: 8px;
+  border: 0;
+  font-size: 14px;
+  padding: 0 18px;
+  min-height: 32px;
+  line-height: 32px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  transition: color 0.2s;
+}
+
+.system-settings-drawer .el-segmented__item::before,
+.sys-dialog .el-segmented__item::before {
+  display: none; /* 移除默认的分隔竖线 */
+}
+
+.system-settings-drawer .el-segmented__item:hover:not(.is-selected),
+.sys-dialog .el-segmented__item:hover:not(.is-selected) {
+  color: var(--color-text-primary);
+  background: transparent;
+}
+
+.system-settings-drawer .el-segmented__item.is-selected,
+.sys-dialog .el-segmented__item.is-selected {
+  color: var(--color-transfer);
+  font-weight: 600;
+  background: transparent;
+}
+
+/* 浮动的选中态指示器（element-plus 用它跟踪当前选中项的位置） */
+.system-settings-drawer .el-segmented__item-selected,
+.sys-dialog .el-segmented__item-selected {
+  background-color: #fff;
+  border: 1px solid var(--color-transfer);
+  border-radius: 8px;
+  box-shadow:
+    0 2px 8px rgba(24, 144, 255, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* === 暗色模式适配 === */
+html.dark .sys-section {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html.dark .sys-section-header {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .sys-info-item {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html.dark .sys-summary-cron code {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .system-settings-drawer .el-switch__core,
+html.dark .sys-dialog .el-switch__core {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+html.dark .system-settings-drawer .el-switch.is-checked .el-switch__core,
+html.dark .sys-dialog .el-switch.is-checked .el-switch__core {
+  background-color: var(--color-transfer);
+}
+
+html.dark .system-settings-drawer .el-segmented,
+html.dark .sys-dialog .el-segmented {
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* 未选中 item：浅灰字，hover 时变白 */
+html.dark .system-settings-drawer .el-segmented__item,
+html.dark .sys-dialog .el-segmented__item {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+html.dark .system-settings-drawer .el-segmented__item:hover:not(.is-selected),
+html.dark .sys-dialog .el-segmented__item:hover:not(.is-selected) {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* 选中 item：亮蓝字 */
+html.dark .system-settings-drawer .el-segmented__item.is-selected,
+html.dark .sys-dialog .el-segmented__item.is-selected {
+  color: #74C0FC;
+}
+
+/* 选中胶囊：偏亮的玻璃感（半透明白叠加 + 蓝边 + 微蓝阴影） */
+html.dark .system-settings-drawer .el-segmented__item-selected,
+html.dark .sys-dialog .el-segmented__item-selected {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(116, 192, 252, 0.6);
+  box-shadow:
+    0 2px 8px rgba(116, 192, 252, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+ * 系统设置对话框：分组卡片 + 横向 label 布局（macOS 风）
+ * 命名前缀 sf- (settings-form)，由 MailSection / AutoExcelSection 等共用。
+ * 在对话框内（.sys-dialog）使用。
+ * ============================================================ */
+
+.sf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sf-card {
+  background: var(--color-bg-page);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+}
+
+.sf-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.5px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.sf-card-meta {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.sf-card-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-bg-card);
+}
+
+.sf-card-body--list {
+  padding: 0 16px;
+  gap: 0;
+}
+
+/* --- form row: 左 label + 右输入 --- */
+.sf-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sf-label {
+  flex-shrink: 0;
+  width: 88px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sf-info {
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  cursor: help;
+}
+
+.sf-info:hover {
+  color: var(--color-transfer);
+}
+
+.sf-tag {
+  margin-left: 0 !important;
+}
+
+.sf-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sf-input--narrow {
+  flex: none;
+  width: 140px;
+}
+
+/* --- 触发开关 row（list 模式：每行带分隔线） --- */
+.sf-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.sf-toggle-row:last-child {
+  border-bottom: 0;
+}
+
+.sf-toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sf-toggle-label > span:first-child {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.sf-toggle-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* --- footer --- */
+.sf-footer {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.sf-footer-spacer {
+  flex: 1;
+}
+
+/* === input / 数字输入 / 时间选择器统一样式（抽屉内 + 对话框内） ===
+ * 圆角 8 + 36px 高 + 主题蓝 focus 边框，与 segmented 32px 节奏对齐
+ */
+/* 用 Element Plus 自带的 CSS 变量控制组件高度，避免手撕 inner.height
+ * 影响：el-input / el-input-number / el-date-picker 内部都会按这个高度渲染 */
+.system-settings-drawer,
+.sys-dialog {
+  --el-component-size: 36px;
+}
+
+.system-settings-drawer .el-input__wrapper,
+.sys-dialog .el-input__wrapper {
+  border-radius: 8px;
+  padding: 0 12px;
+  box-shadow: 0 0 0 1px var(--color-border) inset;
+  transition: box-shadow 0.2s;
+}
+
+.system-settings-drawer .el-input__wrapper:hover,
+.sys-dialog .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--color-text-tertiary) inset;
+}
+
+.system-settings-drawer .el-input__wrapper.is-focus,
+.sys-dialog .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--color-transfer) inset;
+}
+
+/* 不强行撑 height（通过 --el-component-size 让组件自己处理），
+ * 但显式 width: 100% 让 inner 横向充满 wrapper 内容区。 */
+.system-settings-drawer .el-input__inner,
+.sys-dialog .el-input__inner {
+  width: 100%;
+  font-size: 13px;
+  background: transparent !important;
+  color: var(--color-text-primary);
+}
+
+/* textarea */
+.system-settings-drawer .el-textarea__inner,
+.sys-dialog .el-textarea__inner {
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 8px 12px;
+  box-shadow: 0 0 0 1px var(--color-border) inset;
+  transition: box-shadow 0.2s;
+}
+
+.system-settings-drawer .el-textarea__inner:hover,
+.sys-dialog .el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--color-text-tertiary) inset;
+}
+
+.system-settings-drawer .el-textarea__inner:focus,
+.sys-dialog .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--color-transfer) inset;
+}
+
+/* === 时间选择器：用等宽数字 + 大一号字体，让 HH:mm 显得更稳定显眼 ===
+ * 选择器命中 element-plus 给 time-picker 加的 .el-date-editor--time 类
+ */
+.system-settings-drawer .el-date-editor.el-date-editor--time,
+.sys-dialog .el-date-editor.el-date-editor--time {
+  width: 130px !important;
+}
+
+.system-settings-drawer .el-date-editor--time .el-input__wrapper,
+.sys-dialog .el-date-editor--time .el-input__wrapper {
+  padding: 0 14px;
+  background: var(--color-bg-card);
+}
+
+.system-settings-drawer .el-date-editor--time .el-input__inner,
+.sys-dialog .el-date-editor--time .el-input__inner {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 36px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  color: var(--color-text-primary);
+  background: transparent !important;
+}
+
+.system-settings-drawer .el-date-editor--time .el-input__prefix,
+.sys-dialog .el-date-editor--time .el-input__prefix {
+  color: var(--color-transfer);
+}
+
+.system-settings-drawer .el-date-editor--time .el-input__prefix .el-input__icon,
+.sys-dialog .el-date-editor--time .el-input__prefix .el-input__icon {
+  font-size: 16px;
+}
+
+/* === el-input-number：让 controls-right 的上下箭头无缝挨着 ===
+ * 我们把 input 整体高度抬到 36px，element-plus 默认按钮高度按 32px 算，
+ * 所以中间会留 4px 缝隙；这里手动把两个按钮各撑到 wrapper 高度的一半，
+ * 紧贴在一起。
+ */
+.system-settings-drawer .el-input-number,
+.sys-dialog .el-input-number {
+  width: auto;
+}
+
+.system-settings-drawer .el-input-number .el-input__wrapper,
+.sys-dialog .el-input-number .el-input__wrapper {
+  padding: 0 8px 0 12px;
+}
+
+/* InputNumber 内 input 的强制覆盖（element-plus 给 input-number 内的 inner 加了独立深背景，需要更具体的选择器才能压过） */
+.system-settings-drawer .el-input-number .el-input__inner,
+.sys-dialog .el-input-number .el-input__inner {
+  height: 36px;
+  line-height: 36px;
+  background: transparent !important;
+  text-align: center;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* InputNumber 上下箭头按钮：透明底 + hover 主题色（按钮自带浅灰底在 dark 下显得深突出） */
+.system-settings-drawer .el-input-number__increase,
+.system-settings-drawer .el-input-number__decrease,
+.sys-dialog .el-input-number__increase,
+.sys-dialog .el-input-number__decrease {
+  background: transparent !important;
+  color: var(--color-text-tertiary);
+}
+
+.system-settings-drawer .el-input-number__increase:hover,
+.system-settings-drawer .el-input-number__decrease:hover,
+.sys-dialog .el-input-number__increase:hover,
+.sys-dialog .el-input-number__decrease:hover {
+  background: rgba(24, 144, 255, 0.08) !important;
+  color: var(--color-transfer);
+}
+
+html.dark .system-settings-drawer .el-input-number__increase:hover,
+html.dark .system-settings-drawer .el-input-number__decrease:hover,
+html.dark .sys-dialog .el-input-number__increase:hover,
+html.dark .sys-dialog .el-input-number__decrease:hover {
+  background: rgba(116, 192, 252, 0.12) !important;
+  color: #74C0FC;
+}
+
+.system-settings-drawer .el-input-number.is-controls-right .el-input-number__increase,
+.sys-dialog .el-input-number.is-controls-right .el-input-number__increase {
+  top: 1px;
+  bottom: auto;
+  height: calc(50% - 1px);
+  line-height: calc(50% - 1px);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.system-settings-drawer .el-input-number.is-controls-right .el-input-number__decrease,
+.sys-dialog .el-input-number.is-controls-right .el-input-number__decrease {
+  top: 50%;
+  bottom: auto;
+  height: calc(50% - 1px);
+  line-height: calc(50% - 1px);
+  border-top: 0;
+}
+
+html.dark .system-settings-drawer .el-input-number.is-controls-right .el-input-number__increase,
+html.dark .sys-dialog .el-input-number.is-controls-right .el-input-number__increase {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+/* === 暗色模式补充：input / textarea / time-picker / popover === */
+
+/* input / input-number wrapper：半透明白底 + 浅灰边框 */
+html.dark .system-settings-drawer .el-input__wrapper,
+html.dark .sys-dialog .el-input__wrapper {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+html.dark .system-settings-drawer .el-input__wrapper:hover,
+html.dark .sys-dialog .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
+
+html.dark .system-settings-drawer .el-input__wrapper.is-focus,
+html.dark .sys-dialog .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--color-transfer) inset;
+}
+
+/* textarea */
+html.dark .system-settings-drawer .el-textarea__inner,
+html.dark .sys-dialog .el-textarea__inner {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  color: var(--color-text-primary);
+}
+
+html.dark .system-settings-drawer .el-textarea__inner:hover,
+html.dark .sys-dialog .el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+}
+
+html.dark .system-settings-drawer .el-textarea__inner:focus,
+html.dark .sys-dialog .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--color-transfer) inset;
+}
+
+/* time-picker wrapper：稍微亮一点，让它从 sys-info-item 上"浮起" */
+html.dark .system-settings-drawer .el-date-editor--time .el-input__wrapper,
+html.dark .sys-dialog .el-date-editor--time .el-input__wrapper {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* time-picker 时钟 icon：dark 下用偏亮的主题蓝（避免太深看不清） */
+html.dark .system-settings-drawer .el-date-editor--time .el-input__prefix,
+html.dark .sys-dialog .el-date-editor--time .el-input__prefix {
+  color: #74C0FC;
+}
+
+/* popover popper：默认 element-plus dark 主题色不一定理想，显式设置 */
+html.dark .sf-info-popover.el-popover {
+  background: rgba(40, 40, 42, 0.98) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: var(--color-text-primary);
+}
+
+/* popover 箭头跟随背景 */
+html.dark .sf-info-popover.el-popover .el-popper__arrow::before {
+  background: rgba(40, 40, 42, 0.98) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 暗色模式 */
+html.dark .sf-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .sf-card-title {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .sf-card-body {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+html.dark .sf-toggle-row {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
+ * info popover 全局样式（el-popover 用 append-to-body，scoped 命中不到）
+ * 由 MailSection 的"什么是授权码"、AutoExcelSection 的"什么是月度报表"等共用。
+ * ============================================================ */
+
+.sf-info-popover.el-popover {
+  padding: 14px 16px !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+.sf-info-popover .ip-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.sf-info-popover .ip-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--color-text-primary);
+}
+
+.sf-info-popover .ip-desc {
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+}
+
+.sf-info-popover .ip-list {
+  margin: 0 0 10px 0;
+  padding-left: 18px;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+}
+
+.sf-info-popover .ip-list li {
+  margin-bottom: 6px;
+  line-height: 1.55;
+}
+
+.sf-info-popover .ip-list li:last-child {
+  margin-bottom: 0;
+}
+
+.sf-info-popover .ip-list strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.sf-info-popover .ip-tip {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(24, 144, 255, 0.08);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-transfer);
+  line-height: 1.5;
+}
+
+html.dark .sf-info-popover .ip-tip {
+  background: rgba(116, 192, 252, 0.12);
+}
+
+/* ============================================================
+ * 通用 1-28 日号选择 grid
+ * ============================================================ */
+.sf-day-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.sf-day-cell {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.sf-day-cell:hover {
+  border-color: var(--color-transfer);
+  color: var(--color-transfer);
+}
+
+.sf-day-cell.is-active {
+  background: var(--color-transfer);
+  border-color: var(--color-transfer);
+  color: #fff;
+  font-weight: 600;
+}
+
+html.dark .sf-day-cell {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* sf-row 的纵向变体：label 上方 + 控件下方占整行（用于 grid 等大控件） */
+.sf-row--block {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.sf-row--block .sf-label {
+  width: auto;
+}
+
+/* ============================================================
+ * 通用"清除"大按钮（替代输入框，例如已设授权码后）
+ * ============================================================ */
+.sf-clear-btn {
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}

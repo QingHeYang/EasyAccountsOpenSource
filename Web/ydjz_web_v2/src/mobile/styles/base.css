@@ -271,3 +271,30 @@ html.dark .van-cascader__option--disabled,
 .van-theme-dark .van-cascader__option--disabled {
   color: #666 !important;
 }
+
+/* === 长文本 Toast：突破 fail 类型方形容器约束 ===
+ * Vant 默认 fail toast 是 90×90 方形，长文本会被压成多行。
+ * 这里让它变成横长条，文字横向铺开，max-width 88% 容下整段错误信息。
+ */
+.van-toast.app-long-toast {
+  max-width: 88% !important;
+  width: auto !important;
+  min-height: auto !important;
+  padding: 14px 18px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  box-sizing: border-box;
+}
+
+.van-toast.app-long-toast .van-toast__icon {
+  font-size: 22px !important;
+  margin: 0 10px 0 0 !important;
+  flex-shrink: 0;
+}
+
+.van-toast.app-long-toast .van-toast__text {
+  text-align: left !important;
+  line-height: 1.5;
+  font-size: 14px;
+  word-break: break-word;
+}

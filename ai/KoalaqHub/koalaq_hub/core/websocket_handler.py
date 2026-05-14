@@ -128,14 +128,27 @@ class MessageBuilder:
         )
 
     @staticmethod
-    def create_tool_response_message(conversation_id: str, tool_response: dict, tool_name: str,tool_call_id: str, status: bool, agent: AgentMessage = None) -> WebSocketMessage:
-        """创建工具执行结果消息"""
+    def create_tool_response_message(conversation_id: str, tool_response, tool_name: str, tool_call_id: str, status: bool, agent: AgentMessage = None, error_object: Optional[dict] = None) -> WebSocketMessage:
+        """创建工具执行结果消息
+
+        Args:
+            tool_response: 给 LLM 看的执行结果（字符串或 dict）
+            error_object: 失败时附带的结构化错误，前端据此渲染错误 UI / 重试按钮。
+                          字段：code / message / hint / retryable / metadata
+        """
+        obj: dict = {
+            "tool_call_id": tool_call_id,
+            "tool_name": tool_name,
+            "tool_response": tool_response,
+        }
+        if error_object:
+            obj["error_object"] = error_object
         return MessageBuilder.create_message(
             conversation_id=conversation_id,
             message_type=MessageType.TOOL_RESPONSE,
             text=tool_name,
             is_finish=True,
-            object={"tool_call_id": tool_call_id,  "tool_name": tool_name,"tool_response": tool_response},
+            object=obj,
             status=status,
             agent=agent
         )

@@ -8,7 +8,6 @@ import com.deepblue.yd_jz.dto.AnalysisResponseDto;
 import com.deepblue.yd_jz.data.AnalysisExcelData;
 import com.deepblue.yd_jz.dao.mybatis.FlowDao;
 import com.deepblue.yd_jz.entity.FlowType;
-import com.deepblue.yd_jz.utils.FileMakeWebHook;
 import com.deepblue.yd_jz.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +37,7 @@ public class AnalysisService {
     private String excelFolder;
 
     @Autowired
-    FileMakeWebHook fileMakeWebHook;
+    MailService mailService;
 
     @Transactional(rollbackFor = Exception.class)
     public AnalysisResponseDto doAnalysis(String startMonth, String endMonth) {
@@ -430,7 +429,7 @@ public class AnalysisService {
 
     private void uploadExcel(String excelPath, String excelFileName, String title) {
         if (FileUtils.isExist(excelPath)) {
-            fileMakeWebHook.sendFile(new File(excelPath), "analysis_excel", excelFileName);
+            mailService.sendAnalysisExcel(new File(excelPath), title);
         }
     }
 }

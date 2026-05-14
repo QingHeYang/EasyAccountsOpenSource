@@ -40,6 +40,16 @@ public enum ErrorCode {
     INVALID_STATE(42005, "状态不正确"),
     TYPE_CANNOT_DELETE(42006, "该分类下有流水记录，无法删除"),
     ACCOUNT_CANNOT_DELETE(42007, "该账户下有流水记录，无法删除"),
+    // v2.7.0: 定时记账相关业务错误
+    ACCOUNT_DISABLED(42008, "账户已停用"),
+    TYPE_DISABLED(42009, "分类已停用"),
+    TYPE_ARCHIVED(42010, "分类已归档"),
+    ILLEGAL_STATE_TRANSITION(42011, "当前状态不允许此操作"),
+    INVALID_START_DATE(42012, "开始日期必须晚于今天"),
+    INVALID_END_DATE(42013, "结束日期必须不早于开始日期"),
+    INVALID_CYCLE_CONFIG(42014, "周期配置非法"),
+    RULE_EXPIRED(42015, "规则已过结束日期，无法启动"),
+    TRANSFER_ACCOUNT_REQUIRED(42016, "转账场景下必须指定目标账户"),
 
     // ==================== 资源不存在错误 44xxx ====================
     ACCOUNT_NOT_FOUND(44001, "账户不存在"),
@@ -48,12 +58,19 @@ public enum ErrorCode {
     TEMPLATE_NOT_FOUND(44004, "模板不存在"),
     FILE_NOT_FOUND(44005, "文件不存在"),
     ACTION_NOT_FOUND(44006, "操作类型不存在"),
+    // v2.7.0:
+    SCHEDULED_RULE_NOT_FOUND(44007, "定时记账规则不存在"),
+    NOTICE_NOT_FOUND(44008, "通知不存在"),
 
     // ==================== 系统错误 50xxx ====================
     SYSTEM_ERROR(50001, "系统内部错误"),
     DATABASE_ERROR(50002, "数据库错误"),
     FILE_OPERATION_ERROR(50003, "文件操作错误"),
-    EXTERNAL_SERVICE_ERROR(50004, "外部服务调用失败");
+    EXTERNAL_SERVICE_ERROR(50004, "外部服务调用失败"),
+    // v2.7.0 (config-ui): 加解密相关
+    CRYPTO_FAILED(50005, "加解密失败"),
+    // v2.7.0 (config-ui): 启用邮件类功能时 SMTP 必须先配置完整
+    MAIL_NOT_CONFIGURED(42017, "邮件 SMTP 未配置完整，无法启用邮件功能；请先在「系统设置 - 邮件」中填写服务器、发件邮箱、密码、收件人");
 
     private final int code;
     private final String message;

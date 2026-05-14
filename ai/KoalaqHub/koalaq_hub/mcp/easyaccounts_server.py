@@ -18,6 +18,15 @@ from fastmcp.server.dependencies import get_http_headers, get_http_request
 
 from ..config.settings import config
 from ..core.logging_utils import ManagerLogger
+from ..tools.error_codes import (
+    E_FLOW_NOT_FOUND,
+    E_PARAM_INVALID,
+    E_PARAM_MISSING,
+    ToolError,
+    from_backend_response,
+    from_exception,
+    make_error,
+)
 
 # 初始化日志
 logger = ManagerLogger("MCPServer")
@@ -111,6 +120,9 @@ class EasyAccountsClient:
     def __init__(self, auth_token: Optional[str] = None):
         self.base_url = config.easyaccounts_url
         self.auth_token = auth_token
+        # 与内部工具一致：使用 tool_execution_timeout（默认 60s），
+        # 避免 httpx 默认 5s 误把后端慢查询识别为 E_TIMEOUT
+        self.timeout = config.tool_execution_timeout
 
     def _build_headers(self, content_type: Optional[str] = None) -> dict[str, str]:
         headers = {}
@@ -119,6 +131,14 @@ class EasyAccountsClient:
         if content_type:
             headers["Content-Type"] = content_type
         return headers
+
+    def async_client(self) -> "httpx.AsyncClient":
+        """返回配置好 timeout 的 httpx 客户端。
+
+        trust_env=True（httpx 默认）：跟随系统代理，
+        以便后端是公网域名时也能通过用户配置的代理访问。
+        """
+        return httpx.AsyncClient(timeout=self.timeout)
 
     def _handle_auth_error(self) -> dict[str, Any]:
         return {
@@ -135,75 +155,124 @@ def _get_client(ctx: Context) -> EasyAccountsClient:
     return EasyAccountsClient(auth_token=token)
 
 
+def _check_response(response: httpx.Response) -> Optional[ToolError]:
+    """统一的后端响应错误识别。返回 ToolError 表示需要报错；返回 None 表示成功。"""
+    backend_code = None
+    backend_msg = None
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            backend_code = body.get("code")
+            backend_msg = body.get("msg")
+    except Exception:
+        pass
+
+    if response.status_code != 200:
+        return from_backend_response(response.status_code, backend_code, backend_msg)
+    if backend_code is not None and backend_code != 0:
+        return from_backend_response(response.status_code, backend_code, backend_msg)
+    return None
+
+
+def _error_json(err: ToolError) -> str:
+    """把 ToolError 序列化为 MCP 客户端可读的 JSON 字符串。
+
+    输出包含 error/code/message/hint/retryable，外部客户端的 LLM 据此引导用户。
+    """
+    return json.dumps({
+        "error": True,
+        "code": err.code,
+        "message": err.message,
+        "hint": err.hint,
+        "retryable": err.retryable,
+        "metadata": err.metadata,
+    }, ensure_ascii=False)
+
+
+def _param_error(message: str, code: str = E_PARAM_MISSING) -> str:
+    return _error_json(make_error(code, message=message))
+
+
 # ==============================================================================
 #                              MCP 工具定义
 # ==============================================================================
 
 @mcp.tool
 async def accounts(ctx: Context) -> str:
-    """查询用户的资金账户列表。返回所有账户的ID、名称和余额信息。
+    """查询用户的资金账户列表，返回每个账户的 id、name、余额（money，字符串）。
 
-    如果用户需要查询特定账户或需要账户ID，请使用该工具。
-    添加流水或查询特定账户的流水时，需要先使用此工具获取账户ID。
+    需要 accountId、查询特定账户、或查看余额时使用。
+    余额可能为负数（信用卡等场景），不要做"余额够不够"的预判。
     """
     try:
         client = _get_client(ctx)
         url = f"{client.base_url}/account/getAccount"
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.get(url, headers=client._build_headers())
 
-            if response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
 
             return json.dumps(response.json(), ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"获取账户列表失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
 async def types(ctx: Context) -> str:
-    """获取所有账单分类(标签)信息。返回分类的层级结构，包含分类ID、名称、父子关系和对应的actionId。
+    """获取记账分类树（最多两级），每个节点含 id、name、actionId、handle、handleName。
 
-    如果用户需要查询分类ID或了解有哪些分类，请使用该工具。
-    添加流水时需要先使用此工具获取分类ID和actionId。
-    注意：actionId是添加流水时必需的参数，不是handle值。
+    可用性规则（误用会被后端拒绝，错误码 E_TYPE_HAS_CHILDREN）：
+    - 节点没有子分类（叶子）→ 可以直接用本节点记账
+    - 节点有子分类，且自身 actionId=null（通用容器）→ 可以直接用本节点
+    - 节点有子分类，且自身 actionId!=null → 不可以，必须改用其子分类
+
+    actionId 不是 handle 值。actionId 来源：节点 action 字段；为 null 时本 MCP 服务无 actions 工具，
+    需要客户端按收支语义自行选择，或在节点已有 action 的层级里选。
     """
     try:
         client = _get_client(ctx)
         url = f"{client.base_url}/type/getType"
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.get(url, headers=client._build_headers())
 
-            if response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
 
             raw = response.json()
             data = raw.get("data", []) if isinstance(raw, dict) and "data" in raw else (raw if isinstance(raw, list) else [])
 
-            def format_desc(cat):
+            def format_desc(cat, usable: bool):
                 action = cat.get("action")
+                usable_str = "可用" if usable else "不可用"
                 if action:
-                    return f"id={cat.get('id')},name={cat.get('tname')},actionId={action.get('id')},handle={action.get('handle')},handleName={action.get('hname')}"
-                return f"id={cat.get('id')},name={cat.get('tname')},actionId=null"
+                    return f"id={cat.get('id')},name={cat.get('tname')},actionId={action.get('id')},handle={action.get('handle')},handleName={action.get('hname')},{usable_str}"
+                return f"id={cat.get('id')},name={cat.get('tname')},actionId=null,{usable_str}"
 
             result = []
             for cat in data:
-                children = [format_desc(child) for child in cat.get("childrenTypes") or []]
-                result.append({"description": format_desc(cat), "children": children})
+                children_data = cat.get("childrenTypes") or []
+                has_children = len(children_data) > 0
+                # 可用性：叶子可用；有子分类但 actionId=null（通用容器）也可用；
+                # 有子分类且 actionId!=null → 不可用，必须用子分类
+                parent_usable = (not has_children) or (cat.get("action") is None)
+                children = [format_desc(child, usable=True) for child in children_data]
+                result.append({"description": format_desc(cat, usable=parent_usable), "children": children})
 
             return json.dumps(result, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"获取分类失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
 async def current_date(ctx: Context) -> str:
-    """获取当前服务器日期。如果用户询问的问题涉及日期、周期、时间段，请使用该工具获取当前日期作为参考。
+    """获取当前服务器日期（GMT+8）。涉及日期、周期、时间段查询前必须先调用。
 
-    返回yyyy-MM-dd格式的日期及年、月、日、星期信息。
-    查询流水或统计时，建议先调用此工具确定当前日期。
+    返回 yyyy-MM-dd 及年、月、日、星期。
     """
     try:
         now = datetime.datetime.now()
@@ -216,35 +285,37 @@ async def current_date(ctx: Context) -> str:
         }
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"获取日期失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
 async def year_statistics(ctx: Context, year: int) -> str:
-    """获取指定年份的统计信息，包含每个月的收入、支出、盈余数据。
+    """获取指定年份的概览：年度总收入、总支出、盈余，以及各月份明细。
 
-    如果用户询问某年某月的收支概况，请使用该工具。流水详情请使用flows工具。
-    使用前请先调用current_date获取当前年份。
+    用户询问某年/某月概况时使用。统计口径不含转账（handle=2）。
+    需要流水明细改用 flows 工具。
+    使用前先调用 current_date 拿当前年份。
 
     Args:
-        year: 年份，必填。请先使用current_date工具获取当前年份
+        year: 年份，必填
 
     Returns:
-        包含每个月的收入、支出、盈余数据
+        包含 totalAsset/netAsset/yearIncome/yearOutCome/yearBalance/monthDetails 等
     """
     try:
         client = _get_client(ctx)
         url = f"{client.base_url}/home/getHomeInfoV2/{year}"
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.get(url, headers=client._build_headers())
 
-            if response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
 
             return json.dumps(response.json(), ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"获取年度统计失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
@@ -260,30 +331,36 @@ async def flows(
     analysis: bool = False,
     orderBy: int = None
 ) -> str:
-    """根据条件查询流水记录。支持多种查询条件组合：日期范围、账户、分类、关键字等。返回符合条件的流水列表和收支汇总。
+    """按条件查询流水。支持账户、日期范围、分类、关键字、收藏等组合筛选，返回流水列表 + 收支汇总。
 
-    使用场景：1.查询某段时间的收支情况 2.查询特定分类的流水 3.按关键字搜索 4.分析支出占比
-    遇到无法确定的需求时，请先查询types、accounts工具获取必要的ID。
+    关键规则：
+    - handle=3 表示全部（不是 0）
+    - types 多选组内 OR；选父分类自动包含其全部子分类
+    - singleMonth=true 时只看 startDate 所在月，endDate 被忽略
+    - totalIn/totalOut/totalEarn 不含转账（handle=2）
+    - 返回超 100 条会被截断，建议改用 make_excel 导出完整报表
+
+    使用前先调用 accounts、types 拿必要的 ID。
 
     Args:
-        handle: 收支类型：0=收入，1=支出，2=内部转账，3=全部。必填
-        accountId: 账户ID，可选。使用accounts工具获取
-        startDate: 开始日期，格式yyyy-MM-dd
-        endDate: 结束日期，格式yyyy-MM-dd
-        note: 备注关键字，模糊查询。只支持单个关键字，尽量简短
-        singleMonth: 是否单月查询。设为true时无需endDate，startDate传当月1号
-        types: 分类ID列表。使用types工具获取分类ID
-        analysis: 是否分析占比。设为true可查看每笔流水的收入/支出占比
-        orderBy: 排序方式：0=金额升序，1=金额降序，2=时间排序
+        handle: 收支类型：0=只看收入，1=只看支出，2=只看转账，3=全部。看全部传 3，必填
+        accountId: 账户 ID。使用 accounts 工具获取
+        startDate: 开始日期，格式严格 yyyy-MM-dd（10 位，如 2026-04-09）
+        endDate: 结束日期，格式严格 yyyy-MM-dd（10 位）
+        note: 备注关键字，模糊匹配。只传单个关键字、尽量简短
+        singleMonth: true 时只看 startDate 所在月，endDate 被忽略
+        types: 分类 ID 列表。组内 OR；选父分类自动覆盖子分类
+        analysis: true 时返回每笔流水占比
+        orderBy: 0=金额升序，1=金额降序，2=时间排序
 
     Returns:
-        流水列表和收支汇总
+        流水列表 + 收支汇总
     """
     try:
         if handle is None:
-            return json.dumps({"error": "缺少必要参数: handle"}, ensure_ascii=False)
+            return _param_error("缺少必要参数: handle")
         if int(handle) > 3 or int(handle) < 0:
-            return json.dumps({"error": "handle参数错误，请传入0-3之间的整数"}, ensure_ascii=False)
+            return _param_error("handle 取值非法，仅允许 0/1/2/3", code=E_PARAM_INVALID)
 
         client = _get_client(ctx)
         url = f"{client.base_url}/screen/getFlowByScreen"
@@ -301,15 +378,16 @@ async def flows(
         }
         payload = {k: v for k, v in payload.items() if v is not None}
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.post(
                 url,
                 headers=client._build_headers(content_type="application/json"),
                 json=payload
             )
 
-            if response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
 
             flows_data = response.json()
             data = flows_data.get("data", {})
@@ -360,39 +438,50 @@ async def flows(
 
             return json.dumps(result, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"查询流水失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
 async def get_flow(ctx: Context, flowId: int) -> str:
-    """根据流水ID获取单条流水的详细信息。包含完整的账户、分类、金额、日期、备注、图片等信息。
+    """根据流水 id 获取单条流水的完整信息：账户、转入账户（仅转账）、分类、动作、金额、日期、备注、from、images。
+
+    更新流水前必须先用本工具拿到 from 字段，否则 update_flow 会把 from 置空。
 
     Args:
-        flowId: 流水ID，必填。通过flows工具查询获取，或从add_flow/update_flow返回值获取
+        flowId: 流水 ID，必填。通过 flows 工具查询，或从 add_flow/update_flow 返回值获取
 
     Returns:
-        流水详细信息
+        流水详细信息（含 from 字段，update_flow 时务必传回）
     """
     try:
         if flowId is None:
-            return json.dumps({"error": "缺少必要参数: flowId"}, ensure_ascii=False)
+            return _param_error("缺少必要参数: flowId")
 
         client = _get_client(ctx)
         url = f"{client.base_url}/flow/getFlow/{flowId}"
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.get(url, headers=client._build_headers())
 
-            if response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
+            # 特殊：getFlow 不存在的 id 后端用了 code=403, msg="未查询到该条记录"
+            try:
+                resp_data = response.json() if response.status_code == 200 else None
+            except Exception:
+                resp_data = None
+            if isinstance(resp_data, dict) and resp_data.get("code") == 403:
+                return _error_json(make_error(
+                    E_FLOW_NOT_FOUND,
+                    metadata={"flowId": flowId, "backend_msg": resp_data.get("msg")},
+                ))
+
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
 
             resp_data = response.json()
-            if resp_data.get("code") != 0:
-                return json.dumps({"error": resp_data.get("msg", "获取流水失败")}, ensure_ascii=False)
-
             data = resp_data.get("data", {})
             if not data:
-                return json.dumps({"error": f"未找到流水ID={flowId}"}, ensure_ascii=False)
+                return _error_json(make_error(E_FLOW_NOT_FOUND, metadata={"flowId": flowId}))
 
             # 格式化返回结果
             result = {
@@ -431,7 +520,7 @@ async def get_flow(ctx: Context, flowId: int) -> str:
 
             return json.dumps(result, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"获取流水详情失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
@@ -446,23 +535,31 @@ async def add_flow(
     accountToId: int = None,
     collect: bool = False
 ) -> str:
-    """添加一条流水记录。可以记录收入、支出或内部转账。
+    """添加一条流水。可记录收入、支出或内部转账。
 
-    使用前请先：1.用accounts获取账户ID 2.用types获取分类ID和actionId 3.用current_date获取日期
-    注意：actionId必须从types工具返回的action.id字段获取，不是handle值！
+    流程：
+    1) accounts 拿 accountId
+    2) types 拿 typeId（只能用"可用"的分类）和该节点的 action
+    3) 节点 action 不为 null → 直接用 action.id 作为 actionId；
+       节点 action 为 null（通用分类）→ 本 MCP 服务无 actions 工具，需在已有 action 的层级里选
+    4) current_date 拿日期（用户没指定时）
+
+    money 只传正数 2 位小数，方向由 action.handle 决定。
+    仅当 action.handle=2（内部转账）时需要 accountToId。
+    不要预判余额（v2.6.0 起允许账户负余额）。
 
     Args:
-        accountId: 账户ID，必填。使用accounts工具获取
-        typeId: 分类ID，必填。使用types工具获取
-        actionId: 收支动作ID，必填。从types工具返回的action.id字段获取，不是handle值
-        money: 金额，必填。格式如'100.00'
-        fDate: 流水日期，必填。格式yyyy-MM-dd
-        note: 备注，必填。简要描述这笔流水的用途或来源，如'公司午餐'、'12月工资'
-        accountToId: 转入账户ID，内部转账时必填。使用accounts工具获取
-        collect: 是否收藏，可选，默认false
+        accountId: 账户 ID，必填
+        typeId: 分类 ID，必填（必须是"可用"分类，否则后端 E_TYPE_HAS_CHILDREN）
+        actionId: 动作 ID，必填。来源 types 节点的 action.id，不是 handle 值
+        money: 金额，必填。正数字符串，2 位小数（如 '30.00'）
+        fDate: 流水日期，必填。格式严格 yyyy-MM-dd（10 位）
+        note: 备注，必填。简要描述用途或来源
+        accountToId: 转入账户 ID。仅 action.handle=2 时必填
+        collect: 是否收藏，默认 false
 
     Returns:
-        添加结果
+        添加结果（含 flowId）
     """
     try:
         client = _get_client(ctx)
@@ -489,32 +586,29 @@ async def add_flow(
         if accountToId is not None:
             payload["accountToId"] = accountToId
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.post(
                 url,
                 headers=client._build_headers(content_type="application/json"),
                 json=payload
             )
 
-            if response.status_code == 200:
-                resp_data = response.json()
-                # data 是对象 {"id": 123}
-                flow_id = None
-                if isinstance(resp_data, dict) and isinstance(resp_data.get("data"), dict):
-                    flow_id = resp_data["data"].get("id")
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
 
-                return json.dumps({
-                    "success": True,
-                    "message": "流水添加成功",
-                    "flowId": flow_id
-                }, ensure_ascii=False)
-            elif response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
-            else:
-                error_msg = response.json().get('msg', response.text) if response.text else "未知错误"
-                return json.dumps({"error": f"添加流水失败: {error_msg}"}, ensure_ascii=False)
+            resp_data = response.json()
+            flow_id = None
+            if isinstance(resp_data, dict) and isinstance(resp_data.get("data"), dict):
+                flow_id = resp_data["data"].get("id")
+
+            return json.dumps({
+                "success": True,
+                "message": "流水添加成功",
+                "flowId": flow_id
+            }, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"添加流水失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
@@ -530,20 +624,21 @@ async def update_flow(
     accountToId: int = None,
     collect: bool = False
 ) -> str:
-    """更新已有的流水记录。需要提供流水ID（通过flows工具查询获取）和完整的流水信息。
+    """更新已有流水。需要先用 flows 或 get_flow 拿到流水 id 和原始 from 字段。
 
-    使用前请先用flows工具查询获取要修改的流水ID。
+    分类只能使用"可用"分类，actionId 来源同 add_flow。
+    后端会自动按原流水回滚账户余额再正向应用新参数，不需要客户端做差额计算。
 
     Args:
-        flowId: 流水ID，必填。通过flows工具查询获取
-        accountId: 账户ID，必填。使用accounts工具获取
-        typeId: 分类ID，必填。使用types工具获取
-        actionId: 收支动作ID，必填。从types工具返回的action.id字段获取
-        money: 金额，必填。格式如'100.00'
-        fDate: 流水日期，必填。格式yyyy-MM-dd
-        note: 备注，必填。简要描述这笔流水的用途或来源
-        accountToId: 转入账户ID，内部转账时使用
-        collect: 是否收藏，可选
+        flowId: 流水 ID，必填
+        accountId: 账户 ID，必填
+        typeId: 分类 ID，必填（必须"可用"分类）
+        actionId: 动作 ID，必填。来源 types 节点的 action.id
+        money: 金额，必填。正数字符串，2 位小数
+        fDate: 流水日期，必填。格式严格 yyyy-MM-dd（10 位）
+        note: 备注，必填
+        accountToId: 转入账户 ID，仅 action.handle=2 时使用
+        collect: 是否收藏
 
     Returns:
         更新结果
@@ -573,26 +668,24 @@ async def update_flow(
         if accountToId is not None:
             payload["accountToId"] = accountToId
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.put(
                 url,
                 headers=client._build_headers(content_type="application/json"),
                 json=payload
             )
 
-            if response.status_code == 200:
-                return json.dumps({
-                    "success": True,
-                    "message": f"流水ID={flowId}更新成功",
-                    "flowId": flowId
-                }, ensure_ascii=False)
-            elif response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
-            else:
-                error_msg = response.json().get('msg', response.text) if response.text else "未知错误"
-                return json.dumps({"error": f"更新流水失败: {error_msg}"}, ensure_ascii=False)
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
+
+            return json.dumps({
+                "success": True,
+                "message": f"流水ID={flowId}更新成功",
+                "flowId": flowId
+            }, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"更新流水失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 @mcp.tool
@@ -608,31 +701,35 @@ async def make_excel(
     types: list[int] = None,
     collect: bool = False
 ) -> str:
-    """根据流水查询条件生成Excel报表。参数与flows工具类似，输出为Excel文件下载链接。
+    """按筛选条件生成 Excel 报表。
 
-    当流水数量较多时（超过100条），建议使用此工具导出完整报表而不是使用flows工具。
+    重要：本工具不返回下载链接。
+    实际行为是后端生成 Excel 后通过邮件发送到用户配置的邮箱。
+    若返回 hint 提示邮件未配置（E_MAIL_NOT_CONFIGURED），告诉用户去"系统设置 → 邮件"配 SMTP。
+
+    流水超过 100 条或用户明确要求导出时使用。
 
     Args:
-        excelName: Excel文件名称，必填。不需要扩展名，如'2025年1月账单'
-        handle: 收支类型：0=收入，1=支出，2=内部转账，3=全部。必填
-        accountId: 账户ID，可选。使用accounts工具获取
-        startDate: 开始日期，格式yyyy-MM-dd
-        endDate: 结束日期，格式yyyy-MM-dd
-        note: 备注关键字，模糊查询
-        singleMonth: 是否单月查询
-        types: 分类ID列表。使用types工具获取分类ID
-        collect: 是否只导出收藏的流水
+        excelName: Excel 文件名，必填。不带扩展名（如 '2026年4月账单'）
+        handle: 收支类型：0=只看收入，1=只看支出，2=只看转账，3=全部。看全部传 3，必填
+        accountId: 账户 ID
+        startDate: 开始日期，格式严格 yyyy-MM-dd（10 位）
+        endDate: 结束日期，格式严格 yyyy-MM-dd（10 位）
+        note: 备注关键字，模糊匹配
+        singleMonth: true 时只看 startDate 所在月，endDate 被忽略
+        types: 分类 ID 列表。组内 OR；选父分类自动覆盖子分类
+        collect: 是否只导出收藏
 
     Returns:
-        Excel文件下载链接
+        生成结果（含 success / log），不含下载链接
     """
     try:
         if not excelName:
-            return json.dumps({"error": "缺少必要参数: excelName"}, ensure_ascii=False)
+            return _param_error("缺少必要参数: excelName")
         if handle is None:
-            return json.dumps({"error": "缺少必要参数: handle"}, ensure_ascii=False)
+            return _param_error("缺少必要参数: handle")
         if int(handle) > 3 or int(handle) < 0:
-            return json.dumps({"error": "handle参数错误，请传入0-3之间的整数"}, ensure_ascii=False)
+            return _param_error("handle 取值非法，仅允许 0/1/2/3", code=E_PARAM_INVALID)
 
         client = _get_client(ctx)
         url = f"{client.base_url}/screen/makeExcel?excelName={excelName}"
@@ -650,29 +747,27 @@ async def make_excel(
         }
         payload = {k: v for k, v in payload.items() if v is not None}
 
-        async with httpx.AsyncClient() as http_client:
+        async with client.async_client() as http_client:
             response = await http_client.post(
                 url,
                 headers=client._build_headers(content_type="application/json"),
                 json=payload
             )
 
-            if response.status_code == 200:
-                result = response.json()
-                data = result.get("data", {})
-                return json.dumps({
-                    "success": True,
-                    "message": "Excel报表生成成功",
-                    "fileName": data.get("fileName", f"{excelName}.xlsx"),
-                    "downloadUrl": data.get("downloadUrl", "")
-                }, ensure_ascii=False)
-            elif response.status_code == 401:
-                return json.dumps(client._handle_auth_error(), ensure_ascii=False)
-            else:
-                error_msg = response.json().get('msg', response.text) if response.text else "未知错误"
-                return json.dumps({"error": f"生成Excel失败: {error_msg}"}, ensure_ascii=False)
+            err = _check_response(response)
+            if err:
+                return _error_json(err)
+
+            # 后端返回 {success, log}，不含下载链接（实际是发邮件）
+            result = response.json()
+            data = result.get("data", {}) if isinstance(result, dict) else {}
+            return json.dumps({
+                "success": data.get("success", True),
+                "message": "Excel 报表已生成（通过邮件发送到用户邮箱）",
+                "log": data.get("log", "")
+            }, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": f"生成Excel失败: {str(e)}"}, ensure_ascii=False)
+        return _error_json(from_exception(e))
 
 
 # ==============================================================================

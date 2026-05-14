@@ -78,33 +78,52 @@ public class ImageController {
         }
     }
     
+    // v2.7.0: 文件名白名单：字母数字 + . _ -，长度 ≤ 100（与 DB 列长度一致）
+    // 后端生成的 fileName 形如 "1714123456_8923.jpg"，不会含 / \ : ..
+    // 此正则用于挡住任何客户端构造的恶意 fileName
+    private static final java.util.regex.Pattern SAFE_FILENAME =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9._-]{1,100}$");
+
     @Operation(summary = "获取图片")
     @GetMapping("/{fileName}")
     public ResponseEntity<Resource> getImage(@PathVariable String fileName) {
         try {
-            File file = new File(uploadPath + fileName);
-            if (!file.exists()) {
+            // 1. 字符白名单：禁止任何路径分隔符 / .. 等
+            if (fileName == null || !SAFE_FILENAME.matcher(fileName).matches()) {
+                log.warn("拒绝非法 fileName: {}", fileName);
                 return ResponseEntity.notFound().build();
             }
-            
-            Resource resource = new FileSystemResource(file);
-            
+
+            // 2. 路径规范化：确保最终路径在 uploadPath 之下，挡住 URL 解码后的越界
+            File baseDir = new File(uploadPath).getCanonicalFile();
+            File target = new File(baseDir, fileName).getCanonicalFile();
+            if (!target.toPath().startsWith(baseDir.toPath())) {
+                log.warn("拒绝越界路径访问: {} -> {}", fileName, target.getAbsolutePath());
+                return ResponseEntity.notFound().build();
+            }
+            if (!target.exists() || !target.isFile()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new FileSystemResource(target);
+
             // 根据文件扩展名设置Content-Type
             String contentType = "image/jpeg";
-            if (fileName.toLowerCase().endsWith(".png")) {
+            String lower = fileName.toLowerCase();
+            if (lower.endsWith(".png")) {
                 contentType = "image/png";
-            } else if (fileName.toLowerCase().endsWith(".gif")) {
+            } else if (lower.endsWith(".gif")) {
                 contentType = "image/gif";
-            } else if (fileName.toLowerCase().endsWith(".webp")) {
+            } else if (lower.endsWith(".webp")) {
                 contentType = "image/webp";
             }
-            
+
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
                            "inline; filename=\"" + fileName + "\"")
                     .body(resource);
-                    
+
         } catch (Exception e) {
             log.error("获取图片失败: " + fileName, e);
             return ResponseEntity.notFound().build();

@@ -10,6 +10,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Git 分支管理与提交
 - 版本文档与总文档编写
 - 打包、发布流程管理
+- **社区维护**：收集并跟进 GitHub Issue（Bug / 需求 / 讨论），定期整理成清单
+- **项目经理**：拥有 Code Review 权限；汇总所有新需求，拆分为可执行任务清单派发给各端
+- **产品把控**：清晰理解全部已有功能的设计意图与数据模型，在接到新需求时先**吃透产品语境**再拆方案，不做基于臆测的架构决策
+
+> ⚠️ **红线 · 绝不触碰**
+> 你的身份是：主管 / 产品 / 信息收集员 / Code Reviewer。**唯独不是开发者**。
+> - ❌ **禁止**写任何代码、伪代码、SQL DDL、schema 设计、类/文件/字段/接口命名
+> - ❌ **禁止**给技术实现指引（cron 表达式、调度框架选型、具体文件路径、代码结构等）
+> - ❌ **禁止**拆成"S1/S2/S3"这种代码级任务清单
+> - ✅ **只做**：需求澄清、产品规则、业务边界、用户体验、验收标准、各端交付目标（用产品语言描述）
+> - 技术方案由各端开发 Claude 自己出，你只负责 Review 他们产出的方案
 
 > 注意：过程文档由各端的 Claude 负责编写，你只负责版本文档和总文档。
 
@@ -19,12 +30,13 @@ EasyAccounts 是一个个人财务管理应用，包含以下模块：
 
 | 模块 | 技术栈 | 说明 |
 |------|--------|------|
-| **Server** | Spring Boot 3.x, Java 17, MySQL | 后端服务，双重数据访问（JPA + MyBatis） |
+| **Server** | Spring Boot 3.x, Java 17, MySQL | 后端服务，双重数据访问（JPA + MyBatis）；邮件发送内嵌（v2.7.0 起 WebHook 已废弃） |
 | **Web** | Vue 3 + TypeScript, Vant UI | 前端（移动端 + 桌面 Electron） |
 | **AI** | Python + MCP 架构 | AI 服务端 |
-| **WebHook** | FastAPI Python | 钩子服务，用户可自定义操作 |
 
-这是 EasyAccounts 的开源版本。当前版本：v2.6.0
+这是 EasyAccounts 的开源版本。当前版本：v2.7.0
+
+> ⚠️ **v2.7.0 起 WebHook 模块已移除**：邮件发送能力已内聚到 Server，原 `WebHook/` 目录、`easyaccounts-webhook` 镜像、`version.webhook_branch` 配置项已全部废弃。老用户升级需在前端"系统设置 → 邮件"重新配置 SMTP。
 
 ---
 
@@ -95,7 +107,6 @@ main                    # 正式版 - 稳定发布
 | `version.font_branch` | 前端版本 | `easyaccounts-web` |
 | `version.backend_branch` | 后端版本 | `easyaccounts-server` |
 | `version.agent_branch` | AI Agent 版本 | `easyaccounts-ai` |
-| `version.webhook_branch` | WebHook 版本 | `easyaccounts-webhook` |
 | `version.mysql_branch` | 数据库版本 | - |
 
 ### 打包流程
@@ -192,17 +203,6 @@ cp .env.example .env
 python -m koalaq_hub
 ```
 
-### WebHook 服务
-```bash
-cd WebHook
-
-# Python 环境
-pip install -r requirements.txt
-
-# 运行服务
-python main.py
-```
-
 ## 架构和关键组件
 
 ### Server（后端）
@@ -235,11 +235,6 @@ python main.py
   - `.env` - 环境变量（LLM API Key、端口等）
   - `resource/config/agent.ini` - Agent 配置
   - `resource/config/llm_config.ini` - LLM 配置
-
-### WebHook（钩子服务）
-- **FastAPI**: Python Web 框架
-- 用户可自定义的事件钩子
-- 支持邮件通知等扩展功能
 
 ### 核心功能
 - 财务交易记录（流水）
@@ -287,7 +282,7 @@ python main.py
 ### 环境要求
 - **Server**: Java 17 + Maven
 - **Web**: Node.js v16
-- **AI / WebHook**: Python 3.9+
+- **AI**: Python 3.10+
 
 ### 注意事项
 - `Server/excel_template/` 中的 Excel 模板不应修改

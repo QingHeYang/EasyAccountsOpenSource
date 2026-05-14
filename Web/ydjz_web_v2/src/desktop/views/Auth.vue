@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import MD5 from 'crypto-js/md5'
 import { authApi } from '@shared/api/auth'
+import { ApiCode } from '@shared/types'
 import logoUrl from '@shared/assets/logo.png'
 
 const route = useRoute()
@@ -80,6 +81,18 @@ async function onSubmit() {
     const redirect = (route.query.redirect as string) || '/'
     router.replace(redirect)
   } catch (err: any) {
+    // 418：登录时用户不存在 → 引导切换到注册模式
+    if (err?.code === ApiCode.NOT_REGISTERED && isLogin.value) {
+      ElMessage.warning(err.message || '用户尚未注册，已切换到注册模式')
+      // 切到注册模式（保留 redirect query 等其它参数）
+      router.replace({
+        path: '/auth',
+        query: { ...route.query, mode: '0' },
+      })
+      // 清空密码，引导用户重新设置（用户名保留）
+      password.value = ''
+      return
+    }
     ElMessageBox.alert(err.message || '网络错误', '请求失败', {
       type: 'error'
     })
@@ -98,12 +111,9 @@ function onForgotPassword() {
   )
 }
 
-// 回车提交
-function handleKeyEnter(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    onSubmit()
-  }
-}
+// password 输入框 autocomplete：登录用 current-password，注册用 new-password
+// 这样浏览器密码管理器才能正确识别表单语义（避免注册时误填旧密码）
+const passwordAutocomplete = computed(() => isLogin.value ? 'current-password' : 'new-password')
 </script>
 
 <template>
@@ -141,10 +151,12 @@ function handleKeyEnter(e: KeyboardEvent) {
         <h2 class="card-title">{{ title }}</h2>
         <p class="card-subtitle">{{ subtitle }}</p>
 
-        <el-form class="auth-form" @keydown="handleKeyEnter">
+        <el-form class="auth-form" @submit.prevent="onSubmit">
           <el-form-item>
             <el-input
               v-model="username"
+              name="username"
+              autocomplete="username"
               placeholder="请输入用户名"
               size="large"
               clearable
@@ -156,6 +168,8 @@ function handleKeyEnter(e: KeyboardEvent) {
             <el-input
               v-model="password"
               type="password"
+              name="password"
+              :autocomplete="passwordAutocomplete"
               placeholder="请输入密码"
               size="large"
               show-password
@@ -173,9 +187,9 @@ function handleKeyEnter(e: KeyboardEvent) {
             <el-button
               type="primary"
               size="large"
+              native-type="submit"
               :loading="loading"
               class="submit-btn"
-              @click="onSubmit"
             >
               {{ buttonText }}
             </el-button>

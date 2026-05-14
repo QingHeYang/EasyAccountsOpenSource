@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showToast, showLoadingToast, closeToast } from 'vant'
 import { homeApi, type HomeInfo } from '@shared/api/home'
+import { storage } from '@shared/utils/storage'
 import { aiApi } from '@shared/api/ai'
+import { Bell } from 'lucide-vue-next'
+import { useNoticeStore } from '@shared/stores/notice'
 import logoUrl from '@shared/assets/logo.png'
 import ChartOverlay from '@mobile/components/ChartOverlay.vue'
+import VersionAnimation from '@shared/components/VersionAnimation.vue'
 
 const router = useRouter()
+const noticeStore = useNoticeStore()
+const unreadCount = computed(() => noticeStore.unreadCount)
+const unreadDisplay = computed(() => (unreadCount.value > 99 ? '99+' : String(unreadCount.value)))
+
+function openNotifications() {
+  router.push('/notifications')
+}
 
 // AI 服务可用状态
 const aiServiceAvailable = ref(false)
@@ -81,15 +92,41 @@ async function checkAiService() {
   aiServiceAvailable.value = health !== null
 }
 
+// ============= 版本号庆祝动画（基于 versionCode 比对，仅升级首次触发） =============
+const showVersionAnim = ref(false)
+const animVersion = ref('')
+const LAST_SEEN_VERSION_KEY = 'lastSeenVersionCode'
+
+async function checkVersionUpdate() {
+  try {
+    const res = await homeApi.getSystemConfig()
+    if (res.data.code !== 0) return
+    const { versionCode, release } = res.data.data.versions
+    if (!versionCode) return
+    const lastSeen = storage.getJSON<number>(LAST_SEEN_VERSION_KEY, 0)
+    if (versionCode > lastSeen) {
+      animVersion.value = release || ''
+      showVersionAnim.value = true
+      storage.setJSON(LAST_SEEN_VERSION_KEY, versionCode)
+    }
+  } catch (err) {
+    console.warn('检查版本更新失败', err)
+  }
+}
+
 onMounted(() => {
   fetchHomeInfo()
   checkAiService()
+  noticeStore.refresh()
+  setTimeout(checkVersionUpdate, 300)
 })
 
 onActivated(() => {
   // 激活时重新计算滚动状态
   handleScroll()
   window.addEventListener('scroll', handleScroll, { passive: true })
+  // 从通知中心 / 编辑页返回时同步未读数（用户可能在那边标记/删除了）
+  noticeStore.refresh()
 })
 
 onDeactivated(() => {
@@ -223,15 +260,25 @@ function isMaxBalance(month: string) {
 }
 
 // 获取首页数据
+// 失败标识：用于让 van-empty 显示"加载失败"而不是"暂无数据"
+const loadFailed = ref(false)
+
 async function fetchHomeInfo() {
   loading.value = true
+  loadFailed.value = false
+  showLoadingToast({ message: '加载中...', forbidClick: true, duration: 0 })
   try {
     const res = await homeApi.getHomeInfoByYear(chooseYear.value)
     if (res.data.code === 0) {
       homeInfo.value = res.data.data
     }
+    // 成功才关 loading toast；失败时让全局 onError 弹的 showFailToast 自然显示
+    closeToast()
   } catch (err) {
     console.error('获取首页数据失败:', err)
+    // 网络错误：清空数据 + 标记失败，让月度概览显示"加载失败"占位
+    homeInfo.value = null
+    loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -290,6 +337,17 @@ function toAI() {
           <span class="title-text">EasyAccounts</span>
         </template>
       </div>
+
+      <!-- 通知铃铛 -->
+      <button
+        class="bell-btn"
+        type="button"
+        title="消息通知"
+        @click="openNotifications"
+      >
+        <Bell class="bell-icon" :size="22" :stroke-width="1.75" />
+        <span v-if="unreadCount > 0" class="bell-badge">{{ unreadDisplay }}</span>
+      </button>
     </div>
 
     <!-- 页面内容 -->
@@ -442,7 +500,11 @@ function toAI() {
           </div>
         </div>
 
-        <van-empty v-else description="暂无数据" />
+        <van-empty
+          v-else
+          :image="loadFailed ? 'network' : 'default'"
+          :description="loadFailed ? '加载失败，请切换年份重试' : '暂无数据'"
+        />
       </div>
 
     </div>
@@ -515,6 +577,9 @@ function toAI() {
         </div>
       </div>
     </van-dialog>
+
+    <!-- 版本号庆祝动画（仅首次见到新版本时触发） -->
+    <VersionAnimation v-model:show="showVersionAnim" :version="animVersion" />
   </div>
 </template>
 
@@ -574,6 +639,49 @@ function toAI() {
   font-weight: 700;
   color: var(--color-text-primary);
   letter-spacing: -0.5px;
+}
+
+/* 通知铃铛（顶栏右上角） */
+.bell-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-card);
+  border: none;
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  padding: 0;
+  cursor: pointer;
+}
+
+.bell-btn:active {
+  opacity: 0.7;
+}
+
+.bell-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.bell-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--color-expense);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--color-bg-page);
 }
 
 /* 浮动 AI+ 按钮 */

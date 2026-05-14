@@ -128,7 +128,21 @@ public class AnalysisV2Service {
                     parentBean.setMoney(parentMoney.add(currentMoney).setScale(2, RoundingMode.HALF_UP).toString());
                 }
             } else {
-                parentMap.put(bean.getId(), bean);
+                // v2.7.0 修复 HashMap 顺序覆盖 bug：
+                // 一级分类自己有流水（actionId=null 通用容器）+ 子分类也有流水时，
+                // 如果子分类先于一级分类被遍历到，parentMap[id] 已被子分类创建并累加了金额，
+                // 此时一级分类直接 put 会覆盖丢失子分类的累加结果。
+                // 典型撞这个坑的场景："借还"父分类自己记一笔 + "借还/借出""借还/还款"子各自记账，
+                // 合并子分类视图下父分类的总金额会丢失或表现为不稳定数值。
+                AnalysisTypeListResponseDto.TypeBean existing = parentMap.get(bean.getId());
+                if (existing == null) {
+                    parentMap.put(bean.getId(), bean);
+                } else {
+                    BigDecimal existingMoney = new BigDecimal(existing.getMoney());
+                    BigDecimal currentMoney = new BigDecimal(bean.getMoney());
+                    existing.setMoney(existingMoney.add(currentMoney)
+                            .setScale(2, RoundingMode.HALF_UP).toString());
+                }
             }
         }
         dealMap.clear();

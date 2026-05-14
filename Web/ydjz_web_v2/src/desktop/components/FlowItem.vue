@@ -86,7 +86,8 @@ function onDelete(e: Event) {
         </el-tag>
         <el-tag v-if="flow.from === 'ai'" size="small" class="ai-tag">AI</el-tag>
         <el-tag v-if="flow.from === 'mcp'" size="small" class="mcp-tag">MCP</el-tag>
-        <el-tag v-if="flow.from === 'Claw'" size="small" class="claw-tag">Claw</el-tag>
+        <el-tag v-if="flow.from === 'Claw'" size="small" class="claw-tag">🦞</el-tag>
+        <el-tag v-if="flow.from === 'scheduled'" size="small" class="scheduled-tag">定时</el-tag>
         <el-tag v-if="flow.exempt" size="small" type="info">不计入</el-tag>
       </div>
     </div>
@@ -208,8 +209,23 @@ function onDelete(e: Event) {
   color: #fff;
 }
 
+/* 🦞 emoji 标签：中性底 + 淡色描边，让 emoji 自己发色 */
 .claw-tag {
-  background: #FF6B7A;
+  background: var(--color-bg-card, #fff);
+  padding: 0 6px;
+  font-size: 14px;
+  line-height: 20px;
+  height: 22px;
+  border: 1px solid rgba(255, 107, 122, 0.35);
+}
+
+html.dark .claw-tag {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 定时：青色实底 + 白字，跟 AI / MCP 同风格 */
+.scheduled-tag {
+  background: #13C2C2;
   border: none;
   color: #fff;
 }

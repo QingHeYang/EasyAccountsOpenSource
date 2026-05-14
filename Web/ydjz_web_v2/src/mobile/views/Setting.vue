@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { useThemeStore } from '@shared/stores/theme'
+import { useNoticeStore } from '@shared/stores/notice'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig } from '@shared/api/home'
 import MarkdownIt from 'markdown-it'
 
@@ -10,27 +10,37 @@ import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import { showConfirmDialog } from 'vant'
 import logoUrl from '@shared/assets/logo.png'
 import NoticePopup from '../components/NoticePopup.vue'
+import {
+  ArrowLeftRight,
+  Wallet,
+  Tags,
+  Layers2,
+  AlarmClock,
+  Sparkles,
+  Settings,
+  Bell,
+  Info,
+  Newspaper,
+  LogOut,
+} from 'lucide-vue-next'
 
 const router = useRouter()
-const themeStore = useThemeStore()
+
+// 通知中心未读数（共享 store，跟 Board 顶栏铃铛同源）
+const noticeStore = useNoticeStore()
+const unreadNoticeCount = computed(() => noticeStore.unreadCount)
+const unreadNoticeDisplay = computed(() =>
+  unreadNoticeCount.value > 99 ? '99+' : String(unreadNoticeCount.value)
+)
+
+function openNotifications() {
+  router.push('/notifications')
+}
 
 // AI 服务状态
 const aiHealth = ref<AiHealthResponse | null>(null)
 const aiServiceAvailable = computed(() => aiHealth.value !== null)
 const aiConfigured = computed(() => aiHealth.value?.data?.llm?.configured === true)
-
-// 主题相关
-const themeText = computed(() => {
-  const map = { light: '浅色', dark: '深色', system: '跟随系统' }
-  return map[themeStore.mode]
-})
-
-function onThemeChange() {
-  const modes = ['light', 'dark', 'system'] as const
-  const idx = modes.indexOf(themeStore.mode)
-  const next = modes[(idx + 1) % modes.length]
-  themeStore.set(next)
-}
 
 // 关于弹窗
 const showAbout = ref(false)
@@ -41,7 +51,6 @@ const versions = ref<VersionInfo>({
   backendBranch: '',
   mysqlBranch: '',
   agentBranch: '',
-  webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
 const updateInfo = ref<UpdateInfo | null>(null)
@@ -133,6 +142,13 @@ onMounted(() => {
   loadSystemConfig()
   // 检测 AI 服务
   checkAiService()
+  // 通知未读数（store 内部静默失败，不打扰 UI）
+  noticeStore.refresh()
+})
+
+onActivated(() => {
+  // 用户从通知中心 / 编辑页返回时刷新未读数
+  noticeStore.refresh()
 })
 </script>
 
@@ -146,30 +162,31 @@ onMounted(() => {
     <div class="page-body">
       <!-- 数据管理 -->
       <van-cell-group inset title="数据管理">
-        <van-cell
-          title="收支"
-          icon="exchange"
-          is-link
-          to="/setting/action"
-        />
-        <van-cell
-          title="账户"
-          icon="paid"
-          is-link
-          to="/setting/account"
-        />
-        <van-cell
-          title="分类"
-          icon="balance-list-o"
-          is-link
-          to="/setting/type"
-        />
-        <van-cell
-          title="快记模板"
-          icon="cluster-o"
-          is-link
-          to="/setting/template"
-        />
+        <van-cell title="收支" is-link to="/setting/action">
+          <template #icon>
+            <ArrowLeftRight :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="账户" is-link to="/setting/account">
+          <template #icon>
+            <Wallet :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="分类" is-link to="/setting/type">
+          <template #icon>
+            <Tags :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="快记模板" is-link to="/setting/template">
+          <template #icon>
+            <Layers2 :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
+        <van-cell title="定时记账" is-link to="/setting/scheduled-flow">
+          <template #icon>
+            <AlarmClock :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
       </van-cell-group>
 
       <!-- 系统管理 -->
@@ -178,44 +195,62 @@ onMounted(() => {
         <van-cell
           v-if="aiServiceAvailable"
           title="AI+ 设置"
-          icon="fire-o"
           is-link
           :class="{ 'ai-unconfigured': !aiConfigured }"
           @click="onAiClick"
         >
+          <template #icon>
+            <Sparkles :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
           <template #value>
             <van-tag v-if="!aiConfigured" type="warning">未配置</van-tag>
           </template>
         </van-cell>
-        <van-cell
-          title="系统信息"
-          icon="setting-o"
-          is-link
-          to="/setting/system"
-        />
+        <van-cell title="系统设置" is-link to="/setting/system">
+          <template #icon>
+            <Settings :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+        </van-cell>
       </van-cell-group>
 
       <!-- 其他 -->
       <van-cell-group inset title="其他">
         <van-cell
-          title="关于"
-          icon="info-o"
+          is-link
+          class="notification-cell"
+          @click="openNotifications"
+        >
+          <template #icon>
+            <Bell :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
+          <template #title>
+            <span>消息通知</span>
+            <span v-if="unreadNoticeCount > 0" class="notification-badge">
+              {{ unreadNoticeDisplay }}
+            </span>
+          </template>
+        </van-cell>
+        <van-cell
           is-link
           class="about-cell"
           @click="openAbout"
         >
+          <template #icon>
+            <Info :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
           <template #title>
             <span>关于</span>
             <span v-if="hasUpdate" class="update-dot"></span>
           </template>
         </van-cell>
         <van-cell
-          title="公告"
-          icon="volume-o"
           is-link
           class="notice-cell"
           @click="showNoticePopup = true"
         >
+          <template #icon>
+            <Newspaper :size="18" :stroke-width="1.75" class="cell-icon" />
+          </template>
           <template #title>
             <span>公告</span>
             <span v-if="hasUnreadNotice" class="notice-dot"></span>
@@ -224,10 +259,13 @@ onMounted(() => {
         <van-cell
           v-if="showLogout"
           title="退出登录"
-          icon="revoke"
           is-link
           @click="onLogout"
-        />
+        >
+          <template #icon>
+            <LogOut :size="18" :stroke-width="1.75" class="cell-icon cell-icon-danger" />
+          </template>
+        </van-cell>
       </van-cell-group>
     </div>
 
@@ -537,6 +575,47 @@ onMounted(() => {
   height: 8px;
   background: var(--color-expense);
   border-radius: 50%;
+}
+
+/* 消息通知 cell：未读数徽章 */
+.notification-cell :deep(.van-cell__title) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 镂空 SVG 铃铛，跟 vant 默认 icon 视觉对齐 */
+/* 设置页 cell 内的 Lucide 图标统一样式 */
+.cell-icon {
+  display: block; /* 关键：去除 svg 默认 inline baseline 偏移，让 flex 居中生效 */
+  margin-right: 8px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  align-self: center; /* 双保险：跟标题严格垂直居中 */
+}
+
+/* 危险操作（退出登录等）淡红色 */
+.cell-icon-danger {
+  color: #ff7875;
+}
+
+html.dark .cell-icon-danger {
+  color: #ff9999;
+}
+
+.notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  background: var(--color-expense);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 更新提示横幅 */

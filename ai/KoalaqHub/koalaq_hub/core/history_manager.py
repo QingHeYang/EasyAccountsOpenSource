@@ -240,12 +240,16 @@ class HistoryManager:
             if round_id not in self.histories[user_id][conversation_id]["rounds"]:
                 raise ValueError(f"轮次ID不存在: {round_id}")
 
-            # 创建内存中的消息（不包含reasoning_content，保持对话历史干净）
-            message = Message.create_assistant_message(content, round_id, tool_calls, 
+            # 内存与数据库版本均带 reasoning_content：
+            # DeepSeek-R1 等思考模型在 thinking 模式下，要求历史中所有 assistant 消息的
+            # reasoning_content 原样回传，否则 API 返回 400
+            # ("The `reasoning_content` in the thinking mode must be passed back to the API.")
+            # 其他平台（OpenAI/智谱等）会忽略未知字段，统一带回最稳妥
+            message = Message.create_assistant_message(content, round_id, tool_calls,
+                                                     reasoning_content=reasoning_content,
                                                      is_agent=is_agent, agent_id=agent_id)
             self.histories[user_id][conversation_id]["rounds"][round_id].append(message)
 
-            # 创建数据库存储的消息（包含reasoning_content）
             db_message = Message.create_assistant_message(content, round_id, tool_calls, reasoning_content,
                                                         is_agent=is_agent, agent_id=agent_id)
             message_id = self.sqlite_storage.add_message(round_id, db_message)
@@ -402,30 +406,55 @@ class HistoryManager:
                 
                 if msg.type == MessageType.TOOL_CALL or msg.type == MessageType.AGENT_START:
                     # assistant 消息包含 tool_calls
-                    
+
                     # 数据校验1：如果没有 tool_calls 且 content 为空，添加中断提示
                     content = msg.content
                     if not msg.tool_calls and not content:
                         content = "[思考被中断...]"
                         self.logger.warning(f"[{round_id}][{idx}] assistant 消息内容为空，可能是思维链被中断")
-                    
+
                     message_dict = {
                         "role": "assistant",
                         "content": content
                     }
-                    
+                    # DeepSeek-R1 等思考模型要求把历史 assistant 的 reasoning_content 一起送回
+                    if msg.reasoning_content:
+                        message_dict["reasoning_content"] = msg.reasoning_content
+
                     if msg.tool_calls:
-                        message_dict["tool_calls"] = msg.tool_calls
-                        # 记录待匹配的 tool_calls
+                        # 兜底清洗历史中的残缺 tool_call：
+                        #   - 缺 function.name → 丢弃（无法执行也无法配对）
+                        #   - 缺 function.arguments → 补 "{}"（OpenAI/智谱协议 required）
+                        # 不清洗会让 LLM API 在请求体校验阶段直接 400。
+                        # 来源：旧版本未做生产侧过滤时已落库的污染数据。
+                        cleaned_tool_calls = []
                         for tc in msg.tool_calls:
-                            if tc.get("id"):
-                                round_tool_calls[tc["id"]] = tc.get("function", {}).get("name", "unknown")
-                        
-                        self.logger.debug(f"[{round_id}][{idx}] {msg.type.value} with tools", {
-                            "tool_count": len(msg.tool_calls),
-                            "tool_ids": [tc.get("id") for tc in msg.tool_calls]
-                        })
-                    
+                            fn = (tc.get("function") or {}) if isinstance(tc, dict) else {}
+                            if not fn.get("name"):
+                                self.logger.warning(f"[{round_id}][{idx}] 丢弃历史中无 name 的 tool_call", {
+                                    "tool_call_id": tc.get("id") if isinstance(tc, dict) else None,
+                                })
+                                continue
+                            if "arguments" not in fn or fn["arguments"] is None:
+                                fn = dict(fn)
+                                fn["arguments"] = "{}"
+                            cleaned_tc = dict(tc)
+                            cleaned_tc["function"] = fn
+                            cleaned_tool_calls.append(cleaned_tc)
+
+                        if cleaned_tool_calls:
+                            message_dict["tool_calls"] = cleaned_tool_calls
+                            # 记录待匹配的 tool_calls（只注册清洗后保留下来的）
+                            for tc in cleaned_tool_calls:
+                                if tc.get("id"):
+                                    round_tool_calls[tc["id"]] = tc.get("function", {}).get("name", "unknown")
+
+                            self.logger.debug(f"[{round_id}][{idx}] {msg.type.value} with tools", {
+                                "tool_count": len(cleaned_tool_calls),
+                                "tool_ids": [tc.get("id") for tc in cleaned_tool_calls],
+                                "dropped": len(msg.tool_calls) - len(cleaned_tool_calls),
+                            })
+
                     result.append(message_dict)
                     
                 elif msg.type == MessageType.TOOL_RESULT:
@@ -488,7 +517,11 @@ class HistoryManager:
                                 "content_parts": len(llm_content) if isinstance(llm_content, list) else 1
                             })
                     else:
-                        result.append({"role": msg.role, "content": content})
+                        plain_msg = {"role": msg.role, "content": content}
+                        # assistant 消息带回 reasoning_content（DeepSeek-R1 thinking mode 协议要求）
+                        if msg.role == "assistant" and msg.reasoning_content:
+                            plain_msg["reasoning_content"] = msg.reasoning_content
+                        result.append(plain_msg)
                     self.logger.debug(f"[{round_id}][{idx}] {msg.type.value}", {
                         "role": msg.role
                     })

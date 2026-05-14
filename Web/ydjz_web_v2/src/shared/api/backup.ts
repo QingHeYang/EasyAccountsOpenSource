@@ -5,7 +5,7 @@ import type { ApiResponse } from '../types'
 export const backupApi = {
   /**
    * 手动备份
-   * 生成备份文件 → 发送 WebHook（邮件）→ 返回文件名
+   * 生成备份文件 → 发送邮件通知（需先在「系统设置 → 邮件」中配置）→ 返回文件名
    */
   backup() {
     return getRequest().post<ApiResponse<string>>('/backup/backup', null, {

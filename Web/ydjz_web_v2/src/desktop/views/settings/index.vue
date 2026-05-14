@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight, Close } from '@element-plus/icons-vue'
 import {
-  SwitchButton,
-  CreditCard,
+  ArrowLeftRight,
   Wallet,
-  PriceTag,
-  DocumentCopy,
-  InfoFilled,
-  ArrowRight,
-  Close,
-  MagicStick,
-  Setting,
-  FolderOpened,
-  Bell
-} from '@element-plus/icons-vue'
+  Tags,
+  Layers2,
+  AlarmClock,
+  Sparkles,
+  Settings,
+  FolderOpen,
+  Info,
+  Newspaper,
+  LogOut,
+} from 'lucide-vue-next'
 import { homeApi, type VersionInfo, type UpdateInfo, type AuthConfig, type BackupConfig } from '@shared/api/home'
 import { aiApi, type AiHealthResponse } from '@shared/api/ai'
 import logoUrl from '@shared/assets/logo.png'
@@ -30,9 +30,10 @@ import AccountManager from './AccountManager.vue'
 import TypeManager from './TypeManager.vue'
 import TemplateManager from './TemplateManager.vue'
 import AiSettings from './AiSettings.vue'
-import SystemInfo from './SystemInfo.vue'
+import SystemSettings from './SystemSettings.vue'
 import BackupManager from './BackupManager.vue'
 import NoticeDrawer from './NoticeDrawer.vue'
+import ScheduledFlowManager from './ScheduledFlowManager.vue'
 
 const router = useRouter()
 
@@ -50,7 +51,6 @@ const versions = ref<VersionInfo>({
   backendBranch: '',
   mysqlBranch: '',
   agentBranch: '',
-  webhookBranch: '',
 })
 const authConfig = ref<AuthConfig | null>(null)
 const backupConfig = ref<BackupConfig | null>(null)
@@ -68,8 +68,8 @@ const changelogHtml = computed(() => {
   return md.render(updateInfo.value.changelog)
 })
 
-// 系统信息抽屉
-const showSystemInfo = ref(false)
+// 系统设置抽屉
+const showSystemSettings = ref(false)
 
 // 公告抽屉
 const showNoticeDrawer = ref(false)
@@ -119,16 +119,17 @@ function onLogout() {
 
 // 数据管理项
 const dataItems = [
-  { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: CreditCard },
+  { key: 'action', title: '收支管理', desc: '管理收入和支出类型', icon: ArrowLeftRight },
   { key: 'account', title: '账户管理', desc: '管理银行卡、现金等账户', icon: Wallet },
-  { key: 'type', title: '分类管理', desc: '管理收支分类', icon: PriceTag },
-  { key: 'template', title: '快记模板', desc: '快速记账模板', icon: DocumentCopy },
+  { key: 'type', title: '分类管理', desc: '管理收支分类', icon: Tags },
+  { key: 'template', title: '快记模板', desc: '快速记账预填模板', icon: Layers2 },
+  { key: 'scheduledFlow', title: '定时记账', desc: '周期性自动生成真实流水', icon: AlarmClock },
 ]
 
 // 系统管理项
 const systemItems = [
-  { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: MagicStick },
-  { key: 'systemInfo', title: '系统信息', desc: '版本、认证与备份信息', icon: Setting },
+  { key: 'ai', title: 'AI+ 设置', desc: 'Token 统计与 MCP 状态', icon: Sparkles },
+  { key: 'systemSettings', title: '系统设置', desc: '鉴权 / 邮件 / 提醒 / 备份 / 版本', icon: Settings },
 ]
 
 // 检测 AI 服务
@@ -141,6 +142,7 @@ const showActionDrawer = ref(false)
 const showAccountDrawer = ref(false)
 const showTypeDrawer = ref(false)
 const showTemplateDrawer = ref(false)
+const showScheduledFlowDrawer = ref(false)
 const showAiDrawer = ref(false)
 const showBackupDrawer = ref(false)
 
@@ -153,6 +155,8 @@ function openDrawer(key: string) {
     showTypeDrawer.value = true
   } else if (key === 'template') {
     showTemplateDrawer.value = true
+  } else if (key === 'scheduledFlow') {
+    showScheduledFlowDrawer.value = true
   } else if (key === 'ai') {
     // AI 配置未完成时显示提示
     if (!aiConfigured.value) {
@@ -202,16 +206,43 @@ function openDrawer(key: string) {
       return
     }
     showAiDrawer.value = true
-  } else if (key === 'systemInfo') {
-    showSystemInfo.value = true
+  } else if (key === 'systemSettings') {
+    showSystemSettings.value = true
   } else if (key === 'backup') {
     showBackupDrawer.value = true
   }
 }
 
+// ScheduledFlowManager ref，用于从通知中心跳转时打开指定规则
+const scheduledFlowRef = ref<InstanceType<typeof ScheduledFlowManager> | null>(null)
+
+async function openScheduledRuleById(ruleId: number) {
+  showScheduledFlowDrawer.value = true
+  await nextTick()
+  scheduledFlowRef.value?.openRuleById(ruleId)
+}
+
+function handleOpenScheduledRuleEvent(e: Event) {
+  const ruleId = (e as CustomEvent).detail?.ruleId
+  if (ruleId) openScheduledRuleById(Number(ruleId))
+}
+
 onMounted(() => {
   loadSystemConfig()
   checkAiService()
+
+  // 通知跳转：首次进入设置页时读 sessionStorage
+  const stored = sessionStorage.getItem('pendingOpenScheduledRule')
+  if (stored) {
+    sessionStorage.removeItem('pendingOpenScheduledRule')
+    openScheduledRuleById(Number(stored))
+  }
+  // 已在设置页内时用全局事件触发
+  window.addEventListener('open-scheduled-rule', handleOpenScheduledRuleEvent)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('open-scheduled-rule', handleOpenScheduledRuleEvent)
 })
 </script>
 
@@ -231,7 +262,7 @@ onMounted(() => {
             @click="openDrawer(item.key)"
           >
             <div class="card-icon">
-              <el-icon :size="24"><component :is="item.icon" /></el-icon>
+              <component :is="item.icon" :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">{{ item.title }}</div>
@@ -254,7 +285,7 @@ onMounted(() => {
             @click="openDrawer('ai')"
           >
             <div class="card-icon ai-icon">
-              <el-icon :size="24"><MagicStick /></el-icon>
+              <Sparkles :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">
@@ -265,21 +296,21 @@ onMounted(() => {
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
-          <!-- 系统信息卡片 -->
-          <div class="data-card" @click="openDrawer('systemInfo')">
+          <!-- 系统设置卡片 -->
+          <div class="data-card" @click="openDrawer('systemSettings')">
             <div class="card-icon system-icon">
-              <el-icon :size="24"><Setting /></el-icon>
+              <Settings :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
-              <div class="card-title">系统信息</div>
-              <div class="card-desc">版本、认证与备份信息</div>
+              <div class="card-title">系统设置</div>
+              <div class="card-desc">鉴权 / 邮件 / 提醒 / 备份 / 版本</div>
             </div>
             <el-icon class="card-arrow"><ArrowRight /></el-icon>
           </div>
           <!-- 数据备份卡片 -->
           <div class="data-card" @click="openDrawer('backup')">
             <div class="card-icon backup-icon">
-              <el-icon :size="24"><FolderOpened /></el-icon>
+              <FolderOpen :size="24" :stroke-width="1.75" />
             </div>
             <div class="card-info">
               <div class="card-title">数据备份</div>
@@ -295,17 +326,17 @@ onMounted(() => {
         <h2 class="section-title">其他</h2>
         <div class="other-actions">
           <el-button size="large" class="about-btn" @click="openAbout">
-            <el-icon><InfoFilled /></el-icon>
+            <Info :size="16" :stroke-width="1.75" class="btn-icon" />
             <span>关于</span>
             <span v-if="hasUpdate" class="update-dot"></span>
           </el-button>
           <el-button size="large" class="notice-btn" @click="showNoticeDrawer = true">
-            <el-icon><Bell /></el-icon>
+            <Newspaper :size="16" :stroke-width="1.75" class="btn-icon" />
             <span>公告</span>
             <span v-if="hasUnreadNotice" class="notice-dot"></span>
           </el-button>
           <el-button v-if="showLogout" size="large" type="danger" plain @click="onLogout">
-            <el-icon><SwitchButton /></el-icon>
+            <LogOut :size="16" :stroke-width="1.75" class="btn-icon" />
             <span>退出登录</span>
           </el-button>
         </div>
@@ -398,7 +429,7 @@ onMounted(() => {
           target="_blank"
           class="update-tip"
         >
-          <el-icon><InfoFilled /></el-icon>
+          <Info :size="14" :stroke-width="1.75" />
           <span>查看更新指南</span>
           <el-icon class="tip-arrow"><ArrowRight /></el-icon>
         </a>
@@ -418,12 +449,11 @@ onMounted(() => {
     <AccountManager v-model:visible="showAccountDrawer" />
     <TypeManager v-model:visible="showTypeDrawer" />
     <TemplateManager v-model:visible="showTemplateDrawer" />
+    <ScheduledFlowManager ref="scheduledFlowRef" v-model:visible="showScheduledFlowDrawer" />
     <AiSettings v-model:visible="showAiDrawer" />
-    <SystemInfo
-      v-model:visible="showSystemInfo"
+    <SystemSettings
+      v-model:visible="showSystemSettings"
       :versions="versions"
-      :auth-config="authConfig"
-      :backup-config="backupConfig"
     />
     <BackupManager v-model:visible="showBackupDrawer" />
     <NoticeDrawer ref="noticeDrawerRef" v-model:visible="showNoticeDrawer" />
@@ -920,6 +950,12 @@ html.dark .card-icon {
 
 html.dark .data-card.ai-unconfigured .card-icon.ai-icon {
   background: var(--color-text-quaternary);
+}
+
+/* el-button 内 Lucide 图标的间距（Lucide 不是 el-icon，不会自动应用 EP 间距规则） */
+.el-button .btn-icon {
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 /* AI 配置对话框样式 */

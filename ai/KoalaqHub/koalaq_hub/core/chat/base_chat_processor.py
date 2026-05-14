@@ -353,20 +353,27 @@ class BaseChatProcessor(ABC):
         tool_calls_to_execute = []
         
         for tc in tool_calls_list:
-            tool_name = tc["function"]["name"]
+            # 防御性取字段：部分 LLM 偶发返回不完整 tool_call（缺 arguments），
+            # 这里只做 .get() 兜底，不丢弃任何 tool_call ——
+            # 因为 assistant 历史里已经写了所有 tool_call_id，必须每个 id 都有对应的 tool_response，
+            # 否则会破坏 OpenAI/智谱协议的"tool_calls 必须配对 tool message"约束，下一轮 LLM 调用 400。
+            # 上游 _convert_tool_calls_list 已过滤掉无 name 的残缺项，到这里 name 必然存在。
+            fn = tc.get("function") or {}
+            tool_name = fn.get("name")
+            arguments = fn.get("arguments", "{}")
             tool_call_data = {
                 "tool_call_id": tc["id"],
                 "tool_name": tool_name,
-                "arguments": tc["function"]["arguments"]
+                "arguments": arguments
             }
-            
+
             if tool_name == "call_agent":
                 # call_agent 特殊处理，不发送 tool message，留到最后执行
                 agent_calls.append(tool_call_data)
             else:
                 # 其他所有工具（包括内部工具和MCP工具），发送 tool message
                 message_obj = MessageBuilder.create_tool_call_message(
-                    conversation_id, tool_name, tc["id"], tc["function"]["arguments"]
+                    conversation_id, tool_name, tc["id"], arguments
                 )
                 await self.send_message(conversation_id, message_obj)
                 tool_calls_to_execute.append(tool_call_data)
@@ -425,7 +432,9 @@ class BaseChatProcessor(ABC):
                 tool_response=result["result"],
                 tool_name=result["tool_name"],
                 tool_call_id=result["tool_call_id"],
-                status=result["success"]
+                status=result["success"],
+                # 失败时把结构化错误透传给前端，前端据此渲染错误 UI
+                error_object=result.get("error_object") if not result["success"] else None,
             )
             await self.send_message(conversation_id, message_obj)
         
@@ -499,12 +508,15 @@ class BaseChatProcessor(ABC):
                     )
 
                 # 添加到结果列表
-                results.append({
+                entry = {
                     "tool_call_id": call["tool_call_id"],
                     "tool_name": "call_agent",
-                    "result": tool_result.get("result") if tool_result.get("success") else f"错误: {tool_result.get('error')}",
-                    "success": tool_result.get("success", False)
-                })
+                    "result": tool_result.get("result") if tool_result.get("success") else tool_result.get("error", "执行失败"),
+                    "success": tool_result.get("success", False),
+                }
+                if not entry["success"] and tool_result.get("error_object"):
+                    entry["error_object"] = tool_result["error_object"]
+                results.append(entry)
 
             except Exception as e:
                 self.logger.error("执行 call_agent 失败", {
@@ -538,11 +550,15 @@ class BaseChatProcessor(ABC):
                     sub_conversation_id=None
                 )
 
+                # 给前端带一份结构化错误，便于统一渲染
+                from ...tools.error_codes import from_exception as _from_exc
+                err_obj = _from_exc(e)
                 results.append({
                     "tool_call_id": call["tool_call_id"],
                     "tool_name": "call_agent",
                     "result": error_message,
-                    "success": False
+                    "success": False,
+                    "error_object": err_obj.to_dict(),
                 })
 
         return results

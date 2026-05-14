@@ -1,52 +1,40 @@
 package com.deepblue.yd_jz.config;
-import com.deepblue.yd_jz.dto.BaseDto;
-import com.deepblue.yd_jz.service.AuthService;
+
+import com.deepblue.yd_jz.service.AuthConfigService;
 import com.deepblue.yd_jz.utils.AuthUtils;
-import com.deepblue.yd_jz.utils.ContentValues;
-import com.deepblue.yd_jz.utils.GsonUtils;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.Response;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.IOException;
-
+// v2.7.0 (config-ui): 拦截器始终注册（见 WebConfig）；进入时现读 AuthConfigService.isLoginEnable() 决定放行
+// 不缓存登录开关，每次请求实时反映 DB 配置；用户在 UI 切换登录开关后下一个请求即生效
 @Slf4j
 public class TokenInterceptor implements HandlerInterceptor {
 
-    private boolean authEnable;
-    private AuthUtils authUtils;
+    private final AuthUtils authUtils;
+    private final AuthConfigService authConfigService;
 
-    // 构造函数注入依赖
-    public TokenInterceptor(boolean authEnable, AuthUtils authUtils) {
-        this.authEnable = authEnable;
+    public TokenInterceptor(AuthUtils authUtils, AuthConfigService authConfigService) {
         this.authUtils = authUtils;
+        this.authConfigService = authConfigService;
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.debug("TokenInterceptor preHandle called for URI: {}", request.getRequestURI());
 
-        if (!authEnable) {
+        // 现读 DB 配置；登录功能关闭时直接放行
+        if (!authConfigService.isLoginEnable()) {
             log.debug("Authentication is disabled. Allowing request: {}", request.getRequestURI());
             return true;
         }
 
         String uri = request.getRequestURI();
-
-        // 拦截器中移除 Swagger 和登录注册路径的过滤逻辑
-        // 这些逻辑现在由 WebConfig 的 excludePathPatterns 处理
-
         String token = request.getHeader("Authorization");
         log.debug("Authorization token: {}", token);
 
-        // 进行token验证，并处理验证结果
         int code = authUtils.isAuth(token);
         if (code == 200) {
             log.debug("Authentication successful for URI: {}", uri);
@@ -67,12 +55,10 @@ public class TokenInterceptor implements HandlerInterceptor {
     @Override
     public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
                            ModelAndView modelAndView) throws Exception {
-        // 请求处理后的逻辑
     }
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
                                 Object handler, Exception ex) throws Exception {
-        // 请求完成后的逻辑
     }
 }

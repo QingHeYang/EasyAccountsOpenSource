@@ -37,8 +37,8 @@ public class ScreenService {
 
 
     @Autowired
-    FileMakeWebHook fileMakeWebHook;
-    
+    MailService mailService;
+
     @Autowired
     ImageService imageService;
 
@@ -217,12 +217,13 @@ public class ScreenService {
         String dateStr = sdf.format(new Date());
         excelName = excelName + "_" + dateStr + ".xlsx";
         String excelPath = doMakeExcel(excelBean, excelName);
-        return uploadExcel(excelPath, excelName, excelBean.getName());
+        return uploadExcel(excelPath, excelName);
     }
 
-    private String uploadExcel(String excelPath, String excelFileName, String title) {
+    private String uploadExcel(String excelPath, String excelFileName) {
         if (FileUtils.isExist(excelPath)) {
-            return fileMakeWebHook.sendFile(new File(excelPath), "screen_excel", excelFileName);
+            mailService.sendScreenExcel(new File(excelPath));
+            return "\n筛选 Excel 已生成并发送邮件\n" + excelFileName + "|0";
         }else {
             return "\n文件上传失败\n"+excelPath+excelFileName+"文件不存在|1";
         }
