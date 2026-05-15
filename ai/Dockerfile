@@ -1,5 +1,6 @@
-# 使用Python 3.10基础镜像
-FROM python:3.10-slim
+# 使用 Python 3.10 slim 镜像（锁定版本，避免 latest/3.10 飘动）
+# v2.8.0 起从 python:3.10-slim 切到锁版本 python:3.10.16-slim-bookworm
+FROM python:3.10.16-slim-bookworm
 
 # 设置工作目录
 WORKDIR /app

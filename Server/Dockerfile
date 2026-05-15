@@ -1,25 +1,19 @@
-# 使用 Ubuntu 作为基础镜像
-FROM ubuntu:latest
+# Eclipse Temurin 官方 OpenJDK 17 JRE（基于 Ubuntu 22.04 jammy）
+# v2.8.0 起从 ubuntu:latest+完整 JDK 切到 JRE 镜像，体积 1.13GB → ~350MB
+FROM eclipse-temurin:17-jre-jammy
 
-# 维护者信息
 LABEL maintainer="Mecy@deep-blue.cloud"
 
-# 暴露端口 8081
 EXPOSE 8081
 
-# 设置环境变量
 ENV LANGUAGE=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     LANG=C.UTF-8
 
-# 安装必要的软件和 OpenJDK 17
+# 安装 mysql-client（用于 SQLBackUpTask 调 mysqldump）
 RUN apt-get update \
-    && apt-get install -y vim tree net-tools mysql-client \
-    && apt-get install -y openjdk-17-jdk
-
-# 设置 JAVA_HOME 环境变量
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH=$PATH:$JAVA_HOME/bin
+    && apt-get install -y --no-install-recommends mysql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 # 创建必要的目录并设置权限
 RUN mkdir -p /Ledger/config/ /Ledger/excel/month/ /Ledger/excel/screen/ /Ledger/excel/analysis/ /Ledger/excel_template/ /Ledger/backup/ /Ledger/app/ /Ledger/logs/ \
@@ -31,7 +25,6 @@ COPY YD_JZ/excel_template/*.xlsx /Ledger/excel_template/
 # 复制编译好的 JAR 文件到容器内的 /Ledger/app/ 目录
 COPY YD_JZ/target/YD_JZ-SNAPSHOT.jar /Ledger/app/
 
-# 设置工作目录
 WORKDIR /Ledger
 
 # 设置容器启动时执行的命令（内存优化版，约200MB）
