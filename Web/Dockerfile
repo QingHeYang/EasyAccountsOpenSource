@@ -1,5 +1,6 @@
-# 使用官方的Nginx镜像作为基础镜像
-FROM nginx:latest
+# 使用官方 Nginx Alpine 镜像（锁定版本，避免 latest 飘动）
+# v2.8.0 起从 nginx:latest 切到 nginx:1.27-alpine，体积 146MB → ~50MB
+FROM nginx:1.27-alpine
 
 # 维护者信息
 LABEL maintainer="Mecy@deep-blue.cloud"
