@@ -69,11 +69,6 @@ ydjz_web_v2/
 │   ├── main-desktop.ts             # 桌面端入口
 │   └── main-mobile.ts              # 移动端入口
 │
-├── docs/
-│   ├── dev-log/                    # 开发日志
-│   ├── dev-guide/                  # 开发指南
-│   └── api/                        # API 文档
-│
 ├── index.html                      # 桌面端 HTML
 ├── mobile.html                     # 移动端 HTML
 ├── vite.config.ts                  # Vite 配置
@@ -356,3 +351,12 @@ services:
 ```
 
 > 注意：NGINX 配置中的 `server:8081` 和 `ai:8001` 是 Docker 内部网络地址，需要确保服务名称与 docker-compose.yml 中定义的一致。
+
+---
+
+## 相关文档
+
+各端架构指南、开发日志、专项设计已迁移到独立的 Devlog 仓库（不在开源源码仓库中）。开源用户可参考：
+
+- [GitBook 用户文档](https://mercys-organization-2.gitbook.io/easyaccounts/)
+- [部署仓库](https://github.com/QingHeYang/EasyAccounts)

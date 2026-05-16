@@ -323,16 +323,13 @@ docker build -t easyaccounts-mysql .
 
 ### 配置项
 
-```properties
-# 是否启用登录
-auth.enable=true
+> **v2.7.0 起**：以下配置已从 `application-*.properties` 下沉到数据库（前端「**系统设置 → 鉴权**」UI 管理），**改完立即生效，无需重启**。开发期可直接在数据库 `app_config` 表里查看/调整：
 
-# Token 过期时间（分钟）
-auth.expired=30
-
-# 单设备登录：true=新登录踢掉旧设备
-auth.single_login=true
-```
+| 配置 key | 说明 | 默认 |
+|---------|------|------|
+| `auth.enable` | 是否启用登录 | true |
+| `auth.expired` | Token 过期时间（分钟）| 30 |
+| `auth.single_login` | 单设备登录（true=新登录踢掉旧设备）| true |
 
 ### Token 机制
 
@@ -346,12 +343,29 @@ auth.single_login=true
 
 ### 数据库备份
 
-```properties
-# 备份时间（cron 表达式，默认每天 22:00）
-cron.sqlBackupTime=0 0 22 * * ?
+> **v2.7.0 起**：备份开关与 cron 表达式已迁移到「**系统设置 → 备份**」UI（数据库 `app_config` 表），运行期可动态调整。
 
-# 备份命令
+```properties
+# 仅作为备份命令模板（mysqldump 路径，开发期可在 application-local.properties 中覆盖）
 sqldumpCmd=mysqldump -h localhost -P 3306 -uroot -p密码 --databases yd_jz >
 ```
 
 备份文件存储在 `sqlBackUpFolder` 配置的目录。
+
+### v2.7.0 新增定时任务
+
+| 任务 | 用途 | 实现位置 |
+|------|------|---------|
+| `ScheduledFlowExecuteTask` | 定时记账（周期账单自动生成流水）| `task/ScheduledFlowExecuteTask.java` |
+| `AutoExcelExecuteTask` | 每月自动导出 Excel 报表 | `task/AutoExcelExecuteTask.java` |
+| `ReminderDispatchTask` | 提醒分发（站内通知 + 邮件）| `task/ReminderDispatchTask.java` |
+| `SQLBackUpTask` | SQL 数据库备份 | `task/SQLBackUpTask.java` |
+
+---
+
+## 相关文档
+
+各端架构指南、开发日志、专项设计已迁移到独立的 Devlog 仓库（不在开源源码仓库中）。开源用户可参考：
+
+- [GitBook 用户文档](https://mercys-organization-2.gitbook.io/easyaccounts/)
+- [部署仓库](https://github.com/QingHeYang/EasyAccounts)
