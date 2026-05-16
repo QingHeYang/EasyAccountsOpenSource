@@ -68,10 +68,6 @@ KoalaqHub/
 │   │   └── 小易.role
 │   └── database/                   # SQLite 数据库
 │
-├── docs/                           # 文档
-│   ├── dev-log/                    # 开发日志
-│   └── dev-guide/                  # 开发指南
-│
 ├── .env.example                    # 环境变量模板
 ├── requirements.txt                # Python 依赖
 └── Dockerfile                      # Docker 构建文件
@@ -297,7 +293,8 @@ task_instructions_file = ["easy_accounts_instructions_inner.prompt", "easy_accou
 
 ## 相关文档
 
-| 文档 | 路径 |
-|------|------|
-| 提示词组装流程 | `docs/dev-guide/system_提示词组装使用流程.md` |
-| 开发日志 | `docs/dev-log/` |
+各端架构指南、开发日志、专项设计已迁移到独立的 Devlog 仓库（不在开源源码仓库中）。开源用户可参考：
+
+- [GitBook 用户文档](https://mercys-organization-2.gitbook.io/easyaccounts/)
+- [部署仓库](https://github.com/QingHeYang/EasyAccounts)
+- [EasyAccounts Skills（OpenClaw）](https://github.com/QingHeYang/EasyAccounts-Skills)
