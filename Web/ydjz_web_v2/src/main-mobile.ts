@@ -14,7 +14,17 @@ import { ApiCode } from '@shared/types'
 setupRequest({
   baseURL: window.config?.apiBaseUrl || '/api',
   onUnauthorized: (code) => {
-    const redirect = router.currentRoute.value.fullPath
+    const current = router.currentRoute.value
+
+    // 已在登录页：不重复跳转。
+    // 否则会话失效时首屏并发的多个 401 会把 /auth?redirect=... 整段
+    // 再次当作 redirect 层层嵌套，产生畸形 URL（登录后回不去）。
+    if (current.path.startsWith('/auth')) {
+      return
+    }
+
+    // 仅记录“真实业务页面”作为登录后回跳目标
+    const redirect = current.fullPath
 
     // 未注册 -> 注册模式（使用 replace，不留历史记录）
     if (code === ApiCode.NOT_REGISTERED) {

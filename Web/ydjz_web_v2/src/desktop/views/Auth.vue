@@ -78,7 +78,10 @@ async function onSubmit() {
     ElMessage.success(isLogin.value ? '登录成功' : '注册成功')
 
     // 跳转（使用 replace，不让登录页留在历史记录中）
-    const redirect = (route.query.redirect as string) || '/'
+    // 净化 redirect：避免 redirect 指向 /auth（会话失效时可能被污染成
+    // /auth?redirect=... 嵌套），否则登录成功后又跳回登录页 → 看似登录失败
+    const rawRedirect = (route.query.redirect as string) || ''
+    const redirect = rawRedirect && !rawRedirect.startsWith('/auth') ? rawRedirect : '/'
     router.replace(redirect)
   } catch (err: any) {
     // 418：登录时用户不存在 → 引导切换到注册模式
