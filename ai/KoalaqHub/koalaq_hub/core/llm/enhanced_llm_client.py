@@ -76,8 +76,12 @@ class EnhancedLLMClient:
             tool_calls_list: 工具调用列表
             tool_call_delta: 流式传输的工具调用片段
         """
-        index = tool_call_delta.index
-        
+        # OpenAI 协议要求 tool_call delta 必带 index，但部分兼容平台（如小米）
+        # 可能下发缺失/为 None 的 index，导致 None+1 抛 TypeError。此处兜底为 0。
+        index = getattr(tool_call_delta, "index", None)
+        if index is None:
+            index = 0
+
         # 根据 index 扩充列表
         if len(tool_calls_list) < (index + 1):
             tool_calls_list.extend([{}] * (index + 1 - len(tool_calls_list)))
@@ -461,18 +465,39 @@ class EnhancedLLMClient:
                     # 主动关闭stream连接，真正停止服务器端生成
                     await safe_close_stream(stream)
                     break  # 中断循环，停止token消耗
-            
+
+                # 安全检查：确保chunk有choices且不为空
+                # 部分平台（如小米 OpenAI 兼容 API）在工具调用流中会下发 choices 为空数组的
+                # usage-only chunk，直接取 [0] 会抛 list index out of range。
+                # 此处与 block()/_stream_sse() 保持一致：空 choices 时只提取 usage 后跳过。
+                if not chunk.choices or len(chunk.choices) == 0:
+                    if chunk.usage:
+                        total_tokens = chunk.usage.total_tokens
+                        prompt_tokens = chunk.usage.prompt_tokens
+                        completion_tokens = chunk.usage.completion_tokens
+                        reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
+                    continue
 
                 choice = chunk.choices[0]
                 delta = choice.delta
-                
+
+                # 兼容平台可能下发 delta 为空的边界 chunk（如仅含 finish_reason），
+                # 此时仍需处理本 chunk 携带的 usage，故不能直接 continue 到循环顶部。
+                if delta is None:
+                    if chunk.usage:
+                        total_tokens = chunk.usage.total_tokens
+                        prompt_tokens = chunk.usage.prompt_tokens
+                        completion_tokens = chunk.usage.completion_tokens
+                        reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
+                    continue
+
                 # 处理工具调用
                 if hasattr(delta, "tool_calls") and delta.tool_calls:
                     for tool_call_delta in delta.tool_calls:
                         self._accumulate_tool_calls(tool_calls_list, tool_call_delta)
-                
+
                 # 处理内容
-                content = delta.content
+                content = getattr(delta, "content", None)
                 chunk_reasoning = getattr(delta, "reasoning_content", None)
 
                 # 发送思考内容(如果模型支持) 子agent模式不发送
