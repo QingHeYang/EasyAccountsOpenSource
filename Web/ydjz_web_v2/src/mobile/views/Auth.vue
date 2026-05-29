@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showDialog, showLoadingToast, closeToast, showToast } from 'vant'
 import MD5 from 'crypto-js/md5'
 import { authApi } from '@shared/api/auth'
+import { homeApi } from '@shared/api/home'
 import { ApiCode } from '@shared/types'
 import { useThemeStore } from '@shared/stores/theme'
 import logoUrl from '@shared/assets/logo.png'
@@ -12,10 +13,52 @@ const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
 
-// 单用户系统：mode 由 API 拦截器决定
+// 解析登录/注册后的回跳目标：
+// - query 同名多值时 route.query.redirect 运行时是数组，强转 string 调 .startsWith 会抛 TypeError，
+//   先收敛为单值；
+// - 避免 redirect 指向 /auth（会话失效时可能被污染成 /auth?redirect=... 嵌套），否则登录后又跳回登录页。
+function resolveRedirect(fallback: string): string {
+  const raw = route.query.redirect
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value && !value.startsWith('/auth') ? value : fallback
+}
+
+// 单用户系统：mode 由后端判定（secret.key 是否存在 → 401 登录 / 418 注册）
 // mode=0 未注册 → 注册页
 // mode=1 未登录 → 登录页
+// 未带 mode（守卫无 token 跳来）→ 默认按登录展示，onMounted 探测后端后再校正
 const isLogin = computed(() => route.query.mode !== '0')
+
+/**
+ * 探测后端真实状态，决定 登录/注册 模式。
+ *
+ * 背景：路由守卫无 token 时只“干净跳到 /auth”，不写死 mode（写死 mode=1 会让
+ * 全新部署的首装用户错看到登录页）。唯一能区分“首装 vs 已有用户”的是后端：
+ * 无 token 请求任意业务接口，后端按 secret.key 是否存在返回 401（已有用户→登录）
+ * 或 418（尚无用户→注册）。这里复用现成只读接口 /home/getVersion 探测，不新增后端契约。
+ *
+ * - 418 → 注册模式（mode=0）
+ * - 接口成功（后端关闭了登录）→ 直接进入应用
+ * - 其他（401 / 网络错误）→ 登录模式（mode=1）：对“已有用户”是正确缺省
+ *
+ * 注意：探测请求触发的 onUnauthorized 因当前已在 /auth 而不会再跳转（见 main-*.ts 守卫），
+ * 故不会与本逻辑互相干扰。
+ */
+async function detectMode() {
+  // URL 已明确带 mode（如登录失败后切到 mode=0）→ 尊重之，不再探测
+  if (route.query.mode === '0' || route.query.mode === '1') return
+
+  try {
+    await homeApi.getSystemConfig()
+    // 探测成功：后端未开启登录鉴权，无需停留登录页，直接进入应用
+    router.replace(resolveRedirect('/board'))
+  } catch (err: any) {
+    // 418 未注册 → 注册模式；其余（401/网络错误）→ 登录模式
+    const mode = err?.code === ApiCode.NOT_REGISTERED ? '0' : '1'
+    router.replace({ path: '/auth', query: { ...route.query, mode } })
+  }
+}
+
 const title = computed(() => isLogin.value ? '欢迎回来' : '创建账户')
 const subtitle = computed(() => isLogin.value ? '请登录您的账户' : '首次使用，请设置账户')
 const buttonText = computed(() => isLogin.value ? '登录' : '注册')
@@ -26,6 +69,8 @@ const loading = ref(false)
 
 // password autocomplete：登录用 current-password，注册用 new-password
 const passwordAutocomplete = computed(() => isLogin.value ? 'current-password' : 'new-password')
+
+onMounted(detectMode)
 
 // 表单验证
 function validate(): string | null {
@@ -77,8 +122,7 @@ async function onSubmit() {
     localStorage.setItem('token', token)
 
     // 跳转（使用 replace，不让登录页留在历史记录中）
-    const redirect = (route.query.redirect as string) || '/board'
-    router.replace(redirect)
+    router.replace(resolveRedirect('/board'))
   } catch (err: any) {
     // 418：登录时用户不存在 → 引导切换到注册模式
     if (err?.code === ApiCode.NOT_REGISTERED && isLogin.value) {
