@@ -69,6 +69,43 @@ class EnhancedLLMClient:
     """增强版LLM客户端 - 支持动态配置和多种输出方式"""
     
     @staticmethod
+    def _extract_usage_tokens(usage, total_tokens: int, prompt_tokens: int,
+                              completion_tokens: int, reasoning_tokens: int):
+        """从一个 usage 来源（chunk.usage / choice.usage / delta.usage）提取四项 token。
+
+        统一处理两种形态：
+          - 对象形态（标准 OpenAI、moonshot 的 delta.usage、对象版 choice.usage）；
+          - 字典形态（Kimi 风格把 usage 放在 choice 里且为 dict）。
+        某一项取不到时回退到传入的当前值，行为与原先各处分散写法等价：
+        正常 usage 对象/字典一定带这些字段，取到即用；缺失才保留旧值，不会抛错。
+        reasoning_tokens 在标准 usage 中常缺省，回退尤为重要。
+
+        Args:
+            usage: 待提取的 usage 来源（对象或 dict），可能为 None。
+            total_tokens/prompt_tokens/completion_tokens/reasoning_tokens: 当前已累积值，
+                作为缺失字段的回退。
+
+        Returns:
+            (total_tokens, prompt_tokens, completion_tokens, reasoning_tokens) 四元组；
+            usage 为 None 时原样返回传入值。
+        """
+        if not usage:
+            return total_tokens, prompt_tokens, completion_tokens, reasoning_tokens
+
+        if isinstance(usage, dict):
+            getter = usage.get
+        else:
+            def getter(key, default=None):
+                return getattr(usage, key, default)
+
+        return (
+            getter("total_tokens", total_tokens),
+            getter("prompt_tokens", prompt_tokens),
+            getter("completion_tokens", completion_tokens),
+            getter("reasoning_tokens", reasoning_tokens),
+        )
+
+    @staticmethod
     def _accumulate_tool_calls(tool_calls_list: List[Dict], tool_call_delta) -> None:
         """累积流式传输的工具调用
         
@@ -78,6 +115,8 @@ class EnhancedLLMClient:
         """
         # OpenAI 协议要求 tool_call delta 必带 index，但部分兼容平台（如小米）
         # 可能下发缺失/为 None 的 index，导致 None+1 抛 TypeError。此处兜底为 0。
+        # 注意：刻意兜底为固定的 0，而非“追加到末尾”——已知平台单工具调用恒为 index=0，
+        # 若改成追加，遇到后续真带 index=0 的 arguments 分片会错位到不同槽位，反而拆散同一个工具调用。
         index = getattr(tool_call_delta, "index", None)
         if index is None:
             index = 0
@@ -213,22 +252,20 @@ class EnhancedLLMClient:
                 # 安全检查：确保chunk有choices且不为空
                 if not chunk.choices or len(chunk.choices) == 0:
                     # 处理token信息（某些chunk只包含usage信息）
-                    if chunk.usage:
-                        total_tokens = chunk.usage.total_tokens
-                        prompt_tokens = chunk.usage.prompt_tokens
-                        completion_tokens = chunk.usage.completion_tokens
-                        reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
+                    total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                        self._extract_usage_tokens(chunk.usage, total_tokens, prompt_tokens,
+                                                   completion_tokens, reasoning_tokens)
                     continue
-                
+
                 choice = chunk.choices[0]
                 delta = choice.delta
-                
+
                 # 处理工具调用
                 if hasattr(delta, "tool_calls") and delta.tool_calls:
                     for tool_call_delta in delta.tool_calls:
                         # 累积工具调用数据
                         self._accumulate_tool_calls(tool_calls_list, tool_call_delta)
-                
+
                 # 处理内容
                 content = delta.content
                 chunk_reasoning = getattr(delta, "reasoning_content", None)
@@ -242,38 +279,26 @@ class EnhancedLLMClient:
                     full_content += content
 
                 # 处理token信息
-                if chunk.usage:
-                    total_tokens = chunk.usage.total_tokens
-                    prompt_tokens = chunk.usage.prompt_tokens
-                    completion_tokens = chunk.usage.completion_tokens
-                    reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
-                
-                # 检查其他可能的 usage 位置（如 Kimi 将 usage 放在 choice 中）
+                total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                    self._extract_usage_tokens(chunk.usage, total_tokens, prompt_tokens,
+                                               completion_tokens, reasoning_tokens)
+
+                # 检查其他可能的 usage 位置（如 Kimi 将 usage 放在 choice 中，可能是 dict 或对象）
                 if hasattr(choice, 'usage') and choice.usage:
-                    # Kimi 的 usage 是字典格式
-                    if isinstance(choice.usage, dict):
-                        total_tokens = choice.usage.get('total_tokens', total_tokens)
-                        prompt_tokens = choice.usage.get('prompt_tokens', prompt_tokens)
-                        completion_tokens = choice.usage.get('completion_tokens', completion_tokens)
-                        reasoning_tokens = choice.usage.get('reasoning_tokens', reasoning_tokens)
-                    else:
-                        # 标准对象格式
-                        total_tokens = getattr(choice.usage, 'total_tokens', total_tokens)
-                        prompt_tokens = getattr(choice.usage, 'prompt_tokens', prompt_tokens)
-                        completion_tokens = getattr(choice.usage, 'completion_tokens', completion_tokens)
-                        reasoning_tokens = getattr(choice.usage, 'reasoning_tokens', reasoning_tokens)
-                
+                    total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                        self._extract_usage_tokens(choice.usage, total_tokens, prompt_tokens,
+                                                   completion_tokens, reasoning_tokens)
+
                 # 特殊处理：moonshot 平台在 finish_reason="stop" 时，usage 在 delta 中
                 if self.platform == "moonshot" and hasattr(choice, "finish_reason") and choice.finish_reason == "stop":
                     if hasattr(delta, "usage") and delta.usage:
-                        total_tokens = delta.usage.total_tokens
-                        prompt_tokens = delta.usage.prompt_tokens
-                        completion_tokens = delta.usage.completion_tokens
-                        reasoning_tokens = getattr(delta.usage, "reasoning_tokens", 0)
+                        total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                            self._extract_usage_tokens(delta.usage, total_tokens, prompt_tokens,
+                                                       completion_tokens, reasoning_tokens)
 
             # 将工具调用列表转换为 ToolCall 对象
             tool_calls = self._convert_tool_calls_list(tool_calls_list)
-            
+
             result = LLMResponse(
                 is_interrupted=False,
                 content=full_content, 
@@ -470,12 +495,11 @@ class EnhancedLLMClient:
                 # 部分平台（如小米 OpenAI 兼容 API）在工具调用流中会下发 choices 为空数组的
                 # usage-only chunk，直接取 [0] 会抛 list index out of range。
                 # 此处与 block()/_stream_sse() 保持一致：空 choices 时只提取 usage 后跳过。
+                # （此分支无 choice 对象，只能取 chunk.usage）
                 if not chunk.choices or len(chunk.choices) == 0:
-                    if chunk.usage:
-                        total_tokens = chunk.usage.total_tokens
-                        prompt_tokens = chunk.usage.prompt_tokens
-                        completion_tokens = chunk.usage.completion_tokens
-                        reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
+                    total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                        self._extract_usage_tokens(chunk.usage, total_tokens, prompt_tokens,
+                                                   completion_tokens, reasoning_tokens)
                     continue
 
                 choice = chunk.choices[0]
@@ -483,12 +507,16 @@ class EnhancedLLMClient:
 
                 # 兼容平台可能下发 delta 为空的边界 chunk（如仅含 finish_reason），
                 # 此时仍需处理本 chunk 携带的 usage，故不能直接 continue 到循环顶部。
+                # 此分支 choice 存在，故同时提取 chunk.usage 与 choice.usage（Kimi 风格），
+                # 与正常路径保持一致，避免边界 chunk 的 token 统计丢失。
                 if delta is None:
-                    if chunk.usage:
-                        total_tokens = chunk.usage.total_tokens
-                        prompt_tokens = chunk.usage.prompt_tokens
-                        completion_tokens = chunk.usage.completion_tokens
-                        reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
+                    total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                        self._extract_usage_tokens(chunk.usage, total_tokens, prompt_tokens,
+                                                   completion_tokens, reasoning_tokens)
+                    if hasattr(choice, 'usage') and choice.usage:
+                        total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                            self._extract_usage_tokens(choice.usage, total_tokens, prompt_tokens,
+                                                       completion_tokens, reasoning_tokens)
                     continue
 
                 # 处理工具调用
@@ -527,22 +555,19 @@ class EnhancedLLMClient:
                         continue
 
                 # 处理token信息
-                if chunk.usage:
-                    total_tokens = chunk.usage.total_tokens
-                    prompt_tokens = chunk.usage.prompt_tokens
-                    completion_tokens = chunk.usage.completion_tokens
-                    reasoning_tokens = getattr(chunk.usage, "reasoning_tokens", 0)
-                
-                # 检查其他可能的 usage 位置（如 Kimi 将 usage 放在 choice 中）
+                total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                    self._extract_usage_tokens(chunk.usage, total_tokens, prompt_tokens,
+                                               completion_tokens, reasoning_tokens)
+
+                # 检查其他可能的 usage 位置（如 Kimi 将 usage 放在 choice 中，可能是 dict 或对象）
                 if hasattr(choice, 'usage') and choice.usage:
-                    total_tokens = choice.usage.get('total_tokens', total_tokens)
-                    prompt_tokens = choice.usage.get('prompt_tokens', prompt_tokens)
-                    completion_tokens = choice.usage.get('completion_tokens', completion_tokens)
-                    reasoning_tokens = choice.usage.get('reasoning_tokens', reasoning_tokens)
-                   
+                    total_tokens, prompt_tokens, completion_tokens, reasoning_tokens = \
+                        self._extract_usage_tokens(choice.usage, total_tokens, prompt_tokens,
+                                                   completion_tokens, reasoning_tokens)
+
             # 将工具调用列表转换为 ToolCall 对象
             tool_calls = self._convert_tool_calls_list(tool_calls_list)
-            
+
             return LLMResponse(
                 is_interrupted=is_interrupted,
                 content=full_content, 
