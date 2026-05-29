@@ -120,3 +120,6 @@ tmpclaude-*/
 # 本机打包记录（独属于当前打包服务器，不纳入版本管理）
 version-history.csv
 versions.json
+
+# Understand-Anything 知识图谱产物（本地分析用，不纳入版本管理）
+.understand-anything/
